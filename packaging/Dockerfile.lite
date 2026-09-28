@@ -1,0 +1,18 @@
+# crabSDR Lite – kleinstes Laufzeit-Image für Pi/Odroid & Co.: Alpine, nur RTL-SDR (rtl_sdr, rtl_tcp), keine Decoder-Werkzeuge.
+#   docker buildx build -f packaging/Dockerfile.lite --platform linux/amd64,linux/arm64,linux/arm/v7 -t crabsdr:lite .
+# Das Binary ist statisch (musl) und läuft ohne weitere Bibliotheken; libusb kommt nur für rtl_sdr mit.
+FROM alpine:3.20
+ARG TARGETARCH
+RUN apk add --no-cache rtl-sdr ca-certificates tzdata
+COPY dist/bin/ /tmp/bin/
+RUN A="$TARGETARCH"; [ "$A" = arm ] && A=armv7; install -m 755 /tmp/bin/$A/crabsdr-server /usr/local/bin/crabsdr-server && rm -rf /tmp/bin
+COPY web/ /opt/crabsdr/web/
+COPY packaging/config.example.toml /opt/crabsdr/config.example.toml
+COPY packaging/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY LICENSE /opt/crabsdr/LICENSE
+RUN mkdir -p /opt/crabsdr/plugins /data && chmod +x /usr/local/bin/docker-entrypoint.sh
+ENV CRABSDR_CONFIG=/data/config.toml RUST_LOG=info
+EXPOSE 8080
+VOLUME /data
+HEALTHCHECK --interval=60s --timeout=5s CMD ["wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/bandinfo.js"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

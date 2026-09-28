@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Digital · crabSDR</title>
+<meta name="description" content="Was die Decoder des WebSDR empfangen: APRS, FT8, SSTV und die Reichweite der Station.">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f6f7f8" media="(prefers-color-scheme: light)">
+<link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../ui.css?v=35">
+<link rel="stylesheet" href="../pages.css?v=1">
+<link rel="stylesheet" href="vendor/maplibre-gl.css?v=3.6.2">
+<link rel="stylesheet" href="digi.css?v=11">
+<link rel="stylesheet" href="../account.css?v=1">
+<script>
+// Einstellungen der Vorversion übernehmen (Schlüssel gartow_… und 1xx_… werden zu crab_…)
+(function(){try{var L=localStorage,k=['theme','view','wf','lang','snap','sticky','chat','chatw','chath','dec','grid','aprs_mode'],m={'1xx_band':'crab_band','1xx_bands':'crab_bands','1xx_sq_fm':'crab_sq_fm'};k.forEach(function(x){m['gartow_'+x]='crab_'+x});for(var o in m)if(L.getItem(m[o])===null&&L.getItem(o)!==null)L.setItem(m[o],L.getItem(o))}catch(e){}})();
+(function(){var t=null;try{t=localStorage.getItem('crab_theme')}catch(e){}
+var h=document.documentElement;if(t==='dark'||t==='light')h.setAttribute('data-theme',t);
+function sys(){if(!h.getAttribute('data-theme'))h.classList.toggle('sysdark',window.matchMedia('(prefers-color-scheme: dark)').matches)}
+sys();window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',sys);})();
+</script>
+</head>
+<body class="digi" data-page="Digital">
+
+<header class="top">
+  <div class="brand">
+    <img class="logo" src="../logo.svg" alt="">
+    <div>
+      <h1><span data-station="name">WebSDR</span> <span>Digital</span></h1>
+      <p class="sub"><span data-station="sub"></span></p>
+    </div>
+  </div>
+  <div class="topright">
+    <nav class="tabs"><a href="../" class="btn">Hören</a><a href="./" class="btn active" data-feature="digital">Digital</a><a href="../logbuch/" class="btn" data-feature="logbook">Logbuch</a><a href="../info/" class="btn" data-feature="info">Info</a></nav>
+    <button id="gridbtn" class="btn btn-ghost" type="button" title="Locator-Raster ein/aus">Locator</button>
+    <button id="themebtn" class="btn btn-ghost btn-icon" type="button" title="Hell / Dunkel">◐</button>
+  </div>
+</header>
+
+<nav class="bands" id="dectabs"></nav>
+
+<section class="digi-main">
+  <div class="card card-map"><div id="map"></div>
+    <div class="seg aprsonly" id="aprsmode" role="group" aria-label="Empfangsweg">
+      <button type="button" data-m="direct" title="Nur Stationen und Pakete, die die Station selbst über die Luft empfangen hat">direkt empfangen</button>
+      <button type="button" data-m="all" title="Auch Pakete, die über einen Digipeater weitergereicht wurden">alle, auch über Digi</button>
+    </div>
+    <div class="seg rwonly" role="group" aria-label="Reichweite teilen">
+      <button type="button" id="rwpng" title="Karte mit Legende als PNG speichern (am Handy: direkt teilen)">📷 Bild speichern</button>
+      <button type="button" id="rwlink" title="Link zu dieser Ansicht teilen">🔗 Link teilen</button>
+    </div></div>
+  <div class="card card-stations">
+    <h3><span id="sttitle">Stationen</span> <span class="muted" id="stcount"></span></h3>
+    <div id="stations" class="stations"><span class="muted">lädt…</span></div>
+  </div>
+  <div class="card card-packets">
+    <h3><span id="pktitle">Pakete</span> <span class="muted" id="pkcount"></span></h3>
+    <div id="packets" class="packets"><span class="muted">lädt…</span></div>
+  </div>
+</section>
+
+<section class="gallery" id="gallery" hidden>
+  <div class="card"><h3>Bilder <span class="muted" id="galcount"></span></h3><div id="galgrid" class="galgrid"><span class="muted">lädt…</span></div></div>
+</section>
+<div id="lightbox" class="lightbox" hidden>
+  <button class="lb-x" id="lbclose" type="button" aria-label="Schließen">✕</button>
+  <button class="lb-nav lb-prev" id="lbprev" type="button" aria-label="Zurück">‹</button>
+  <img id="lbimg" alt="">
+  <button class="lb-nav lb-next" id="lbnext" type="button" aria-label="Weiter">›</button>
+  <div class="lb-info" id="lbinfo"></div>
+</div>
+
+<footer class="foot">
+  <div class="status" id="status">Stand –</div>
+  <div class="about"><p>Nur Empfang. Die Decoder hören auf denselben Empfängern wie das WebSDR mit.</p></div>
+</footer>
+
+<script>(function(){var t=null;try{t=localStorage.getItem('crab_token')}catch(e){}document.write('<script src="../bandinfo.js?_=' + Date.now() + (t ? '&token=' + encodeURIComponent(t) : '') + '"><\/script>');})();</script>
+<script src="../common.js?v=2"></script>
+<script src="vendor/maplibre-gl.js?v=3.6.2"></script>
+<script src="digi.js?v=20"></script>
+<script src="../account.js?v=1"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+# crabSDR mit einem RTL-SDR-Stick:  docker compose up -d   →  http://<rechner>:8080
+# Vorher auf dem Wirt das DVB-Treibermodul sperren (sonst belegt der Kernel den Stick):
+#   echo 'blacklist dvb_usb_rtl28xxu' | sudo tee /etc/modprobe.d/rtl-sdr-blacklist.conf && sudo modprobe -r dvb_usb_rtl28xxu
+services:
+  crabsdr:
+    image: crabsdr:latest              # oder crabsdr:lite (nur RTL-SDR, kleiner)
+    build: { context: .., dockerfile: packaging/Dockerfile }
+    restart: unless-stopped
+    ports: ["8080:8080"]
+    volumes: ["./data:/data"]           # config.toml, Datenbank; beim ersten Start wird die Beispielkonfiguration angelegt
+    devices: ["/dev/bus/usb:/dev/bus/usb"]   # USB-Durchreichung für die Sticks
+    # Beim ersten Start steht das Admin-Passwort im Log:  docker compose logs | grep "Admin password"

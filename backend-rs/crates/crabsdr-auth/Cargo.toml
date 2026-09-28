@@ -1,0 +1,15 @@
+[package]
+name = "crabsdr-auth"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+rusqlite = { version = "0.32", features = ["bundled"] }
+bcrypt = "0.16"
+jsonwebtoken = "9"
+uuid = { version = "1", features = ["v4"] }
+getrandom = "0.2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }

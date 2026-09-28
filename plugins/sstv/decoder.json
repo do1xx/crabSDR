@@ -1,0 +1,8 @@
+{
+  "name": "sstv",
+  "label": "SSTV",
+  "description": "SSTV-Bilder (Martin, Scottie, Robot 36/72, PD 50–290, ISS = PD 120) mit eigenem numpy-Decoder",
+  "input": { "kind": "audio", "mode": "fm", "rate": 24000, "bandwidth": 12500, "level": "raw" },
+  "command": ["python3", "sstv.py"],
+  "requires": ["python3"]
+}

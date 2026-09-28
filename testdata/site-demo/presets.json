@@ -1,0 +1,7 @@
+[
+  {"band": "2m", "label": "Anruf FM", "label_en": "FM calling", "freq": 145500, "mode": "fm"},
+  {"band": "2m", "label": "APRS", "label_en": "APRS", "freq": 144800, "mode": "fm"},
+  {"band": "2m", "label": "SSB-Anruf", "label_en": "SSB calling", "freq": 144300, "mode": "usb"},
+  {"band": "70cm-oben", "label": "Relais 438,700", "label_en": "Repeater 438.700", "freq": 438700, "mode": "fm"},
+  {"band": "freenet", "label": "Freenet K1", "label_en": "Freenet ch 1", "freq": 149025, "mode": "fm"}
+]

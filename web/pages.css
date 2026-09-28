@@ -1,0 +1,16 @@
+/* Unterseiten (Digital, Logbuch, Info): Ergänzungen zu ui.css */
+.x1banner { padding: 6px 16px; font-size: 12px; background: var(--accent-dim); color: var(--text); border-bottom: 1px solid var(--line2); }
+.x1links { display: flex; gap: 14px; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; margin: 8px 0 0; }
+.x1links a { color: var(--muted); } .x1links a:hover { color: var(--accent); }
+.info-main { max-width: 900px; margin: 0 auto; padding: 10px 16px 30px; }
+.info-main h2 { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin: 26px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--line2); }
+.info-main h2:first-child { margin-top: 8px; }
+.info-main p { margin: 6px 0; line-height: 1.7; }
+.info-main ul { margin: 6px 0 6px 18px; padding: 0; line-height: 1.7; }
+.info-main li b { color: var(--strong); }
+.facts { display: grid; grid-template-columns: max-content 1fr; gap: 3px 18px; margin: 8px 0 12px; }
+.facts dt { color: var(--faint); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; padding-top: 3px; }
+.facts dd { margin: 0; color: var(--strong); line-height: 1.6; font-variant-numeric: tabular-nums; }
+.info-main .muted, .muted { color: var(--muted); }
+.info-main .ok { color: var(--accent); }
+@media (max-width: 700px) { .info-main { padding: 8px 10px 24px; } .facts { grid-template-columns: 1fr; gap: 0; } .facts dd { margin-bottom: 6px; } }

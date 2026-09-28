@@ -1,0 +1,41 @@
+# Pakete bauen: statische musl-Binaries (amd64, arm64, armv7), Release-Archiv und Docker-Images (voll + Lite).
+# Nur manuell oder per Tag; Images werden nur gebaut, nicht veröffentlicht (push: false), bis eine Registry eingerichtet ist.
+name: pakete
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+jobs:
+  binaries:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Statische Binaries (musl, drei Architekturen)
+        run: for a in amd64 arm64 armv7; do sh packaging/build-binaries.sh $a; done
+      - name: Release-Archiv
+        run: sh packaging/make-release.sh "${GITHUB_REF_NAME#v}"
+      - uses: actions/upload-artifact@v4
+        with: { name: crabsdr-release, path: "dist/*.tar.gz", retention-days: 14 }
+      - uses: actions/upload-artifact@v4
+        with: { name: crabsdr-bin, path: dist/bin, retention-days: 3 }
+  images:
+    needs: binaries
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        variant: [{ name: full, file: packaging/Dockerfile }, { name: lite, file: packaging/Dockerfile.lite }]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: crabsdr-bin, path: dist/bin }
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.variant.file }}
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: false
+          tags: crabsdr:${{ matrix.variant.name }}

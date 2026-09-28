@@ -1,0 +1,12 @@
+[package]
+name = "crabsdr-dsp"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+crabsdr-core = { workspace = true }
+rustfft = { workspace = true }
+num-complex = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]

@@ -1,0 +1,14 @@
+/* Anmelde-Dialog (account.js) */
+.acct-back { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.acct-box { width: min(380px, 100%); background: var(--bg, #0b0c10); color: var(--text, #e5e7eb); border: 1px solid var(--line2, #333); border-radius: 6px; padding: 14px 16px 16px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+.acct-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.acct-head b { font-size: 14px; letter-spacing: .04em; }
+.acct-form { display: flex; flex-direction: column; gap: 10px; }
+.acct-field { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--muted, #9ca3af); }
+.acct-field input { font: inherit; font-size: 14px; padding: 8px 10px; border-radius: 4px; border: 1px solid var(--line, #444); background: transparent; color: var(--text, #e5e7eb); }
+.acct-field input:focus { outline: none; border-color: var(--accent, #34d399); }
+.acct-msg { min-height: 1em; font-size: 12px; color: #f87171; }
+.acct-note { margin: 0; font-size: 11px; color: var(--muted, #9ca3af); line-height: 1.5; }
+.acct-menu { display: flex; flex-direction: column; gap: 8px; }
+.acct-menu .btn { text-align: center; text-decoration: none; }
+.acct-btn { white-space: nowrap; }

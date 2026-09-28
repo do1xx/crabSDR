@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>{{STATION_NAME}}</title>
+<meta name="description" content="{{STATION_SUB}}">
+<meta name="theme-color" content="#121316" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f3f4f6" media="(prefers-color-scheme: light)">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="{{STATION_NAME}}">
+<link rel="stylesheet" href="ui.css?v=38">
+<link rel="stylesheet" href="account.css?v=1">
+<script>
+// Einstellungen der Vorversion übernehmen (Schlüssel gartow_… und 1xx_… werden zu crab_…)
+(function(){try{var L=localStorage,k=['theme','view','wf','lang','snap','sticky','chat','chatw','chath','dec','grid','aprs_mode'],m={'1xx_band':'crab_band','1xx_bands':'crab_bands','1xx_sq_fm':'crab_sq_fm'};k.forEach(function(x){m['gartow_'+x]='crab_'+x});for(var o in m)if(L.getItem(m[o])===null&&L.getItem(o)!==null)L.setItem(m[o],L.getItem(o))}catch(e){}})();
+(function(){var t=null;try{t=localStorage.getItem('crab_theme')}catch(e){}
+var h=document.documentElement;if(t==='dark'||t==='light')h.setAttribute('data-theme',t);
+function sys(){if(!h.getAttribute('data-theme'))h.classList.toggle('sysdark',window.matchMedia('(prefers-color-scheme: dark)').matches)}
+sys();window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',sys);
+// Alle WebSockets merken (window.__gws), damit ui.js sie beim Einfrieren/Verlassen der Seite schließen kann.
+window.__gws=[];
+if(window.WebSocket){var W=window.WebSocket;var P=function(u,p){var w=p!==undefined?new W(u,p):new W(u);window.__gws.push(w);return w;};
+P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOSING;P.CLOSED=W.CLOSED;window.WebSocket=P;}})();
+</script>
+<script>(function(){var t=null;try{t=localStorage.getItem('crab_token')}catch(e){}document.write('<script src="bandinfo.js?_=' + Date.now() + (t ? '&token=' + encodeURIComponent(t) : '') + '"><\/script>');})();</script>
+<script>window.STATION_NAME = '{{STATION_NAME_JS}}';</script>
+<script src="core.js?v=60"></script>
+</head>
+<body class="hoeren">
+
+<header class="top">
+  <div class="brand">
+    <img class="logo" src="logo.svg" alt="">
+    <div>
+      <h1>{{STATION_NAME_HTML}}</h1>
+      <p class="sub">{{STATION_SUB}}</p>
+    </div>
+  </div>
+  <div class="topright">
+    <button id="audiobtn" class="btn btn-accent audio-btn" type="button" data-de="🔊 Ton einschalten" data-en="🔊 Start audio">🔊 Ton einschalten</button>
+    <input id="myname" class="myname" type="text" maxlength="20" autocomplete="off" data-ph-de="Dein Name / Call" data-ph-en="Your name / call" placeholder="Dein Name / Call">
+    <span class="users" title="Hörer gerade online"><span id="numusers">–</span> <span data-de="Hörer" data-en="listeners">Hörer</span></span>
+    <button id="chatbtn" class="btn btn-ghost chatbtn" type="button" title="Chat mit den anderen Hörern">Chat<b id="chatbadge" hidden></b></button>
+    <nav class="tabs"><a href="./" class="btn active">Hören</a><a href="digi/" class="btn" data-feature="digital">Digital</a><a href="logbuch/" class="btn" data-feature="logbook" data-de="Logbuch" data-en="Logbook">Logbuch</a><a href="info/" class="btn" data-feature="info">Info</a></nav>
+    <button id="themebtn" class="btn btn-ghost btn-icon" type="button" title="Hell / Dunkel">◐</button>
+    <button id="langbtn" class="btn btn-ghost" type="button" title="Sprache / Language">EN</button>
+  </div>
+</header>
+
+<nav class="bands" id="bandbar"></nav>
+
+<!-- Empfänger: 1024 px breit, wird per CSS-Transform auf die verfügbare Breite skaliert (ui.js).
+     Struktur und IDs innerhalb von .rx erwartet core.js (Wasserfälle, Skala, Passband). -->
+<main class="main" id="main">
+<section class="rx-host">
+  <div class="rx-wrap" id="rxwrap">
+    <div class="rx" id="rx">
+      <div id="dummyforie"></div>
+      <div style="position:relative">
+        <div id="test"></div>
+        <div id="waterfalls"></div>
+        <div class="hideblind">
+          <img src="edge-lo.svg" title="Filterkante ziehen" id="edgelower" onmousedown="dragEdgeLo(event)" class="scaleabs" alt="">
+          <img src="edge-hi.svg" title="Filterkante ziehen" id="edgeupper" onmousedown="dragEdgeHi(event)" class="scaleabs" alt="">
+          <div id="yellowbara">
+            <div id="yellowbar" title="ziehen zum Abstimmen" class="scaleabs" style="position:absolute;width:100px;height:18px;background-color:transparent" onmousedown="dragPassband(event)">
+              <div id="yellowbarr" class="scaleabs" style="position:relative;left:0px;">
+                <div class="scaleabs" style="position:absolute;width:0px;height:0px;"></div>
+              </div>
+            </div>
+            <img src="carrier.svg" title="ziehen zum Abstimmen" id="carrier" onmousedown="dragPassband(event)" class="scaleabs" style="z-index:2" alt="">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="scales" id="scales"></div>
+    <div class="lmarks" id="lmarks"></div>
+  </div>
+</section>
+
+
+</main>
+
+<section class="panel">
+  <div class="strip">
+    <div class="grp grp-freq">
+      <div class="freq-mhz" id="freqmhz">–</div>
+      <form name="freqform" action="#" onsubmit="setFreqText(this.frequency.value); return false;" class="freqform">
+        <input type="text" name="frequency" inputmode="decimal" autocomplete="off" onkeyup="setFreqTextLater(this.value);" aria-label="Frequenz in kHz"><span class="unit">kHz</span>
+        <input type="submit" class="offscreen" value="ok">
+        <span class="offscreen" id="bandradios"></span>
+      </form>
+      <div class="steps">
+        <button class="btn adv" type="button" onclick="freqStep(-3)" title="großer Schritt runter">−−−</button>
+        <button class="btn adv" type="button" onclick="freqStep(-2)">−−</button>
+        <button class="btn" type="button" onclick="freqStep(-1)" title="Schritt runter">−</button>
+        <button class="btn" type="button" onclick="freqStep(1)" title="Schritt hoch">+</button>
+        <button class="btn adv" type="button" onclick="freqStep(2)">++</button>
+        <button class="btn adv" type="button" onclick="freqStep(3)" title="großer Schritt hoch">+++</button>
+        <button class="btn btn-ghost sharebtn" id="linkbtn" type="button" title="Link zu dieser Frequenz teilen">🔗 <span data-de="Teilen" data-en="Share">Teilen</span></button>
+      </div>
+      <div class="presetrow"><select id="presets" class="presetsel" aria-label="Schnellwahl"></select><button class="btn" type="button" id="flistbtn" title="Relais und Frequenzen, die hier zu hören sind" data-de="Liste" data-en="List">Liste</button></div>
+      <div class="vfo adv">
+        <button class="btn" type="button" id="vfoab" title="VFO A/B tauschen">A/B</button>
+        <button class="btn" type="button" id="vfoaeqb" title="B = aktuelle Einstellung">A=B</button>
+        <button class="btn" type="button" id="dot0" title="auf ganze kHz runden">.0</button>
+        <button class="btn" type="button" id="memstore" data-de="Merken" data-en="Store">Merken</button>
+      </div>
+      <div id="memSlots" class="memSlots adv"></div>
+      <label class="snap adv"><span data-de="Raster" data-en="Step grid">Raster</span>
+        <select id="snapsel">
+          <option value="0" data-de="aus" data-en="off">aus</option>
+          <option value="5">5 kHz</option>
+          <option value="6.25">6,25 kHz</option>
+          <option value="10">10 kHz</option>
+          <option value="12.5">12,5 kHz</option>
+          <option value="25">25 kHz</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="grp grp-mode">
+      <span class="lbl" data-de="Betriebsart" data-en="Mode">Betriebsart</span>
+      <div class="modes" id="modes">
+        <button class="btn" type="button" data-mode="FM"  onclick="setMode('fm',-6,6)">FM</button>
+        <button class="btn" type="button" data-mode="AM"  onclick="setMode('am',-4,4)">AM</button>
+        <button class="btn" type="button" data-mode="USB" onclick="setMode('usb',0.3,2.7)">USB</button>
+        <button class="btn" type="button" data-mode="LSB" onclick="setMode('lsb',-2.7,-0.3)">LSB</button>
+        <button class="btn" type="button" data-mode="CW"  onclick="setMode('cw',-0.95,-0.55)">CW</button>
+      </div>
+      <div class="toggles">
+        <label class="toggle"><input id="squelchcheckbox" type="checkbox" onclick="setSquelch(this.checked)"><span>Squelch</span></label>
+        <label class="toggle adv"><input id="autonotchcheckbox" type="checkbox" onclick="setAutoNotch(this.checked)"><span>Notch</span></label>
+        <label class="toggle"><input id="mutecheckbox" type="checkbox" onclick="setMute(this.checked)"><span data-de="Stumm" data-en="Mute">Stumm</span></label>
+      </div>
+    </div>
+
+    <div class="grp grp-bw">
+      <span class="lbl" data-de="Bandbreite" data-en="Bandwidth">Bandbreite</span>
+      <div class="bw">
+        <button class="btn" type="button" onclick="lo+=0.03125; hi-=0.03125; updateBw();" title="schmaler">−</button>
+        <span class="bwval"><span id="numericalbandwidth6">?</span> kHz</span>
+        <button class="btn" type="button" onclick="lo-=0.03125; hi+=0.03125; updateBw();" title="breiter">+</button>
+      </div>
+      <div class="bwpresets" id="bwpresets"></div>
+    </div>
+
+    <div class="grp grp-sig">
+      <span class="lbl">Signal</span>
+      <div class="smeter">
+        <div class="smeter-scale">
+          <span style="left:3.3%">S1</span><span style="left:13.3%">S3</span><span style="left:23.3%">S5</span><span style="left:33.3%">S7</span>
+          <span style="left:43.3%">S9</span><span style="left:60%">+20</span><span style="left:76.7%">+40</span><span style="left:93.3%">+60</span>
+        </div>
+        <div class="smeter-track"><div class="smeter-peak" id="gpeak"></div><div class="smeter-fill" id="gfill"></div></div>
+        <div class="smeter-num" title="S-Stufen nach IARU Region 1 für VHF/UHF: S9 = −93 dBm, 6 dB je Stufe"><b id="gsunit">–</b> <span id="gdbm">–</span> dBm</div>
+      </div>
+      <div class="adv sgraphrow"><label><span data-de="Verlauf" data-en="Plot">Verlauf</span>
+        <select id="sgraphchoice"><option value="0" selected data-de="aus" data-en="off">aus</option><option value="1" data-de="schnell" data-en="fast">schnell</option><option value="10" data-de="langsam" data-en="slow">langsam</option></select></label>
+        <canvas id="sgraph" class="sgraph" style="display:none"></canvas></div>
+      <div class="adv recrow"><span data-de="Aufnahme" data-en="Recording">Aufnahme</span>
+        <span id="record_span"><button id="recbutton" class="btn" onclick="recClick(); return false">start</button> <span id="reccontrol"></span><div id="recwarning" class="hint" style="display:none">Browser unterstützt das Herunterladen der Aufnahme nicht.</div></span></div>
+    </div>
+
+    <div class="grp grp-vol">
+      <span class="lbl" data-de="Lautstärke" data-en="Volume">Lautstärke</span>
+      <span id="volumecontrol" class="volrow">🔈<input type="range" min="-20" max="6" id="volumecontrol2" name="volume" value="0" step="1"
+        oninput="crabAudio.setvolume(Math.pow(10,this.value/10.))"
+        onchange="crabAudio.setvolume(Math.pow(10,this.value/10.))">🔊</span>
+      <div class="recbox"><button id="recbtn" class="btn recbtn" type="button" title="Ton aufnehmen und als WAV-Datei speichern">● <span data-de="Aufnahme" data-en="Record">Aufnahme</span></button><span id="reclink"></span></div>
+    </div>
+
+    <div class="grp grp-wf">
+      <span class="lbl" data-de="Wasserfall" data-en="Waterfall">Wasserfall</span>
+      <div class="wfbtns">
+        <button class="btn" type="button" onclick="setZoom(1)" title="Zoom raus">−</button>
+        <button class="btn" type="button" onclick="setZoom(0)" title="Zoom rein">+</button>
+        <button class="btn" type="button" onclick="setZoom(4)" data-de="ganzes Band" data-en="whole band">ganzes Band</button>
+        <button class="btn adv" type="button" onclick="setZoom(2)" data-de="max. Zoom" data-en="max zoom">max. Zoom</button>
+      </div>
+      <div class="viewsel">
+        <label class="toggle"><input id="allbandschk" type="checkbox"><span data-de="Alle Bänder zeigen" data-en="Show all bands">Alle Bänder zeigen</span></label>
+        <label class="toggle onlyall"><input id="stickychk" type="checkbox"><span data-de="Aktives oben festhalten" data-en="Keep active on top">Aktives oben festhalten</span></label>
+      </div>
+      <div class="wfsel adv">
+        <label><span data-de="Tempo" data-en="Speed">Tempo</span>
+          <select id="wfspeed" onchange="setWfSpeed(this.value)">
+            <option value="4" data-de="langsam" data-en="slow">langsam</option>
+            <option value="2" selected data-de="mittel" data-en="medium">mittel</option>
+            <option value="1" data-de="schnell" data-en="fast">schnell</option>
+          </select></label>
+        <label><span data-de="Höhe" data-en="Height">Höhe</span>
+          <select id="wfsize">
+            <option selected value="auto" data-de="Bildschirm füllen" data-en="fill screen">Bildschirm füllen</option>
+            <option value="50" data-de="klein" data-en="small">klein</option>
+            <option value="100" data-de="mittel" data-en="medium">mittel</option>
+            <option value="200" data-de="groß" data-en="large">groß</option>
+          </select></label>
+        <label><span data-de="Ansicht" data-en="View">Ansicht</span>
+          <select id="wfmode" onchange="setWfMode(this.value)">
+            <option value="0" data-de="Spektrum" data-en="spectrum">Spektrum</option>
+            <option selected value="1" data-de="Wasserfall" data-en="waterfall">Wasserfall</option>
+            <option value="2" data-de="schwache Signale" data-en="weak signals">schwache Signale</option>
+            <option value="3" data-de="starke Signale" data-en="strong signals">starke Signale</option>
+          </select></label>
+      </div>
+      <div class="wflevel adv">
+        <label><span data-de="Helligkeit" data-en="Brightness">Helligkeit</span><input type="range" id="wfbright" min="0.4" max="2.5" step="0.05" value="1"></label>
+        <label><span data-de="Kontrast" data-en="Contrast">Kontrast</span><input type="range" id="wfcontrast" min="0.4" max="2.5" step="0.05" value="1"></label>
+        <div class="wfopts"><button class="btn" type="button" id="wfreset" data-de="Standard" data-en="Default">Standard</button></div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<footer class="foot">
+  <div class="status" id="status"><span data-de="Status wird geladen…" data-en="Loading status…">Status wird geladen…</span></div>
+</footer>
+
+<!-- Chat-Einblendung (eigener Dienst /logbuch/api, unabhängig vom WebSDR) -->
+<aside class="chatdrawer" id="chatdrawer" hidden>
+  <div class="chatgrip" title="Ziehen: Größe ändern"></div>
+  <div class="chathead"><b>Chat</b> <small data-de="mit den anderen Hörern" data-en="with the other listeners">mit den anderen Hörern</small><button class="btn btn-ghost btn-icon" id="chatclose" type="button" aria-label="Schließen">✕</button></div>
+  <div id="chatlist" class="chatlist"><span class="muted" data-de="lädt…" data-en="loading…">lädt…</span></div>
+  <form id="chatform" class="chatform" action="#">
+    <input type="text" name="chatname" class="chatname" maxlength="20" autocomplete="off" data-ph-de="Name / Call" data-ph-en="Name / call" placeholder="Name / Call" hidden>
+    <button class="btn btn-ghost btn-icon" type="button" id="chathere" title="Meine Frequenz einfügen" aria-label="Meine Frequenz einfügen">📍</button>
+    <input type="text" name="chat" maxlength="200" autocomplete="off" data-ph-de="Nachricht an alle Hörer…" data-ph-en="Message to all listeners…" placeholder="Nachricht an alle Hörer…">
+    <button class="btn btn-accent" type="submit" data-de="Senden" data-en="Send">Senden</button>
+  </form>
+</aside>
+
+<!-- Frequenzliste: Relais (eigene Liste + per APRS gehört) und Marker -->
+<div class="keyhelp flist" id="flist" hidden>
+  <div class="keyhelp-box flist-box" role="dialog" aria-label="Frequenzliste">
+    <div class="flist-head"><b data-de="Relais und Frequenzen" data-en="Repeaters and frequencies">Relais und Frequenzen</b>
+      <button class="btn btn-ghost btn-icon" type="button" id="flistclose" aria-label="Schließen">✕</button></div>
+    <p class="hint" data-de="Klick stimmt ab." data-en="Click to tune.">Klick stimmt ab.</p>
+    <div class="flist-scroll"><table class="flist-table"><thead><tr>
+      <th>MHz</th><th data-de="Rufzeichen" data-en="Call">Rufzeichen</th><th data-de="Info" data-en="Info">Info</th><th data-de="Ablage" data-en="Shift">Ablage</th><th data-de="Ton" data-en="Tone">Ton</th><th>km</th><th data-de="Quelle" data-en="Source">Quelle</th>
+    </tr></thead><tbody id="flistbody"></tbody></table></div>
+  </div>
+</div>
+
+<!-- Tastatur-Hilfe (Taste ?) -->
+<div class="keyhelp" id="keyhelp" hidden>
+  <div class="keyhelp-box" role="dialog" aria-label="Tastatur">
+    <b data-de="Tastatur" data-en="Keyboard">Tastatur</b>
+    <dl>
+      <dt>← →</dt><dd data-de="abstimmen (mit Umschalt: größere Schritte)" data-en="tune (shift: bigger steps)">abstimmen (mit Umschalt: größere Schritte)</dd>
+      <dt>1 … 5</dt><dd data-de="Band wählen" data-en="select band">Band wählen</dd>
+      <dt>B</dt><dd data-de="nächstes Band" data-en="next band">nächstes Band</dd>
+      <dt>F A U L C</dt><dd data-de="FM · AM · USB · LSB · CW" data-en="FM · AM · USB · LSB · CW">FM · AM · USB · LSB · CW</dd>
+      <dt>+ −</dt><dd data-de="Wasserfall zoomen" data-en="zoom waterfall">Wasserfall zoomen</dd>
+      <dt>Z</dt><dd data-de="ganzes Band" data-en="whole band">ganzes Band</dd>
+      <dt>M</dt><dd data-de="stumm an/aus" data-en="mute on/off">stumm an/aus</dd>
+      <dt>G</dt><dd data-de="Frequenz eingeben" data-en="enter frequency">Frequenz eingeben</dd>
+      <dt>R</dt><dd data-de="Aufnahme starten/stoppen" data-en="start/stop recording">Aufnahme starten/stoppen</dd>
+      <dt>T</dt><dd data-de="Chat öffnen und schreiben" data-en="open chat and type">Chat öffnen und schreiben</dd>
+      <dt>P</dt><dd data-de="Relais- und Frequenzliste" data-en="repeater and frequency list">Relais- und Frequenzliste</dd>
+      <dt>?</dt><dd data-de="diese Hilfe" data-en="this help">diese Hilfe</dd>
+    </dl>
+    <button class="btn" type="button" id="keyhelpclose" data-de="Schließen" data-en="Close">Schließen</button>
+  </div>
+</div>
+
+<!-- Feste Bedienleiste für Smartphones (nur unter 700 px sichtbar) -->
+<div class="mbar" id="mbar">
+  <button class="mfreq" id="mfreq" type="button" title="Frequenz eingeben">–</button>
+  <select class="mmode" id="mmode" aria-label="Betriebsart">
+    <option value="fm">FM</option><option value="am">AM</option><option value="usb">USB</option><option value="lsb">LSB</option><option value="cw">CW</option>
+  </select>
+  <button class="btn" type="button" onclick="setZoom(1)" aria-label="Zoom raus">−</button>
+  <button class="btn" type="button" onclick="setZoom(0)" aria-label="Zoom rein">+</button>
+  <button class="btn btn-accent audio-btn" id="maudio" type="button" aria-label="Ton einschalten">🔊</button>
+  <div class="mmeter"><div class="smeter-fill" id="mfill"></div></div>
+</div>
+
+<!-- Unsichtbare Felder: Hörername (Cookie) und Zähler, die core.js füllt -->
+<div class="hidden-fields" aria-hidden="true">
+  <form name="usernameform" action="#"><input type="text" name="username" value="Hörer" onchange="saveName()"></form>
+  <div id="stats"></div><div id="users"></div>
+</div>
+</div>
+
+<script src="ui.js?v=54"></script>
+<script src="account.js?v=1"></script>
+</body>
+</html>

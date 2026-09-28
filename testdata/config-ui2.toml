@@ -1,0 +1,56 @@
+# Testkonfiguration für die Schalter in [ui] (tools/e2e/features.spec.mjs): ohne Stationsordner, Chat aus, Banner.
+port = 8083
+frontend_dir = "web"
+plugin_dir = "plugins"
+data_dir = "testdata/data-ui2"
+
+[station]
+name = "Teststation"
+subtitle = "ohne Stationsordner"
+
+[ui]
+chat = false
+banner = "Wartung heute ab 20 Uhr"
+impressum = "https://example.org/impressum"
+
+# Quellen: tools/phase0/iqplay.py spielt .cu8-Dateien als rtl_tcp ab (Ports 7901, 7903, 7905), siehe tools/e2e/README.md
+[[bands]]
+id = "2m"
+label = "2 m"
+driver = "rtl_tcp"
+port = 7901
+center_freq = 145025000
+gain = 12.0
+mode = "fm"
+
+[[bands]]
+id = "freenet"
+label = "Freenet"
+driver = "rtl_tcp"
+port = 7901
+center_freq = 149025000
+gain = 29.7
+
+[[bands]]
+id = "70cm-mitte"
+label = "70 cm SSB"
+driver = "rtl_tcp"
+port = 7903
+center_freq = 433200000
+gain = 29.7
+
+[[bands]]
+id = "70cm-oben"
+label = "70 cm Relais"
+driver = "rtl_tcp"
+port = 7903
+center_freq = 438500000
+gain = 40.2
+
+[[bands]]
+id = "10ghz"
+label = "3 cm"
+driver = "rtl_tcp"
+port = 7905
+center_freq = 10368000000
+gain = 29.7

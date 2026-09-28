@@ -1,0 +1,15 @@
+[package]
+name = "crabsdr-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+serde_ignored = "0.1"
+thiserror = { workspace = true }
+tracing = { workspace = true }
+num-complex = { workspace = true }
+bytes = { workspace = true }
+zstd = { workspace = true }
