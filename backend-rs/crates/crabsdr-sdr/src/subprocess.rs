@@ -173,8 +173,9 @@ impl SubprocessDriver {
                                 ran_ok = true;
                             }
                             iq_send_count += 1;
-                            if iq_send_count <= 5 || iq_send_count % 5000 == 0 {
-                                info!("[{}] IQ chunk #{} ({} bytes)", sdr_label, iq_send_count, buf.len());
+                            // erster Block nach dem Start, danach etwa stündlich (8 Bit: 250 Blöcke/s, 16 Bit: 500/s)
+                            if iq_send_count == 1 || iq_send_count % 1_000_000 == 0 {
+                                info!("[{}] IQ-Block #{} ({} Bytes)", sdr_label, iq_send_count, buf.len());
                             }
                             let mut iq = to_complex(fmt, &buf);
                             if fmt != IqFormat::Cu8 && !iq.is_empty() {
