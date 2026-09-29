@@ -23,6 +23,8 @@ Eine einheitliche crabSDR-Fassung: gleiche Oberfläche für jede Station, alles 
 - Mitgeliefert: **APRS** (direwolf, mit RX-iGate zu APRS-IS, Passcode wird berechnet), **FT8** (jt9, Stationen über
   90 Tage), **SSTV** (eigener Decoder: Martin, Scottie, Robot, PD).
 - Decoder-Menü in der Bedienleiste, API `/api/decoders`, Treffer optional per **MQTT**.
+- SSTV: Sendetakt wird je Bild aus den Syncs gemessen und herausgerechnet, Sync-Kanten robust gegen Rauschen –
+  keine Farbsäume mehr bei Sendern mit Taktfehler (geprüft bis 1 %), Bild sitzt pixelgenau (`tools/sstv/sstv_test.py`).
 
 ### Empfang und Klang
 - Kanalfilter: Blockphase wird fortgesetzt – kein Pfeifton mehr auf Frequenzen außerhalb des 2-kHz-Rasters.

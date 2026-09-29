@@ -95,10 +95,34 @@ def find_vis(x, fs, f=None, start=0):
 
 
 def _sync_runs(f, fs):
-    m = (np.abs(f - 1200) < 80).astype(np.int8)   # Sync 1200 Hz; 1100/1300 (VIS-Bits) und 1500 (Schwarz) bleiben draußen
+    """Sync-Impulse (1200 Hz): Anfang und Ende je Impuls. Mit Rauschen zerfällt ein Impuls in Stücke, und die Kante
+    käme dann zu spät (Scottie bis 3 ms = 7 Pixel, 29.09.). Deshalb: auf 1 ms geglättet suchen, Lücken unter 1 ms
+    schließen, die Kante dann genau auf halber Höhe des Frequenzsprungs bestimmen (bei symmetrischer Glättung
+    ohne Versatz)."""
+    ms = fs / 1000.0
+    k = max(3, int(ms))
+    g = np.convolve(f, np.ones(k) / k, mode="same")
+    m = (np.abs(g - 1200) < 100).astype(np.int8)   # 1100/1300 (VIS-Bits) und 1500 (Schwarz) bleiben draußen
     d = np.diff(np.concatenate(([0], m, [0])))
-    starts = np.where(d == 1)[0]; ends = np.where(d == -1)[0]
-    return starts, ends
+    starts = list(np.where(d == 1)[0]); ends = list(np.where(d == -1)[0])
+    S, E = [], []
+    for st, en in zip(starts, ends):
+        if S and st - E[-1] < ms:
+            E[-1] = en
+        else:
+            S.append(st); E.append(en)
+    # Kante: auf dem kaum geglätteten Signal f (0,3 ms) bei 1350 Hz, der Mitte zwischen Schwarz/Pause (1500) und Sync.
+    # Martin hat vor dem Sync nur 0,57 ms Pause; auf g wäre sie mit den Bildpunkten davor verschmiert (1–2 Pixel Versatz).
+    out = []
+    n = len(f)
+    for st in S:
+        i = int(st); lo = int(max(1, st - 3 * ms))
+        while i > lo and f[i - 1] <= 1350: i -= 1
+        if 0 < i < n and f[i - 1] != f[i]:
+            out.append(i - 1 + (f[i - 1] - 1350) / (f[i - 1] - f[i]))
+        else:
+            out.append(float(i))
+    return np.array(out), np.array(E, dtype=float)
 
 
 def _find_sync(starts, ends, expected, window, min_len):
@@ -149,28 +173,52 @@ def decode(x, fs, vis=None, f=None):
         first = t0 + (m["sync"] + m["sep"] + m["comp"] + m["sep"] + m["comp"]) * ms   # Sync der 1. Zeile sitzt vor Rot
     else:
         first = t0
-    expected = first; decoded = 0; last = None
+    # 1. Durchgang: Syncs der Zeilen suchen (Fenster wandert mit, verträgt Taktfehler)
+    expected = first; last = None; found = []; nrows = 0
     for row in range(rows):
         if last is None:
             s = _find_sync(starts, ends, expected + int(T * 0.3), int(T * 0.3) + int(5 * ms), sync_len * 0.5)   # erster Sync: ab VIS-Ende, nicht davor
         else:
             s = _find_sync(starts, ends, expected, int(min(T * 0.25, 40 * ms)), sync_len * 0.5)
-        if s is None: s = expected
+        if s is None:
+            s = expected
+        else:
+            found.append((row, s))
         if s + T > len(f) + 5 * ms: break
-        last = s; expected = s + T
+        last = s; expected = s + T; nrows = row + 1
+    # 2. Sendetakt messen: Gerade durch die gefundenen Syncs (Ausreißer raus). Soundkarten-Sender weichen oft einige
+    #    Promille ab; mit den Nennzeiten lägen Rot und Grün/Blau dann Pixel auseinander (Farbsäume, DF0HHH 29.09.).
+    #    Die Gerade glättet außerdem das Zittern der einzelnen Sync-Kanten.
+    k, a0 = 1.0, None
+    if len(found) >= 8:
+        r = np.array([x[0] for x in found], float); t = np.array([x[1] for x in found], float)
+        keep = np.ones(len(r), bool)
+        for _ in range(3):
+            A = np.vstack([np.ones(keep.sum()), r[keep]]).T
+            (a_, b_), *_ = np.linalg.lstsq(A, t[keep], rcond=None)
+            res = np.abs(t - (a_ + b_ * r))
+            keep = res < max(2 * ms, 3 * np.median(res[keep]) + 0.5 * ms)
+            if keep.sum() < 8: break
+        if keep.sum() >= 8 and abs(b_ / T - 1) < 0.03:
+            k, a0 = b_ / T, a_
+    msk = ms * k; Tk = T * k
+    # 3. Durchgang: Pixel lesen, Zeitpunkte aus der Geraden (sonst aus dem einzelnen Sync)
+    fd = dict(found); decoded = 0
+    for row in range(nrows):
+        s = a0 + row * Tk if a0 is not None else fd.get(row, first + row * T)
         if kind == "martin":
-            p = s + (m["sync"] + m["porch"]) * ms; step = (m["comp"] + m["gap"]) * ms
-            g = _pixels(f, p, m["comp"], W, fs); b = _pixels(f, p + step, m["comp"], W, fs); r = _pixels(f, p + 2 * step, m["comp"], W, fs)
+            p = s + (m["sync"] + m["porch"]) * msk; step = (m["comp"] + m["gap"]) * msk
+            g = _pixels(f, p, m["comp"] * k, W, fs); b = _pixels(f, p + step, m["comp"] * k, W, fs); r = _pixels(f, p + 2 * step, m["comp"] * k, W, fs)
             img[row] = np.stack([r, g, b], axis=-1)
         elif kind == "scottie":
-            r = _pixels(f, s + (m["sync"] + m["porch"]) * ms, m["comp"], W, fs)
-            b = _pixels(f, s - m["comp"] * ms, m["comp"], W, fs)
-            g = _pixels(f, s - (m["comp"] + m["sep"] + m["comp"]) * ms, m["comp"], W, fs)
+            r = _pixels(f, s + (m["sync"] + m["porch"]) * msk, m["comp"] * k, W, fs)
+            b = _pixels(f, s - m["comp"] * msk, m["comp"] * k, W, fs)
+            g = _pixels(f, s - (m["comp"] + m["sep"] + m["comp"]) * msk, m["comp"] * k, W, fs)
             img[row] = np.stack([r, g, b], axis=-1)
         elif kind == "robot36":
-            p = s + (m["sync"] + m["porch"]) * ms
-            y = _pixels(f, p, m["y"], W, fs)
-            c = _pixels(f, p + (m["y"] + m["sep"] + m["porch2"]) * ms, m["c"], W // 2, fs)
+            p = s + (m["sync"] + m["porch"]) * msk
+            y = _pixels(f, p, m["y"] * k, W, fs)
+            c = _pixels(f, p + (m["y"] + m["sep"] + m["porch2"]) * msk, m["c"] * k, W // 2, fs)
             c = np.repeat(c, 2)
             if row % 2 == 0:
                 img[row, :, 0] = y; img[row, :, 1] = c            # R-Y in Kanal 1 zwischenspeichern
@@ -178,16 +226,16 @@ def decode(x, fs, vis=None, f=None):
                 cr = img[row - 1, :, 1].copy()
                 img[row - 1] = _ycc(img[row - 1, :, 0].copy(), cr, c); img[row] = _ycc(y, cr, c)
         elif kind == "robot72":
-            p = s + (m["sync"] + m["porch"]) * ms
-            y = _pixels(f, p, m["y"], W, fs)
-            q = p + (m["y"] + m["sep"] + m["porch2"]) * ms
-            cr = np.repeat(_pixels(f, q, m["c"], W // 2, fs), 2)
-            cb = np.repeat(_pixels(f, q + (m["c"] + m["sep"] + m["porch2"]) * ms, m["c"], W // 2, fs), 2)
+            p = s + (m["sync"] + m["porch"]) * msk
+            y = _pixels(f, p, m["y"] * k, W, fs)
+            q = p + (m["y"] + m["sep"] + m["porch2"]) * msk
+            cr = np.repeat(_pixels(f, q, m["c"] * k, W // 2, fs), 2)
+            cb = np.repeat(_pixels(f, q + (m["c"] + m["sep"] + m["porch2"]) * msk, m["c"] * k, W // 2, fs), 2)
             img[row] = _ycc(y, cr, cb)
         else:   # pd: Y(gerade), R-Y, B-Y, Y(ungerade)
-            p = s + (m["sync"] + m["porch"]) * ms; step = m["comp"] * ms
-            y0 = _pixels(f, p, m["comp"], W, fs); cr = _pixels(f, p + step, m["comp"], W, fs)
-            cb = _pixels(f, p + 2 * step, m["comp"], W, fs); y1 = _pixels(f, p + 3 * step, m["comp"], W, fs)
+            p = s + (m["sync"] + m["porch"]) * msk; step = m["comp"] * msk
+            y0 = _pixels(f, p, m["comp"] * k, W, fs); cr = _pixels(f, p + step, m["comp"] * k, W, fs)
+            cb = _pixels(f, p + 2 * step, m["comp"] * k, W, fs); y1 = _pixels(f, p + 3 * step, m["comp"] * k, W, fs)
             img[2 * row] = _ycc(y0, cr, cb); img[2 * row + 1] = _ycc(y1, cr, cb)
         decoded += 1
     if decoded < rows * 0.25:
@@ -195,7 +243,8 @@ def decode(x, fs, vis=None, f=None):
     if kind == "robot36" and decoded % 2 == 1:            # letzte gerade Zeile ohne Partner
         img[decoded - 1] = _ycc(img[decoded - 1, :, 0].copy(), img[decoded - 1, :, 1].copy(), np.full(W, 128.0))
     im = Image.fromarray(img.astype(np.uint8), "RGB")
-    return m["name"], im, {"vis": vis, "lines": decoded * (2 if kind == "pd" else 1), "of": H, "t0": t0 / fs}
+    return m["name"], im, {"vis": vis, "lines": decoded * (2 if kind == "pd" else 1), "of": H, "t0": t0 / fs,
+                           "clock_ppm": round((k - 1) * 1e6)}
 
 
 def read_wav(path):
