@@ -5,7 +5,7 @@ Jeder Hörer bekommt seinen eigenen Kanal (Frequenz, Betriebsart, Bandbreite), D
 
 ```
  Stick / rtl_tcp ──IQ──►  Band-Pipeline ──►  DSP-Thread ──┬─► Wasserfall-Zeilen ─────────┐
- (je Band einer)          (Treiber, Wächter)  FFT 4096     ├─► Kanäle je Frequenz ──► Opus ├─► WebSocket /ws/<band>
+ (je Band einer)          (Treiber, Wächter)  FFT ~500 Hz  ├─► Kanäle je Frequenz ──► Opus ├─► WebSocket /ws/<band>
                                               50 Zeilen/s  │   (Hörer teilen Kanäle)       │   (Browser)
                                                            └─► Rohton ──► Decoder-Plugins ─┴─► /api/decoders, MQTT
 ```
