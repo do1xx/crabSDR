@@ -28,7 +28,9 @@ pub struct SdrInstanceConfig {
     pub gain: f64,
     #[serde(default)]
     pub ppm: i32,
-    #[serde(default = "default_fft_size")]
+    /// Punkte der FFT; 0 (Voreinstellung) = automatisch, so dass ein Bin etwa 500 Hz breit ist (2,048 MS/s → 4096,
+    /// 8 MS/s → 16384). Mit gröberen Bins pfeift der Kanalfilter im Blocktakt (MSi2500 bei 8 MS/s, 29.09.).
+    #[serde(default)]
     pub fft_size: usize,
     #[serde(default = "default_fft_fps")]
     pub fft_fps: u32,
@@ -323,6 +325,11 @@ fn default_center_freq() -> u64 { 145_500_000 }
 fn default_sample_rate() -> u32 { 2_048_000 }
 fn default_gain() -> f64 { 40.0 }
 fn default_fft_size() -> usize { 4096 }
+
+/// FFT-Größe für ~500-Hz-Bins (mindestens 4096): 2,048 MS/s → 4096, 3 MS/s → 8192, 8 MS/s → 16384
+pub fn auto_fft_size(sample_rate: u32) -> usize {
+    ((sample_rate as usize).div_ceil(500)).next_power_of_two().clamp(4096, 65536)
+}
 fn default_fft_fps() -> u32 { 50 }
 fn default_audio_rate() -> u32 { 48000 }
 fn default_plugin_dir() -> PathBuf { PathBuf::from("plugins") }
@@ -562,9 +569,16 @@ impl ServerConfig {
         }
     }
 
-    /// Nach dem Lesen: Pfade ergänzen, veraltete [smeter_cal]-Tabelle in die Bänder übernehmen
+    /// Nach dem Lesen: Pfade ergänzen, FFT-Größe automatisch, veraltete [smeter_cal]-Tabelle in die Bänder übernehmen
     fn finish(&mut self, warnings: &mut Vec<String>) {
         self.resolve_paths();
+        for b in self.sdrs.iter_mut() {
+            if b.fft_size == 0 { b.fft_size = auto_fft_size(b.sample_rate); }
+            else if !b.fft_size.is_power_of_two() || b.fft_size < 256 {
+                warnings.push(format!("Band „{}“: fft_size {} ist keine Zweierpotenz ≥ 256 – automatisch", b.id, b.fft_size));
+                b.fft_size = auto_fft_size(b.sample_rate);
+            }
+        }
         for (band, v) in std::mem::take(&mut self.smeter_cal) {
             match self.sdrs.iter_mut().find(|b| b.id == band) {
                 Some(b) => { if b.smeter_cal.is_none() { b.smeter_cal = Some(v); } }
@@ -755,6 +769,15 @@ mod tests {
         assert!(falsch.config.validate().0.iter().any(|e| e.contains("format")));
         let rtl = load_str("fmt-rtl", "[[bands]]\nid = \"2m\"\ncenter_freq = 145000000\nformat = \"cs16\"\n").unwrap();
         assert!(rtl.config.validate().1.iter().any(|w| w.contains("nur für driver")));
+    }
+
+    #[test]
+    fn fft_automatisch() {
+        assert_eq!((auto_fft_size(2_048_000), auto_fft_size(3_000_000), auto_fft_size(8_000_000)), (4096, 8192, 16384));
+        let l = load_str("fft", "[[bands]]\nid = \"a\"\ncenter_freq = 145000000\n[[bands]]\nid = \"b\"\ncenter_freq = 147000000\nsample_rate = 8000000\n[[bands]]\nid = \"c\"\ncenter_freq = 1\nfft_size = 2048\n[[bands]]\nid = \"d\"\ncenter_freq = 1\nfft_size = 3000\n").unwrap();
+        let f: Vec<usize> = l.config.sdrs.iter().map(|b| b.fft_size).collect();
+        assert_eq!(f, vec![4096, 16384, 2048, 4096]);
+        assert!(l.warnings.iter().any(|w| w.contains("3000")));
     }
 
     #[test]

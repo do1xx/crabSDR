@@ -90,7 +90,7 @@ nichts; jede weitere belegte Frequenz etwa 0,4 % CPU (x86), jedes Band mit 2,048
 | `enabled` | `true` | `false` = Band aus, ohne den Eintrag zu löschen |
 | `guest` | `true` | Zugang: `true` = öffentlich (ohne Anmeldung), `false` = nur für angemeldete Benutzer, denen das Band zugeteilt ist |
 | `admin_only` | `false` | nur für Admins (hat Vorrang vor `guest`) |
-| `fft_size` | `4096` | Punkte der FFT (Wasserfall-Auflösung) |
+| `fft_size` | automatisch | Punkte der FFT; automatisch so, dass ein Bin etwa 500 Hz breit ist (2,048 MS/s → 4096, 8 MS/s → 16384). Deutlich kleiner bei hoher Abtastrate lässt FM pfeifen |
 | `fft_fps` | `50` | Wasserfall-Zeilen pro Sekunde |
 | `gain_elements` | – | Verstärkerstufen einzeln, z. B. `{ LNA = 24, Baseband = 30 }` (SoapySDR-Geräte) |
 | `format` | `cs16` | nur `rx_sdr`: Sample-Format – `cs16` (16 Bit, volle Dynamik), `cf32` (Module, die nur Gleitkomma liefern), `cu8` (8 Bit, halbe Datenmenge). Bei 16 Bit und Gleitkomma zieht crabSDR den Gleichanteil ab (Mittenspitze bei Null-ZF-Empfängern) |

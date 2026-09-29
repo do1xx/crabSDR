@@ -9,6 +9,9 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
   LimeSDR, PlutoSDR; neue Band-Einstellung `format` (`cs16`, `cf32`, `cu8`); Gleichanteil wird abgezogen.
 - MSi2500 / SDRplay RSP1 und Nachbauten über die freien Treiber libmirisdr-5 + SoapyMiri (`device = "driver=soapyMiri"`).
 - Admin-Seite „Sticks“: zu jedem gefundenen Gerät der passende Eintrag fürs Band, Zuordnung auch für SoapySDR-Geräte.
+- Hohe Abtastraten ohne Pfeifton: FFT-Größe automatisch nach Abtastrate (≈ 500-Hz-Bins), Kanal-Bins als Vielfaches
+  von 4 (vorher fehlte je Block ein halbes Sample – auch bei 7-kHz-Filtern mit 2,048 MS/s).
+- Protokoll: IQ-Blöcke nur beim Start und etwa stündlich.
 
 ## 0.2.0 – 2026-09-29
 
