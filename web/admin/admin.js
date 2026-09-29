@@ -217,10 +217,10 @@
   function station(v) {
     loadCfg(function (c) {
       clear(v); readonlyNote(v);
-      var p = c.parsed || {}, st = p.station || {}, ui = p.ui || {};
+      var p = c.parsed || {}, st = p.station || {}, ui = p.ui || {}, dir = p.directory || {};
       var inp = {};
       function t(k, label, val, hint) { inp[k] = h('input', { type: 'text', value: val == null ? '' : String(val), maxlength: '200' }); return field(label, inp[k], hint); }
-      var sw = {};
+      var sw = {}, listed = h('input', { type: 'checkbox', checked: !!dir.enabled });
       v.appendChild(h('form', { cls: 'adm-card', onsubmit: function (e) {
         e.preventDefault();
         var ops = [];
@@ -234,12 +234,16 @@
         }
         UI_SWITCHES.forEach(function (x) { var val = sw[x[0]].value, cur = ui[x[0]] == null ? 'auto' : ui[x[0]] ? 'on' : 'off'; if (val !== cur) ops.push({ op: 'set', path: ['ui', x[0]], value: val === 'auto' ? null : val === 'on' }); });
         ['banner', 'impressum', 'datenschutz'].forEach(function (k) { var nv = inp[k].value.trim(); if (nv !== (ui[k] || '')) ops.push({ op: 'set', path: ['ui', k], value: nv || null }); });
+        if (listed.checked && !inp.url.value.trim()) return toast('Für das Verzeichnis bitte die öffentliche Adresse eintragen (https://…)', true);
+        if (listed.checked !== !!dir.enabled) ops.push({ op: 'set', path: ['directory', 'enabled'], value: listed.checked });
         saveOps(ops, function () { show('station'); });
       } },
         h('h3', { text: 'Station' }),
         t('name', 'Name', st.name), t('subtitle', 'Untertitel', st.subtitle, 'z. B. Ort · Antenne · Höhe'),
         h('div', { cls: 'adm-cols' }, t('locator', 'Locator', st.locator), t('lat', 'Breite (Dezimalgrad)', st.lat, 'leer = aus dem Locator'), t('lon', 'Länge (Dezimalgrad)', st.lon)),
-        t('url', 'Öffentliche Adresse', st.url),
+        t('url', 'Öffentliche Adresse', st.url, 'so erreichen Hörer die Station, z. B. https://sdr.example.org'),
+        h('label', { cls: 'adm-check' }, listed, ' Im Verzeichnis auf ' + (dir.server || 'https://crabsdr.de').replace(/^https?:\/\//, '') + ' listen'),
+        h('p', { cls: 'muted small', text: 'Die Station meldet alle 5 Minuten Name, Untertitel, Standort, die öffentlichen Bänder und Decoder und die Hörerzahl. Mitglieder- und Admin-Bänder bleiben unsichtbar. Das Verzeichnis prüft die Angaben über die öffentliche Adresse. Wirkt nach dem Neustart.' }),
         h('h3', { text: 'Oberfläche' }),
         h('div', { cls: 'adm-switches' }, UI_SWITCHES.map(function (x) {
           var cur = ui[x[0]] == null ? 'auto' : ui[x[0]] ? 'on' : 'off';

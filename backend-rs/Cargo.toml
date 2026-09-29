@@ -54,6 +54,9 @@ bytes = "1"
 tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 futures-util = "0.3"
 
+# HTTP-Client (Meldung ans Verzeichnis crabsdr.de), rustls wie der Tunnel
+ureq = { version = "2", default-features = false, features = ["tls", "json"] }
+
 # Internal crates
 crabsdr-core = { path = "crates/crabsdr-core" }
 crabsdr-dsp = { path = "crates/crabsdr-dsp" }

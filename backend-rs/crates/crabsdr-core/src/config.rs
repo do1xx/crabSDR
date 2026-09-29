@@ -158,6 +158,22 @@ pub struct MqttConfig {
 }
 fn default_mqtt_port() -> u16 { 1883 }
 
+/// Eintrag im öffentlichen crabSDR-Verzeichnis (`[directory]`, wie das Receiverbook bei OpenWebRX). Aus, bis der Sysop es
+/// einschaltet. Dann meldet die Station alle 5 min Name, Standort, öffentliche Bänder und Decoder und die Hörerzahl an
+/// `server`; das Verzeichnis prüft die Angaben, indem es `station.url` + `/api/directory` selbst abruft.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DirectoryConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    /// Verzeichnis-Server (Voreinstellung https://crabsdr.de)
+    #[serde(default = "default_directory_server")]
+    pub server: String,
+}
+fn default_directory_server() -> String { "https://crabsdr.de".into() }
+impl Default for DirectoryConfig {
+    fn default() -> Self { Self { enabled: false, server: default_directory_server() } }
+}
+
 /// Oberfläche (`[ui]`). Alles ist optional: ohne Angabe gilt die Voreinstellung (meist „an“ bzw. „automatisch“).
 /// digital/logbook/info erscheinen automatisch, wenn die Seite (digi/, logbuch/, info/) im Stationsordner liegt.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -217,6 +233,9 @@ pub struct ServerConfig {
     /// Treffer zusätzlich per MQTT veröffentlichen
     #[serde(default)]
     pub mqtt: Option<MqttConfig>,
+    /// Im öffentlichen Verzeichnis (crabsdr.de) gelistet werden
+    #[serde(default)]
+    pub directory: DirectoryConfig,
 
 
 
@@ -429,6 +448,7 @@ impl Config {
             sdrs: vec![sdr],
             decoders: vec![],
             mqtt: None,
+            directory: DirectoryConfig::default(),
             site: None,
             opus_bitrate: default_opus_bitrate(),
             opus_complexity: default_opus_complexity(),
@@ -605,6 +625,18 @@ impl ServerConfig {
                 if let Some(f) = &m.password_file { if std::fs::metadata(f).is_err() { warn.push(format!("[mqtt]: password_file {} nicht lesbar", f.display())); } }
             }
         }
+        if self.directory.enabled {
+            let u = self.station.url.trim();
+            if !(u.starts_with("https://") || u.starts_with("http://")) || u.len() < 12 {
+                err.push("[directory]: Verzeichnis braucht die öffentliche Adresse der Station ([station] url = \"https://…\")".into());
+            }
+            if !(self.directory.server.starts_with("https://") || self.directory.server.starts_with("http://")) {
+                err.push("[directory]: server muss mit https:// beginnen".into());
+            }
+            if !self.sdrs.iter().any(|b| b.enabled && b.guest && !b.admin_only) {
+                warn.push("[directory]: kein öffentliches Band – das Verzeichnis zeigt die Station ohne Bänder".into());
+            }
+        }
         if self.site.is_some() { warn.push("[site] (Verzeichnis-Tunnel) ist experimentell".into()); }
         (err, warn)
     }
@@ -691,6 +723,19 @@ mod tests {
         assert_eq!(err.len(), 1);
         assert!(err[0].contains("432"));
         assert!(!l.config.db_path.as_os_str().is_empty() && !l.config.frontend_dir.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn verzeichnis() {
+        let band = "[[bands]]\nid = \"2m\"\ncenter_freq = 145000000\n";
+        let aus = load_str("dir-aus", band).unwrap();
+        assert!(!aus.config.directory.enabled && aus.config.directory.server == "https://crabsdr.de");
+        let ohne = load_str("dir-ohne", &format!("[directory]\nenabled = true\n{}", band)).unwrap();
+        assert!(ohne.config.validate().0.iter().any(|e| e.contains("öffentliche Adresse")), "ohne station.url kein Eintrag");
+        let gut = load_str("dir-gut", &format!("[station]\nurl = \"https://sdr.example.org\"\n[directory]\nenabled = true\n{}", band)).unwrap();
+        assert!(gut.config.validate().0.is_empty());
+        let intern = load_str("dir-mb", &format!("[station]\nurl = \"https://sdr.example.org\"\n[directory]\nenabled = true\n{}guest = false\n", band)).unwrap();
+        assert!(intern.config.validate().1.iter().any(|w| w.contains("kein öffentliches Band")));
     }
 
     #[test]

@@ -73,6 +73,12 @@ Der Server prüft das bei jeder Verbindung und jeder Abfrage; die Oberfläche bl
   starten ihn neu. Ohne Dienstverwalter wird der Neustart abgelehnt (der Server bliebe sonst einfach stehen).
 - Größe der Datei höchstens 512 KiB.
 
+## Verbindungen nach außen
+
+Von sich aus baut crabSDR nur Verbindungen auf, die der Sysop eingerichtet hat: MQTT (`[mqtt]`), das APRS-iGate eines
+Decoders und das Verzeichnis (`[directory]`, standardmäßig aus). Das Verzeichnis bekommt nur öffentliche Angaben
+(Station, öffentliche Bänder und Decoder, Hörerzahl, Version), per HTTPS ohne Weiterleitungen, höchstens alle 5 Minuten.
+
 ## Prüfen
 
 `tools/e2e/security_test.py` prüft jede Regel dieser Seite gegen einen laufenden Server, `tools/e2e/admin.spec.mjs` die

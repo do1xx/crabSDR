@@ -14,6 +14,7 @@ mod check;
 mod digi;
 mod client;
 mod decoders;
+mod directory;
 mod dsp_thread;
 mod sdr_manager;
 mod sdr_pipeline;
@@ -157,6 +158,12 @@ async fn main() {
         });
     }
 
+    // Öffentliches Verzeichnis (crabsdr.de): nur wenn [directory] enabled
+    if config.directory.enabled {
+        info!("Verzeichnis: Station wird bei {} gelistet (öffentliche Adresse {})", config.directory.server, config.station.url);
+        tokio::spawn(directory::run(shared.clone()));
+    }
+
     // Admin-Schnittstelle: eigene Grenzen und Sicherheitsköpfe (docs/SECURITY.md)
     let admin_api = Router::new()
         .route("/api/admin/overview", get(admin::overview))
@@ -191,6 +198,7 @@ async fn main() {
         .route("/api/bands", get(api_list_bands))
         .route("/api/health", get(api_health))
         .route("/api/listeners", get(api_listeners))
+        .route("/api/directory", get(directory::api_entry))
         .route("/api/decoders", get(decoders::api_list))
         .route("/api/decoders/events", get(decoders::api_events))
         .route("/api/decoders/files/{id}/{*path}", get(decoders::api_file))

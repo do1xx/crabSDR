@@ -25,6 +25,8 @@ pub const LOCKED: &[&str] = &["port", "frontend_dir", "plugin_dir", "data_dir", 
 pub const PATH_OPTIONS: &[&str] = &["logdir", "json", "log", "out", "igate_passfile", "passfile", "file", "path", "dir"];
 
 const STATION_KEYS: &[&str] = &["name", "subtitle", "locator", "lat", "lon", "url"];
+/// Verzeichnis: nur Ein/Aus über die Admin-Seite; der Server steht in der Datei
+const DIRECTORY_KEYS: &[&str] = &["enabled"];
 const UI_KEYS: &[&str] = &["login", "chat", "logbook", "digital", "info", "recording", "status", "decoders", "banner", "impressum", "datenschutz", "admin"];
 const TOP_KEYS: &[&str] = &["builtin_chat"];
 const BAND_KEYS: &[&str] = &["id", "label", "note", "driver", "device", "host", "port", "center_freq", "sample_rate", "gain", "ppm", "mode",
@@ -125,6 +127,7 @@ pub fn apply(text: &str, ops: &[Op]) -> Result<String, String> {
             Op::Set { path, value: v } => match path.as_slice() {
                 [s0, k] if key(s0)? == "station" && STATION_KEYS.contains(&key(k)?) => set_in(table_of(&mut doc, "station"), key(k)?, v)?,
                 [s0, k] if key(s0)? == "ui" && UI_KEYS.contains(&key(k)?) => set_in(table_of(&mut doc, "ui"), key(k)?, v)?,
+                [s0, k] if key(s0)? == "directory" && DIRECTORY_KEYS.contains(&key(k)?) => set_in(table_of(&mut doc, "directory"), key(k)?, v)?,
                 [k] if TOP_KEYS.contains(&key(k)?) => { let k = key(k)?; if v.is_null() { doc.remove(k); } else { doc[k] = value(scalar(v)?); } }
                 [s0, i, k] if key(s0)? == "bands" && BAND_KEYS.contains(&key(k)?) => {
                     let arr = array_mut(&mut doc, "bands")?;
@@ -310,6 +313,13 @@ pub fn stamp() -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn verzeichnis_schalter() {
+        let out = apply(BASE, &[set(&["directory", "enabled"], J::from(true))]).unwrap();
+        assert!(out.contains("[directory]") && out.contains("enabled = true"));
+        assert!(apply(BASE, &[set(&["directory", "server"], J::from("https://anders.example"))]).is_err(), "Server nur in der Datei");
+    }
+
     use super::*;
 
     const BASE: &str = r#"# Meine Station

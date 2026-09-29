@@ -33,6 +33,7 @@ await p.click('text=Speichern');
 await p.waitForTimeout(800);
 check('Station gespeichert', /Gespeichert/.test(await toast()), await toast());
 check('Hinweis Neustart', await p.isVisible('#restartbar'));
+check('Schalter Verzeichnis da, aus', await p.isVisible('text=Im Verzeichnis auf') && !(await p.isChecked('.adm-check input')));
 await shot('station');
 
 await tab('bands');

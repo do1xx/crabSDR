@@ -65,7 +65,7 @@ Umgebungsvariablen überschreiben: `PORT`, `PLUGIN_DIR`, `FRONTEND_DIR`, `DATA_D
 | `subtitle` | Zeile unter dem Titel, z. B. Ort, Antenne, Höhe |
 | `locator` | Maidenhead-Locator (4, 6 oder 8 Zeichen) |
 | `lat`, `lon` | Standort in Dezimalgrad; ohne Angabe die Mitte des Locators. Dient für Entfernungen im Logbuch, auf der Digital-Seite, für die Reichweite und als Standort der APRS-iGate-Bake |
-| `url` | öffentliche Adresse (optional) |
+| `url` | öffentliche Adresse, z. B. `https://sdr.example.org` (optional; nötig für das Verzeichnis) |
 
 ## `[[bands]]` – ein Eintrag je Empfänger
 
@@ -194,6 +194,22 @@ Regeln für Passwörter, Sitzungen und die Anmeldebremse: [SECURITY.md](SECURITY
 | `password_file` | – | Datei mit dem Passwort (nur auf dem Gerät, nie in der Konfiguration) |
 | `topic` | – | Themenpräfix, z. B. `crabsdr/meinestation`; Treffer unter `<topic>/<decoder-id>/<art>`, `<topic>/status` = online/offline |
 | `enabled` | `true` | vorübergehend aus |
+
+## `[directory]` – im Verzeichnis auf crabsdr.de erscheinen
+
+Wie das Receiverbook bei OpenWebRX: Auf crabsdr.de steht eine Liste aller crabSDR-Stationen, die das wollen. Aus, bis der
+Sysop es einschaltet (Admin-Seite → Station → „Im Verzeichnis listen“, oder hier).
+
+| Schlüssel | Voreinstellung | Bedeutung |
+|---|---|---|
+| `enabled` | `false` | Station im Verzeichnis listen; braucht `[station] url` |
+| `server` | `https://crabsdr.de` | Verzeichnis (nur in der Datei änderbar) |
+
+Die Station meldet alle 5 Minuten Name, Untertitel, Locator/Standort, die **öffentlichen** Bänder und Decoder, die
+Hörerzahl und die Version. Mitglieder- und Admin-Bänder, Benutzer, Chat und Logbuch werden nie gemeldet. Dieselben
+Angaben stehen unter `/api/directory` (sonst 404); das Verzeichnis ruft diese Adresse unter `url` selbst ab und
+vergleicht die Kennung (Zufallszahl in `data_dir/directory.id`), damit niemand fremde Adressen eintragen kann. Ist
+`enabled` wieder aus, verschwindet die Station nach spätestens einer halben Stunde.
 
 ## Selten gebraucht
 

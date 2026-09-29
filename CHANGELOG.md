@@ -39,6 +39,8 @@ Eine einheitliche crabSDR-Fassung: gleiche Oberfläche für jede Station, alles 
 - Anmeldung nach docs/SECURITY.md: Zufallspasswörter aus dem Betriebssystem, Passwortwechsel beim ersten Anmelden,
   Anmeldebremse, widerrufbare Sitzungen, getrennte Admin-Sitzung, strenge CSP, `crabsdr-server --reset-admin`.
 - Behoben: Decoder-Dateischnittstelle lieferte auch Arbeitsdateien (z. B. direwolf.conf mit iGate-Passcode).
+- Verzeichnis crabsdr.de (`[directory]`, standardmäßig aus): Station meldet alle 5 min ihre öffentlichen Angaben,
+  das Verzeichnis prüft sie über `/api/directory` unter der öffentlichen Adresse. Schalter auf der Admin-Seite.
 
 ### Konfiguration und Betrieb
 - Klarere Schlüssel: `[[bands]]` mit `driver`, `device`, `host`, `port`, `mode`, `smeter_cal`; alte Namen gelten weiter.

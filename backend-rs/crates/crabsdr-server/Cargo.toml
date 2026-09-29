@@ -30,4 +30,5 @@ toml_edit = "0.22"
 sha2 = "0.10"
 toml = { workspace = true }
 tokio-tungstenite = { workspace = true }
+ureq = { workspace = true }
 futures-util = { workspace = true }

@@ -66,6 +66,7 @@ check("CSP streng (nur self, kein inline)", "script-src 'self'" in csp and "unsa
 check("X-Frame-Options DENY, no-store", h.get("x-frame-options") == "DENY" and "no-store" in h.get("cache-control", ""))
 check("nosniff überall", req("GET", "/", raw=True)[2].get("x-content-type-options") == "nosniff")
 check("Admin-Schnittstelle ohne Token: 401", req("GET", "/api/admin/overview")[0] == 401)
+check("Verzeichnis-Angaben aus, solange nicht eingeschaltet: 404", req("GET", "/api/directory")[0] == 404)
 
 # ---------- Anmelden ----------
 t0 = time.time(); s1, j1, _ = login("admin", "falsch-falsch-1"); d1 = time.time() - t0
