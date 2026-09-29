@@ -149,9 +149,10 @@ impl Channelizer {
     pub fn plan_channel(&self, center_freq: u64, tune_freq: u64, bandwidth: u32) -> Option<ChannelPlan> {
         let min_bins = ((12000.0f32 / self.bin_hz).ceil() as usize).max(4);
         let mut n_bins = ((bandwidth as f32 / self.bin_hz).ceil() as usize).max(min_bins);
-        if n_bins % 2 != 0 {
-            n_bins += 1;
-        }
+        // Vielfaches von 4: je Block kommen n_bins·hop/N = ¾·n_bins Kanal-Samples heraus – das muss ganzzahlig sein.
+        // Bei 2,048 MS/s (500-Hz-Bins) war es das zufällig immer; bei 8 MS/s ergab FM 14 Bins → 10,5 Samples, je Block
+        // fehlte ein halbes Sample → Knacken im Blocktakt (≈ 2,6 kHz Pfeifton, MSi2500 auf Gartow 29.09.).
+        n_bins = n_bins.div_ceil(4) * 4;
         n_bins = n_bins.min(self.fft_size);
 
         let offset_hz = tune_freq as f64 - center_freq as f64;
@@ -306,6 +307,33 @@ mod tests {
         // Nutzsignal 0,1 → −20 dBFS; Störer bei 0 dBFS müsste < −60 dBFS erscheinen → Summe ≈ −20 dB
         assert!(p_db < -19.0 && p_db > -21.0, "Kanalleistung {p_db} dB, Störer nicht unterdrückt?");
     }
+    #[test]
+    fn test_hohe_abtastrate_ohne_pfeifton() {
+        // 8 MS/s (MSi2500, 29.09.): Bins 1953 Hz breit, FM braucht 14 Bins → 14·¾ = 10,5 Samples je Block. Die Bin-Zahl
+        // muss ein Vielfaches von 4 sein, sonst fehlt je Block ein halbes Sample (Knacken im Blocktakt ≈ 2,6 kHz).
+        for &fs in &[8_000_000u32, 6_000_000, 2_048_000] {
+            let n = 4096;
+            let mut ch = Channelizer::new(n, fs);
+            let blocks = 60;
+            let iq = tone(n * blocks, fs as f32, 331_700.0, 0.5);
+            let out = ch.process(&iq);
+            let c = 1_000_000u64;
+            // 24 kHz wie der FM-Ausschnitt (extraction_bw: FM mindestens 24 kHz) → bei 8 MS/s 14 Bins
+            let (x, rate, resid) = ch.extract_channel(&out.fft_blocks, c, c + 331_700 - 400, 24000).unwrap();
+            // Anzahl: jeder Block liefert genau hop/N der Kanal-Samples (Kanalrate × Blockdauer)
+            let per_block = rate as f64 * (n * 3 / 4) as f64 / fs as f64;
+            assert!((x.len() as f64 / out.fft_blocks.len() as f64 - per_block).abs() < 1e-6,
+                "{fs}: {} Samples je Block, erwartet {per_block}", x.len() as f64 / out.fft_blocks.len() as f64);
+            let step = std::f64::consts::TAU * (400.0 + resid) / rate as f64;   // Ton im Kanal: Ablage + Rasterfehler
+            let mut worst = 0.0f64;
+            for w in x[100..].windows(2) {
+                let d = (w[1] * w[0].conj()).arg() as f64;
+                worst = worst.max(((d - step + std::f64::consts::PI).rem_euclid(std::f64::consts::TAU) - std::f64::consts::PI).abs());
+            }
+            assert!(worst < 0.2, "{fs}: größter Phasenfehler {worst:.3} rad");
+        }
+    }
+
     #[test]
     fn test_block_phase_continuous_off_grid() {
         // Ton genau auf einem Bin, der kein Vielfaches von 4 ist (425 kHz bei 500 Hz/Bin = Bin 850 → Sprung 180°),
