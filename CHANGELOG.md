@@ -2,7 +2,7 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## 0.2.0 – 2026-09-28
+## 0.2.0 – 2026-09-29
 
 Eine einheitliche crabSDR-Fassung: gleiche Oberfläche für jede Station, alles über die Konfiguration einstellbar.
 
