@@ -479,7 +479,9 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
             if msg.get("off").and_then(|v| v.as_bool()).unwrap_or(false) {
                 clients.set_waterfall(client_id, None);
             } else if let Some(zoom) = msg.get("zoom").and_then(|v| v.as_u64()) {
-                let zoom = zoom.min(2) as u8;
+                // Server-Zoom bis ein Pixel ein Bin ist (FFT 4096: Stufe 2, 16384: Stufe 4), weiter streckt der Browser
+                let srv_max = ((pipeline.fft_size as u64 / 1024).max(1)).ilog2() as u64;
+                let zoom = zoom.min(srv_max) as u8;
                 let max_start = (pipeline.fft_size as u64).saturating_sub(1024u64 * ((pipeline.fft_size as u64 / 1024) >> zoom).max(1));
                 let start_bin = msg.get("start_bin").and_then(|v| v.as_u64()).unwrap_or(0).min(max_start) as u16;
                 clients.set_waterfall(client_id, Some(WaterfallSub { zoom, start_bin }));

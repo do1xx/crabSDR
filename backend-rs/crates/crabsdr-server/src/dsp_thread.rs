@@ -558,6 +558,16 @@ mod tests {
     }
 
     #[test]
+    fn line_zoom4_bei_fft_16384_ein_bin_je_pixel() {
+        // 8 MS/s → FFT 16384: der Server zoomt bis Stufe 4, dann ist ein Pixel ein Bin
+        let mut spec = vec![-100.0f32; 16384];
+        spec[9000 + 3] = -25.0;
+        let line = build_line(&spec, WaterfallSub { zoom: 4, start_bin: 9000 });
+        assert_eq!(line[3], quantize_db(-25.0));
+        assert_eq!(line[4], quantize_db(-100.0));
+    }
+
+    #[test]
     fn floor_ignores_own_channel_and_strong_neighbours() {
         // Rauschen −90 dB, starker Träger im Kanal (Bin 2048) und ein Nachbar bei 2060 → Boden bleibt ≈ −90
         let mut spec = vec![-90.0f32; 4096];

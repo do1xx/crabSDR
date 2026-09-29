@@ -26,7 +26,7 @@ var scaleEl = null, scaleEls = [], scaleHeight = 14, smeterEl = null, passbandEl
 var keysOn = true, dx = [], uu = [], hideMarks = false, wfModeNames = ['Spektrum', 'Wasserfall', 'schwach', 'stark'];
 
 var _crab = {
-  token: null, bands: [], fft: 4096, px: 1024, maxzoom: 7, srvmaxzoom: 2, wsBase: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + location.pathname.replace(/[^\/]*$/, ''),   // Basis-Pfad, damit /beta/ hinter nginx funktioniert
+  token: null, bands: [], fft: 4096, px: 1024, wsBase: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + location.pathname.replace(/[^\/]*$/, ''),   // Basis-Pfad, damit /beta/ hinter nginx funktioniert
   audio: { gain: null, node: null, decoder: null, ts: 0, muted: false, volume: 1, pcm: typeof AudioDecoder !== 'function', rec: null },   // ohne WebCodecs (z. B. http:// im LAN) gleich PCM anfordern
   level: -200, floor: -200, sq: true, squelchOn: false, notch: false, listenersTimer: null, palette: null,
   dragRxX: 0, dragEdge: 0, started: false, sel: [0], bandsOff: [], features: {}, banner: '', links: {},
@@ -118,22 +118,26 @@ function updateBw() {
 function id2band(i) { return Number(view) === Views.allbands ? _crab.sel[i] : band; }
 function band2id(b) { return Number(view) === Views.allbands ? _crab.sel.indexOf(b) : (b === band ? 0 : -1); }
 function freq2x(fabs, b) { var e = bi[b]; return (fabs - (e.effcenterfreq - e.effsamplerate / 2)) / (e.effsamplerate / 1024); }
-function _crabBpp(zoom) { return Math.max(1, (_crab.fft / _crab.px) >> Math.min(zoom, _crab.srvmaxzoom)); }
-function _crabScale(zoom) { return 1 << Math.max(0, zoom - _crab.srvmaxzoom); }   // Pixel-Streckung ab Stufe 3
+/* Zoom je Band: die FFT-Größe hängt von der Abtastrate ab (4096 bei 2 MS/s, 16384 bei 8 MS/s). Der Server liefert
+   1024 Pixel und zoomt, bis ein Pixel ein Bin ist; danach streckt der Browser noch fünf Stufen (bis ×32). */
+function _crabSrvMax(e) { return Math.max(0, Math.round(Math.log2((e.fft || _crab.fft) / _crab.px))); }
+function _crabMaxZoom(e) { return _crabSrvMax(e) + 5; }
+function _crabBpp(zoom, e) { return Math.max(1, ((e.fft || _crab.fft) / _crab.px) >> Math.min(zoom, _crabSrvMax(e))); }
+function _crabScale(zoom, e) { return 1 << Math.max(0, zoom - _crabSrvMax(e)); }   // Pixel-Streckung über die Server-Stufen hinaus
 function _crabGeom(b) {
-  var e = bi[b], bpp = _crabBpp(e.zoom), sc = _crabScale(e.zoom), binkhz = e.samplerate / _crab.fft;
+  var e = bi[b], bpp = _crabBpp(e.zoom, e), sc = _crabScale(e.zoom, e), binkhz = e.samplerate / e.fft;
   e.effsamplerate = 1024 * bpp * binkhz / sc;
   e.effcenterfreq = e.centerfreq - e.samplerate / 2 + (e.start + 512 * bpp / sc) * binkhz;
   // Server-Ausschnitt (Stufe ≤ 2, 1024 Server-Pixel) so legen, dass der sichtbare Teil darin liegt
   var sstart = e.start - Math.round((1024 - 1024 / sc) / 2 * bpp);
-  e.sstart = Math.max(0, Math.min(_crab.fft - 1024 * bpp, sstart)); e.szoom = Math.min(e.zoom, _crab.srvmaxzoom);
+  e.sstart = Math.max(0, Math.min(e.fft - 1024 * bpp, sstart)); e.szoom = Math.min(e.zoom, _crabSrvMax(e));
   if (b === band) { centerfreq = e.effcenterfreq; khzPerPx = e.effsamplerate / 1024; }
 }
 function zoomToFreq(b, zoom, f) {
-  var e = bi[b]; zoom = Math.max(0, Math.min(_crab.maxzoom, Number(zoom) || 0));
-  var bpp = _crabBpp(zoom), sc = _crabScale(zoom), binkhz = e.samplerate / _crab.fft;
+  var e = bi[b]; zoom = Math.max(0, Math.min(_crabMaxZoom(e), Number(zoom) || 0));
+  var bpp = _crabBpp(zoom, e), sc = _crabScale(zoom, e), binkhz = e.samplerate / e.fft;
   var startBin = Math.round((f - (e.centerfreq - e.samplerate / 2)) / binkhz - 512 * bpp / sc);
-  e.zoom = zoom; e.start = Math.max(0, Math.min(_crab.fft - 1024 * bpp / sc, startBin));
+  e.zoom = zoom; e.start = Math.max(0, Math.min(e.fft - 1024 * bpp / sc, startBin));
   _crabGeom(b);
   var B = _crab.bands[b]; if (B) { B.prev = null; B.liveSinceHist = 0; _crabSendWf(b); }
   if (b === band) drawPassband();
@@ -141,9 +145,9 @@ function zoomToFreq(b, zoom, f) {
 }
 function setZoom(n) {
   var e = bi[band], z = e.zoom;
-  if (n === 0) z = Math.min(_crab.maxzoom, z + 1);
+  if (n === 0) z = Math.min(_crabMaxZoom(e), z + 1);
   else if (n === 1) z = Math.max(0, z - 1);
-  else if (n === 2) z = _crab.maxzoom;
+  else if (n === 2) z = _crabMaxZoom(e);
   else z = 0;
   // um das gehörte Signal zoomen (Mitte des Durchlassbereichs), nicht um die Mitte des Ausschnitts
   var r = _crabBandRange(band), f = freq + (lo + hi) / 2;
@@ -548,7 +552,7 @@ function _crabOnWaterfall(b, u8) {
   if (delta) { if (!B.prev) return; for (var i = 0; i < 1024; i++) B.prev[i] = (B.prev[i] + payload[i]) & 255; }
   else B.prev = new Uint8Array(payload);
   if (!B.started) { B.started = true; if (!B.waitReleased && --wfWaiting <= 0) { wfWaiting = 0; wfAllStarted(); } }
-  var sc = _crabScale(e.zoom);
+  var sc = _crabScale(e.zoom, e);
   if (sc === 1) _crabDrawLine(b, B.prev);
   else {   // Stufe 3/4: sichtbaren Teil des Server-Ausschnitts strecken
     var off = e.start - e.sstart, out = new Uint8Array(1024);
@@ -568,7 +572,7 @@ function _crabOnWaterfallHist(b, u8) {
   var raw; try { raw = _crabZstd(u8.subarray(7)); } catch (err) { return; }
   if (!raw || raw.length !== n * 1024) return;
   if (delta) for (var q = 1; q < n; q++) { var o0 = q * 1024, p0 = o0 - 1024; for (var k = 0; k < 1024; k++) raw[o0 + k] = (raw[p0 + k] + raw[o0 + k]) & 255; }
-  var sc = _crabScale(e.zoom), off = e.start - e.sstart, w = B.canvas.width, h = Math.min(B.canvas.height, n);
+  var sc = _crabScale(e.zoom, e), off = e.start - e.sstart, w = B.canvas.width, h = Math.min(B.canvas.height, n);
   var pal = _crabPalette(), img = B.ctx.createImageData(w, h), d = img.data, line = new Uint8Array(1024);
   for (var r = 0; r < h; r++) {           // Zeile r im Bild = (n-1-r)-te im Verlauf (neueste oben)
     var src = raw.subarray((n - 1 - r) * 1024, (n - r) * 1024);
@@ -589,7 +593,7 @@ function _crabOnWaterfallHist(b, u8) {
 function _crabOnWaterfallJpeg(b, u8) {
   if (u8.length < 8 || typeof createImageBitmap !== 'function') return;
   var zoom = u8[1], start = u8[2] | (u8[3] << 8), B = _crab.bands[b], e = bi[b];
-  if (zoom !== e.szoom || start !== e.sstart || !B || !B.ctx || wfMode === 0 || _crabScale(e.zoom) !== 1) return;
+  if (zoom !== e.szoom || start !== e.sstart || !B || !B.ctx || wfMode === 0 || _crabScale(e.zoom, e) !== 1) return;
   createImageBitmap(new Blob([u8.subarray(6)], { type: 'image/jpeg' })).then(function (bmp) {
     if (zoom !== e.szoom || start !== e.sstart) return;          // inzwischen gezoomt
     var live = B.liveSinceHist || 0;                                // schon gezeichnete Live-Zeilen oben freilassen
@@ -672,7 +676,7 @@ function _crabConnect(b) {
     ws.onmessage = function (ev) {
       if (typeof ev.data === 'string') {
         var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-        if (m.type === 'config') { bi[b].centerfreq = m.center_freq / 1000; bi[b].samplerate = m.sample_rate / 1000; _crab.fft = m.fft_size || _crab.fft; _crabGeom(b); B.myId = m.client_id; }
+        if (m.type === 'config') { bi[b].centerfreq = m.center_freq / 1000; bi[b].samplerate = m.sample_rate / 1000; if (m.fft_size && m.fft_size !== bi[b].fft) { bi[b].fft = m.fft_size; bi[b].zoom = Math.min(bi[b].zoom, _crabMaxZoom(bi[b])); } _crabGeom(b); B.myId = m.client_id; }
         return;
       }
       var u8 = new Uint8Array(ev.data), tag = u8[0];
@@ -970,7 +974,7 @@ function crabStart() {
   if (typeof bandinfo === 'undefined' || !bandinfo.length) { _crabStatus('Keine Bänder (bandinfo.js fehlt)'); return; }
   _crab.fft = bandinfo[0].fft_size || 4096;
   bi = bandinfo.map(function (x, i) { return { name: x.name, centerfreq: Number(x.centerfreq), samplerate: Number(x.samplerate), tuningstep: 0.03125, maxlinbw: 8,
-    vfo: Number(x.vfo || x.centerfreq), maxzoom: _crab.maxzoom, minzoom: 0, realband: i, zoom: 0, start: 0, effcenterfreq: Number(x.centerfreq), effsamplerate: Number(x.samplerate), lastfreq: null, mode: x.mode || null }; });
+    vfo: Number(x.vfo || x.centerfreq), fft: Number(x.fft_size) || _crab.fft, minzoom: 0, realband: i, zoom: 0, start: 0, effcenterfreq: Number(x.centerfreq), effsamplerate: Number(x.samplerate), lastfreq: null, mode: x.mode || null }; });
   _crab.bands = bi.map(function () { return { ws: null }; });
   for (var b = 0; b < bi.length; b++) _crabGeom(b);
   var cv = readCookie('view'); view = (cv === null || cv === '') ? Views.oneband : Number(cv);
