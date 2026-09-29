@@ -145,7 +145,9 @@ function setZoom(n) {
   else if (n === 1) z = Math.max(0, z - 1);
   else if (n === 2) z = _crab.maxzoom;
   else z = 0;
-  zoomToFreq(band, z, e.effcenterfreq);
+  // um das gehörte Signal zoomen (Mitte des Durchlassbereichs), nicht um die Mitte des Ausschnitts
+  var r = _crabBandRange(band), f = freq + (lo + hi) / 2;
+  zoomToFreq(band, z, (freq && f >= r.lo && f <= r.hi) ? f : e.effcenterfreq);
 }
 function wheelStep(e) { var d = e.deltaY || -e.wheelDelta || 0; if (d) freqStep(d > 0 ? -1 : 1); }
 function setWaterfall(b, f) {
