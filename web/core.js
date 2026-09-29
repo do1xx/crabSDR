@@ -712,10 +712,10 @@ function _crabLoadLook() {
     if (h1 && !document.getElementById('crabbrand') && _crab.features.own_logo) { var cb = document.createElement('a'); cb.id = 'crabbrand'; cb.className = 'crabbrand'; cb.href = 'https://github.com/do1xx/crabSDR'; cb.target = '_blank'; cb.rel = 'noopener';
       cb.title = 'läuft mit crabSDR – freie Software (MIT)'; cb.innerHTML = '<img src="crabsdr-mark.svg" alt="crabSDR"><span>crabSDR</span>'; h1.appendChild(cb); }
     if (foot) { var a = document.createElement('a'); a.id = 'crabmark'; a.className = 'crabmark'; a.href = 'admin/';   // Sysop-Bereich (Anmeldung); Projektseite steht auf der Info-Seite
-      a.title = 'Läuft mit crabSDR – Sysop-Bereich'; a.innerHTML = '<img src="crabsdr-mark.svg" alt="">läuft mit crabSDR'; foot.appendChild(a); }
+      a.title = 'Läuft mit crabSDR – Sysop-Bereich'; a.innerHTML = '<span class="crabemoji" aria-hidden="true">🦀</span>läuft mit crabSDR'; foot.appendChild(a); }
   }
   if (!document.getElementById('crab-look-css')) {
-    var l = document.createElement('link'); l.id = 'crab-look-css'; l.rel = 'stylesheet'; l.href = 'look.css?v=6'; document.head.appendChild(l);
+    var l = document.createElement('link'); l.id = 'crab-look-css'; l.rel = 'stylesheet'; l.href = 'look.css?v=7'; document.head.appendChild(l);
   }
 }
 
