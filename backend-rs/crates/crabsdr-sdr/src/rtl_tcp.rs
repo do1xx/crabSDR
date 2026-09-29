@@ -261,7 +261,7 @@ mod tests {
             driver: "rtl_tcp".into(), device: "0".into(), tcp_host: "127.0.0.1".into(), tcp_port: port,
             center_freq: 145_000_000, sample_rate: 2_048_000, gain: 10.0, ppm: 0, bias_tee: false,
             gain_elements: Default::default(),
-        };
+        format: None, };
         let (iq_tx, _iq_rx) = mpsc::channel(4);
         let (cmd_tx, cmd_rx) = mpsc::channel(4);
         let (health_tx, mut health_rx) = watch::channel(false);

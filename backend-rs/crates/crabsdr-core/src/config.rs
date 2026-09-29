@@ -53,6 +53,10 @@ pub struct SdrInstanceConfig {
     /// S-Meter-Kalibrierung in dB (dBm = dBFS − gain + smeter_cal), bezogen auf 0 dB Verstärkung
     #[serde(default)]
     pub smeter_cal: Option<f64>,
+    /// Nur driver = "rx_sdr": Rohformat der Samples – "cs16" (Voreinstellung, volle Dynamik), "cf32" (Module, die nur
+    /// Gleitkomma liefern), "cu8" (wie RTL-Sticks, halbe Datenmenge)
+    #[serde(default)]
+    pub format: Option<String>,
 }
 
 /// Directory/tunnel site configuration for connecting to a central directory server.
@@ -435,6 +439,7 @@ impl Config {
             gain_elements: None,
             note: None,
             smeter_cal: None,
+            format: None,
         };
         ServerConfig {
             port: self.port,
@@ -603,6 +608,10 @@ impl ServerConfig {
             if !["rtl_sdr", "rtl_tcp", "hackrf", "rx_sdr", "soapy", "airspy", "airspyhf", "file", "iq_file"].contains(&b.sdr_driver.as_str()) {
                 warn.push(format!("Band „{}“: driver „{}“ unbekannt (rtl_sdr, rtl_tcp, hackrf, rx_sdr)", b.id, b.sdr_driver));
             }
+            if let Some(f) = &b.format {
+                if !["cs16", "cf32", "cu8"].contains(&f.to_ascii_lowercase().as_str()) { err.push(format!("Band „{}“: format „{}“ unbekannt (cs16, cf32, cu8)", b.id, f)); }
+                else if !["rx_sdr", "soapy"].contains(&b.sdr_driver.as_str()) { warn.push(format!("Band „{}“: format gilt nur für driver = \"rx_sdr\" – wird ignoriert", b.id)); }
+            }
             if let Some(m) = &b.default_mode { if !["fm", "am", "usb", "lsb", "cw", "nfm", "wfm"].contains(&m.to_lowercase().as_str()) { warn.push(format!("Band „{}“: mode „{}“ unbekannt", b.id, m)); } }
         }
         let mut dids = std::collections::HashSet::new();
@@ -736,6 +745,16 @@ mod tests {
         assert!(gut.config.validate().0.is_empty());
         let intern = load_str("dir-mb", &format!("[station]\nurl = \"https://sdr.example.org\"\n[directory]\nenabled = true\n{}guest = false\n", band)).unwrap();
         assert!(intern.config.validate().1.iter().any(|w| w.contains("kein öffentliches Band")));
+    }
+
+    #[test]
+    fn rohformat_rx_sdr() {
+        let ok = load_str("fmt-ok", "[[bands]]\nid = \"hf\"\ndriver = \"rx_sdr\"\ndevice = \"driver=soapyMiri\"\ncenter_freq = 7100000\nformat = \"cs16\"\n").unwrap();
+        assert!(ok.config.validate().0.is_empty() && ok.config.sdrs[0].format.as_deref() == Some("cs16"));
+        let falsch = load_str("fmt-bad", "[[bands]]\nid = \"hf\"\ndriver = \"rx_sdr\"\ncenter_freq = 7100000\nformat = \"s12\"\n").unwrap();
+        assert!(falsch.config.validate().0.iter().any(|e| e.contains("format")));
+        let rtl = load_str("fmt-rtl", "[[bands]]\nid = \"2m\"\ncenter_freq = 145000000\nformat = \"cs16\"\n").unwrap();
+        assert!(rtl.config.validate().1.iter().any(|w| w.contains("nur für driver")));
     }
 
     #[test]

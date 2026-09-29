@@ -275,6 +275,7 @@
     f.access = sel([['public', 'öffentlich (ohne Anmeldung)'], ['members', 'Mitglieder (angemeldet, zugeteilt)'], ['admin', 'nur Admin']], access);
     f.mode = sel(MODES, b.mode || b.default_mode);
     f.driver = sel(DRIVERS, b.driver);
+    f.format = sel([['', 'Voreinstellung (16 Bit)'], ['cs16', 'cs16 – 16 Bit'], ['cf32', 'cf32 – Gleitkomma'], ['cu8', 'cu8 – 8 Bit']], b.format);
     f.enabled = h('input', { type: 'checkbox', checked: b.enabled !== false });
     var live = h('button', { cls: 'btn', type: 'button', text: 'sofort ausprobieren', title: 'Verstärkung sofort setzen, ohne zu speichern', onclick: function () {
       var g = num(f.gain.value); if (g == null) return toast('Verstärkung: Zahl', true);
@@ -292,6 +293,7 @@
       var a = f.access.value; if (a !== access) { ops.push({ op: 'set', path: P('guest'), value: a === 'public' }); ops.push({ op: 'set', path: P('admin_only'), value: a === 'admin' ? true : null }); }
       if (f.enabled.checked !== (b.enabled !== false)) ops.push({ op: 'set', path: P('enabled'), value: f.enabled.checked ? null : false });
       cmp('driver', f.driver.value, b.driver); cmp('device', f.device.value.trim(), b.device); cmp('host', f.host.value.trim(), b.host);
+      cmp('format', f.format.value, b.format);
       var port = f.port.value.trim() === '' ? '' : parseInt(f.port.value, 10); if (port !== '' && !(port > 0 && port < 65536)) return toast('Port 1–65535', true); cmp('port', port, b.port);
       saveOps(ops, function () { show('bands'); });
     } },
@@ -304,7 +306,8 @@
       h('div', { cls: 'adm-cols' }, h('div', { cls: 'adm-field' }, h('span', { text: 'Verstärkung (dB)' }), h('div', { cls: 'adm-inline' }, (f.gain = h('input', { type: 'text', value: String(b.gain) })), live)),
         t('smeter', 'S-Meter-Korrektur (dB)', b.smeter_cal, 'leer = keine')),
       h('details', null, h('summary', { text: 'Quelle' }),
-        h('div', { cls: 'adm-cols' }, field('Treiber', f.driver), t('device', 'Gerät (Index oder Seriennummer)', b.device), t('host', 'rtl_tcp: Adresse', b.host), t('port', 'rtl_tcp: Port', b.port))),
+        h('div', { cls: 'adm-cols' }, field('Treiber', f.driver), t('device', 'Gerät (Index, Seriennummer oder SoapySDR-Angabe)', b.device), t('host', 'rtl_tcp: Adresse', b.host), t('port', 'rtl_tcp: Port', b.port)),
+        h('div', { cls: 'adm-cols' }, field('rx_sdr: Sample-Format', f.format, 'nur bei Treiber rx_sdr (SoapySDR)'))),
       h('label', { cls: 'adm-check' }, f.enabled, ' Band eingeschaltet'),
       h('button', { cls: 'btn btn-accent', type: 'submit', text: 'Speichern', disabled: !writable }));
   }
@@ -524,9 +527,9 @@
     api('GET', 'admin/devices', undefined, function (code, r) {
       if (!okOr(code, r)) return;
       clear(v);
-      v.appendChild(h('p', { cls: 'muted small', text: 'Angeschlossene Empfänger. Mit einer eigenen Seriennummer (z. B. „2m“) findet crabSDR jeden Stick zuverlässig wieder, egal an welchem USB-Anschluss. Ein Stick, der gerade als Band läuft, kann nicht umprogrammiert werden.' }));
+      v.appendChild(h('p', { cls: 'muted small', text: 'Angeschlossene Empfänger (über SoapySDR gefunden). „Eintrag im Band“ zeigt, was in ein neues Band gehört. RTL-Sticks: mit einer eigenen Seriennummer (z. B. „2m“) findet crabSDR jeden Stick zuverlässig wieder, egal an welchem USB-Anschluss; ein Stick, der gerade als Band läuft, kann nicht umprogrammiert werden.' }));
       if (!r.devices.length) { v.appendChild(h('p', { cls: 'muted', text: 'Keine Empfänger gefunden.' })); return; }
-      v.appendChild(table(['Gerät', 'Seriennummer', 'als Band', 'Hinweis', ''], r.devices.map(function (d) {
+      v.appendChild(table(['Gerät', 'Seriennummer', 'Eintrag im Band', 'als Band', 'Hinweis', ''], r.devices.map(function (d) {
         var act = null;
         if (d.driver === 'rtlsdr' && d.index != null) {
           var inp = h('input', { type: 'text', value: d.serial || '', maxlength: '16', size: '10' });
@@ -535,7 +538,9 @@
             api('POST', 'admin/devices/serial', { index: d.index, serial: inp.value.trim() }, function (c2, r2) { okOr(c2, r2, r2.message); });
           } }));
         }
-        return [d.label || d.product || d.driver, d.serial || '–', d.band || '–', d.duplicate_serial ? 'Seriennummer doppelt!' : (d.available ? '' : 'belegt'), act || ''];
+        var entry = d.config && d.config.device ? h('code', { cls: 'small', text: 'driver = "' + d.config.driver + '"  device = "' + d.config.device + '"' }) : '–';
+        var note = d.duplicate_serial ? 'Seriennummer doppelt!' : (d.hint || (d.available ? '' : 'belegt'));
+        return [d.label || d.product || d.driver, d.serial || '–', entry, d.band || '–', note, act || ''];
       })));
     });
   }

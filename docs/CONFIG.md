@@ -78,7 +78,7 @@ nichts; jede weitere belegte Frequenz etwa 0,4 % CPU (x86), jedes Band mit 2,048
 | `label` | `id` | Anzeige in der Bandleiste |
 | `note` | – | Kurzbeschreibung (Tooltip, Info-Seite) |
 | `driver` | `rtl_tcp` | Quelle: `rtl_sdr` (Stick am Rechner), `rtl_tcp` (Stick über das Netz), `hackrf`, `rx_sdr` (SoapySDR) |
-| `device` | `0` | Index oder Seriennummer des Sticks (`rtl_sdr`, `hackrf`, `rx_sdr`) |
+| `device` | `0` | Index oder Seriennummer des Sticks (`rtl_sdr`, `hackrf`); bei `rx_sdr` die SoapySDR-Angabe, z. B. `driver=soapyMiri` oder `driver=airspy,serial=…` (siehe unten) |
 | `host`, `port` | `127.0.0.1`, `1234` | Adresse des `rtl_tcp`-Servers |
 | `center_freq` | – (Pflicht) | Mitte des Wasserfalls in Hz |
 | `sample_rate` | `2048000` | Abtastrate; sichtbare Breite ≈ Abtastrate |
@@ -92,11 +92,28 @@ nichts; jede weitere belegte Frequenz etwa 0,4 % CPU (x86), jedes Band mit 2,048
 | `admin_only` | `false` | nur für Admins (hat Vorrang vor `guest`) |
 | `fft_size` | `4096` | Punkte der FFT (Wasserfall-Auflösung) |
 | `fft_fps` | `50` | Wasserfall-Zeilen pro Sekunde |
-| `gain_elements` | – | Verstärkerstufen einzeln, z. B. `{ IFGR = 40, RFGR = 2 }` (SDRplay über SoapySDR) |
+| `gain_elements` | – | Verstärkerstufen einzeln, z. B. `{ LNA = 24, Baseband = 30 }` (SoapySDR-Geräte) |
+| `format` | `cs16` | nur `rx_sdr`: Sample-Format – `cs16` (16 Bit, volle Dynamik), `cf32` (Module, die nur Gleitkomma liefern), `cu8` (8 Bit, halbe Datenmenge). Bei 16 Bit und Gleitkomma zieht crabSDR den Gleichanteil ab (Mittenspitze bei Null-ZF-Empfängern) |
 
 Alte Schlüsselnamen gelten weiter, `--check` weist darauf hin: `[[sdrs]]` → `[[bands]]`, `sdr_driver` → `driver`,
 `sdr_device` → `device`, `sdr_tcp_host` → `host`, `sdr_tcp_port` → `port`, `default_mode` → `mode`, die Tabelle
 `[smeter_cal]` → `smeter_cal` im Band.
+
+### Empfänger
+
+| Gerät | `driver` | `device` | Treiber (frei) |
+|---|---|---|---|
+| RTL-SDR-Stick | `rtl_sdr` | Index oder Seriennummer | Paket `rtl-sdr` |
+| RTL-SDR im Netz | `rtl_tcp` | – (`host`, `port`) | `rtl_tcp` auf dem anderen Rechner |
+| HackRF | `hackrf` | Index | Paket `hackrf` |
+| Airspy, Airspy HF+ | `rx_sdr` | `driver=airspy` bzw. `driver=airspyhf` | SoapySDR-Module aus Debian |
+| MSi2500 / SDRplay RSP1 und Nachbauten | `rx_sdr` | `driver=soapyMiri` | [libmirisdr-5](https://github.com/ericek111/libmirisdr-5) und [SoapyMiri](https://github.com/ericek111/SoapyMiri) |
+| LimeSDR, PlutoSDR, bladeRF, USRP | `rx_sdr` | `driver=lime`, `driver=plutosdr`, … | SoapySDR-Module |
+
+`rx_sdr` stammt aus [rx_tools](https://github.com/rxseger/rx_tools) (im Docker-Image enthalten). Welche Geräte
+SoapySDR findet und was ins Band gehört, zeigt die Admin-Seite unter „Sticks“ (oder `SoapySDRUtil --find`).
+Das alte Debian-Modul `driver=miri` für den MSi2500 verliert Samples und stürzt ab – dafür libmirisdr-5 und SoapyMiri
+aus dem Quellcode bauen (`cmake`, `make install`; beide nach `/usr/local`, die alte `libmirisdr0` stört nicht).
 
 ## `[[decoders]]` – Decoder hören ständig mit
 

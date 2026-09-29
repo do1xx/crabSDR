@@ -1,11 +1,12 @@
 //! Subprocess-based SDR driver.
 //!
 //! Starts rtl_sdr / rx_sdr / hackrf_transfer as a child process,
-//! reads raw u8 IQ from stdout, converts to Complex32, sends via mpsc.
+//! reads raw IQ from stdout (8 Bit bei rtl_sdr/hackrf, bei rx_sdr 16 Bit oder Gleitkomma, siehe `IqFormat`),
+//! converts to Complex32, sends via mpsc.
 //!
 //! Port of backend/sdr/manager.py (subprocess path)
 
-use crate::{u8_to_complex, DriverCommand, SdrConfig};
+use crate::{to_complex, DriverCommand, IqFormat, SdrConfig};
 use crabsdr_core::IqBuffer;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 use tokio::process::Command;
@@ -147,9 +148,14 @@ impl SubprocessDriver {
             }
         });
 
-        // Read IQ in chunks: fft_size * 2 bytes = fft_size IQ samples
-        let chunk_size = 8192;
+        // IQ in Blöcken zu 4096 Samples lesen (8 Bit: 8192 Bytes wie bisher, 16 Bit: 16384, Gleitkomma: 32768)
+        let fmt = self.config.iq_format();
+        let chunk_size = 4096 * fmt.bytes_per_sample();
         let mut buf = vec![0u8; chunk_size];
+        // Gleichanteil langsam abziehen (Zeitkonstante ~0,2 s): Null-ZF-Empfänger wie der MSi2500 haben eine kräftige
+        // Mittenspitze. Nur bei 16 Bit/Gleitkomma – der 8-Bit-Weg der RTL-Sticks bleibt wie er ist.
+        let mut dc = num_complex::Complex32::new(0.0, 0.0);
+        let mut dc_ready = false;
         let mut ran_ok = false;
         let mut iq_send_count: u64 = 0;
 
@@ -170,7 +176,12 @@ impl SubprocessDriver {
                             if iq_send_count <= 5 || iq_send_count % 5000 == 0 {
                                 info!("[{}] IQ chunk #{} ({} bytes)", sdr_label, iq_send_count, buf.len());
                             }
-                            let iq = u8_to_complex(&buf);
+                            let mut iq = to_complex(fmt, &buf);
+                            if fmt != IqFormat::Cu8 && !iq.is_empty() {
+                                let m = iq.iter().sum::<num_complex::Complex32>() / iq.len() as f32;
+                                dc = if dc_ready { dc * 0.99 + m * 0.01 } else { dc_ready = true; m };
+                                for x in iq.iter_mut() { *x -= dc; }
+                            }
                             // Use try_send to avoid blocking if DSP thread is slow
                             match iq_tx.try_send(iq) {
                                 Ok(()) => {}
@@ -362,12 +373,18 @@ impl SubprocessDriver {
                         .collect::<Vec<_>>()
                         .join(",")
                 };
+                // Format: Eingang = Ausgang bei cs16/cf32 (keine Umrechnung; manche Module können nur CF32), bei cu8
+                // Eingang CS16 (rx_sdr rechnet um)
+                let fmt = c.iq_format();
+                let input = if fmt == IqFormat::Cu8 { IqFormat::Cs16 } else { fmt };
                 vec![
                     "rx_sdr".into(),
                     "-f".into(), c.center_freq.to_string(),
                     "-s".into(), c.sample_rate.to_string(),
                     "-g".into(), gain_str,
                     "-d".into(), c.device.clone(),
+                    "-I".into(), input.rx_sdr_name().into(),
+                    "-F".into(), fmt.rx_sdr_name().into(),
                     "-".into(),
                 ]
             }

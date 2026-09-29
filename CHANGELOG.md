@@ -2,6 +2,14 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Empfänger
+- SoapySDR-Geräte (`driver = "rx_sdr"`) werden mit 16 Bit gelesen statt 8 Bit – volle Dynamik für Airspy, SDRplay/MSi2500,
+  LimeSDR, PlutoSDR; neue Band-Einstellung `format` (`cs16`, `cf32`, `cu8`); Gleichanteil wird abgezogen.
+- MSi2500 / SDRplay RSP1 und Nachbauten über die freien Treiber libmirisdr-5 + SoapyMiri (`device = "driver=soapyMiri"`).
+- Admin-Seite „Sticks“: zu jedem gefundenen Gerät der passende Eintrag fürs Band, Zuordnung auch für SoapySDR-Geräte.
+
 ## 0.2.0 – 2026-09-29
 
 Eine einheitliche crabSDR-Fassung: gleiche Oberfläche für jede Station, alles über die Konfiguration einstellbar.

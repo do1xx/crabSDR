@@ -400,12 +400,23 @@ pub async fn devices(State(state): State<Arc<AppState>>, headers: HeaderMap) -> 
     let cfg = state.config.read().await;
     let mut serials: HashMap<String, usize> = HashMap::new();
     for d in found.iter().filter(|d| d.driver == "rtlsdr" && !d.serial.is_empty()) { *serials.entry(d.serial.clone()).or_default() += 1; }
+    let has_soapymiri = found.iter().any(|d| d.driver == "soapyMiri");
     let list: Vec<Value> = found.iter().map(|d| {
         let index = (d.driver == "rtlsdr").then(|| rtl_index(&found, d)).flatten();
-        let band = cfg.sdrs.iter().find(|s| (!d.serial.is_empty() && s.sdr_device == d.serial)
-            || (s.sdr_driver == "rtl_sdr" && d.driver == "rtlsdr" && s.sdr_device.parse::<u32>().ok() == index)).map(|s| s.id.clone());
+        // Eintrag für die Konfiguration: RTL-Sticks direkt (rtl_sdr, Seriennummer), alles andere über SoapySDR (rx_sdr)
+        let soapy_dev = if d.serial.is_empty() { format!("driver={}", d.driver) } else { format!("driver={},serial={}", d.driver, d.serial) };
+        let (cdrv, cdev) = if d.driver == "rtlsdr" {
+            ("rtl_sdr".to_string(), if d.serial.is_empty() { index.map(|i| i.to_string()).unwrap_or_default() } else { d.serial.clone() })
+        } else { ("rx_sdr".to_string(), soapy_dev.clone()) };
+        let band = cfg.sdrs.iter().find(|s| (s.sdr_driver == "rtl_sdr" && d.driver == "rtlsdr" && ((!d.serial.is_empty() && s.sdr_device == d.serial) || s.sdr_device.parse::<u32>().ok() == index))
+            || (["rx_sdr", "soapy"].contains(&s.sdr_driver.as_str()) && d.driver != "rtlsdr"
+                && s.sdr_device.split(',').any(|kv| kv.trim() == format!("driver={}", d.driver))
+                && (d.serial.is_empty() || !s.sdr_device.contains("serial=") || s.sdr_device.contains(&format!("serial={}", d.serial))))).map(|s| s.id.clone());
+        let hint = if d.driver == "miri" && has_soapymiri { Some("alter Treiber – dasselbe Gerät über soapyMiri nehmen") }
+            else if d.driver == "sdrplay" { Some("braucht die unfreie SDRplay-API") } else { None };
         json!({"driver": d.driver, "label": d.label, "serial": d.serial, "product": d.product, "available": d.available, "index": index, "band": band,
-            "duplicate_serial": d.driver == "rtlsdr" && serials.get(&d.serial).copied().unwrap_or(0) > 1})
+            "duplicate_serial": d.driver == "rtlsdr" && serials.get(&d.serial).copied().unwrap_or(0) > 1,
+            "config": {"driver": cdrv, "device": cdev}, "hint": hint})
     }).collect();
     ok(json!({"devices": list}))
 }
