@@ -21,10 +21,12 @@ Mit Docker:     docker compose up -d        → http://<rechner>:8080   (Konfigu
 Ohne Docker:    sudo ./install.sh           → http://<rechner>:8080   (Konfiguration: /etc/crabsdr/config.toml)
 Kleines Image (Alpine, nur RTL-SDR, ~20 MB):  docker build -f Dockerfile.lite -t crabsdr:lite .
 Konfiguration prüfen:  crabsdr-server --check <config.toml>   (Erklärung aller Einstellungen: docs/CONFIG.md)
-Admin-Passwort beim ersten Start im Log: „Admin password“.
+Admin-Passwort beim ersten Start im Log: journalctl -u crabsdr | grep Passwort (Docker: docker compose logs | grep Passwort).
 Unterstützt: x86-64, ARM64 (Pi 4/5, Odroid N2), ARMv7 (Odroid XU4, Pi 2/3 32 Bit).
 Empfänger: RTL-SDR (rtl_sdr), rtl_tcp übers Netz, HackRF (hackrf_transfer); Airspy, Mirics, LimeSDR usw. über
 SoapySDR (rx_sdr) – im vollen Docker-Image enthalten, ohne Docker rx_tools selbst installieren.
 Das Server-Programm ist statisch gebaut und braucht keine weiteren Bibliotheken.
 TXT
-tar -C dist -czf "dist/crabsdr-$V.tar.gz" "crabsdr-$V" && ls -la "dist/crabsdr-$V.tar.gz"
+# ohne macOS-Zusatzattribute (sonst warnt GNU tar beim Entpacken)
+if tar --version 2>/dev/null | grep -q bsdtar; then X="--no-xattrs"; else X=""; fi
+COPYFILE_DISABLE=1 tar $X -C dist -czf "dist/crabsdr-$V.tar.gz" "crabsdr-$V" && ls -la "dist/crabsdr-$V.tar.gz"

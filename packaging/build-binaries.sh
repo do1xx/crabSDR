@@ -22,6 +22,7 @@ fi
 export RUSTFLAGS="-C link-arg=-lc -C link-arg=-lm" OPUS_LIB_DIR=$OP OPUS_STATIC=1 OPUS_NO_PKG=1
 cargo build --release --target $T 2>&1 | grep -E "^error|error\[|Finished|undefined reference" | head -5 || true
 mkdir -p dist-out/$A && cp target/$T/release/crabsdr-server dist-out/$A/
+chown -R "${HOST_UID:-0}:${HOST_GID:-0}" dist-out   # unter Linux (z. B. GitHub) sonst root-eigen, der Aufrufer könnte sie nicht verschieben
 IN
 for a in $ARCHS; do
   case $a in
@@ -32,7 +33,7 @@ for a in $ARCHS; do
   esac
   echo "== $a ($T)"
   docker run --rm --platform linux/amd64 -v "$PWD/backend-rs:/home/rust/src" -v "crabsdr-musl-cargo-$a:/root/.cargo/registry" \
-    -v "crabsdr-musl-target-$a:/home/rust/src/target" -w /home/rust/src -e T=$T -e A=$a -e CRABSDR_GIT="${CRABSDR_GIT:-}" "$IMG" sh .musl-build.sh
+    -v "crabsdr-musl-target-$a:/home/rust/src/target" -w /home/rust/src -e T=$T -e A=$a -e CRABSDR_GIT="${CRABSDR_GIT:-}" -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" "$IMG" sh .musl-build.sh
   mkdir -p dist/bin/$a && mv backend-rs/dist-out/$a/crabsdr-server dist/bin/$a/ && rmdir backend-rs/dist-out/$a
   ls -la dist/bin/$a/crabsdr-server
 done

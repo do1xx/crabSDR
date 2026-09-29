@@ -32,7 +32,10 @@ Jeder Hörer bekommt seinen eigenen Kanal (Frequenz, Betriebsart, Bandbreite), D
 | `chat.rs` | Chat und Logbuch (SQLite `pinnwand.db`), Hörer online |
 | `digi.rs` | Daten der Digital-Seite aus den Datenordnern der Decoder |
 | `check.rs` | `crabsdr-server --check` |
-| `admin.rs`, `auth.rs`, `tunnel.rs` | REST-Admin (Benutzer, Bänder), Anmeldung, optionaler Verzeichnis-Tunnel |
+| `auth.rs`, `access.rs`, `ratelimit.rs` | Anmeldung, Rechte je Band und Decoder, Anmeldebremse ([SECURITY.md](SECURITY.md)) |
+| `admin.rs`, `confedit.rs` | Admin-Schnittstelle: Überblick, Benutzer, Konfiguration bearbeiten (Kommentare bleiben, Sicherungen) |
+| `directory.rs` | optionaler Eintrag im Verzeichnis crabsdr.de (`[directory]`) |
+| `tunnel.rs` | experimenteller Verzeichnis-Tunnel (`[site]`) |
 
 ## Kosten
 
@@ -66,6 +69,9 @@ Befehle vom Browser: `tune` (Frequenz, Modus, Bandbreite), `untune`, `set_squelc
 | `/api/decoders`, `/api/decoders/events?since=&wait=1` | Decoder-Zustand, Meldungen (Langabfrage) |
 | `/digi/aprs.json`, `ft8.json`, `sstv.json`, `relais.json` | Übersichten der Decoder |
 | `/logbuch/api/chat`, `/logbuch/api/log`, `/logbuch/api/online` | Chat, Logbuch, Hörer online |
+| `/admin/`, `/api/admin/…` | Admin-Seite und ihre Schnittstelle (nur mit Admin-Anmeldung) |
+| `/api/auth/…` | Anmelden, Passwort ändern, eigenes Konto |
+| `/api/directory` | Angaben fürs Verzeichnis (404, solange `[directory]` aus ist) |
 
 ## Oberfläche (`web/`)
 
@@ -78,6 +84,8 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt.
 | `ui.js` | Bedienung: Bandleiste, Schnellwahl, Frequenzliste, S-Meter, Tastatur, Teilen, Aufnahme, Chat |
 | `ui.css`, `look.css` | Aussehen (hell/dunkel) |
 | `digi/`, `logbuch/`, `info/` | Unterseiten; `common.js` setzt Kopf, Reiter und Stationsname aus `ui.json` |
+| `account.js` | Anmelden auf der Hören-Seite (Mitglieder-Bänder) |
+| `admin/` | Admin-Seite (kein Inline-Code, eigene Sicherheitsköpfe) |
 
 ## Decoder-Plugins (`plugins/<name>/`)
 

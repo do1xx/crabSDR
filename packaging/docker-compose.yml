@@ -9,4 +9,4 @@ services:
     ports: ["8080:8080"]
     volumes: ["./data:/data"]           # config.toml, Datenbank; beim ersten Start wird die Beispielkonfiguration angelegt
     devices: ["/dev/bus/usb:/dev/bus/usb"]   # USB-Durchreichung für die Sticks
-    # Beim ersten Start steht das Admin-Passwort im Log:  docker compose logs | grep "Admin password"
+    # Beim ersten Start steht das Admin-Passwort im Log:  docker compose logs | grep Passwort

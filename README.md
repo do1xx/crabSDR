@@ -3,73 +3,54 @@
 </p>
 
 <p align="center">
-  <b>A WebSDR you can run yourself.</b> One small program turns RTL-SDR sticks into a receiver that many people
-  can use in the browser at the same time – each on their own frequency.
+  <b>A modern, minimalist WebSDR.</b> Goal: stable and simple.
 </p>
 
 <p align="center">
-  <a href="#quick-start">Quick start</a> ·
+  <a href="#install">Install</a> ·
   <a href="docs/CONFIG.md">Configuration</a> ·
   <a href="docs/ARCHITECTURE.md">Architecture</a> ·
   <a href="CHANGELOG.md">Changes</a> ·
+  <a href="https://crabsdr.de">crabsdr.de</a> ·
   <a href="README.de.md">Deutsch</a>
 </p>
 
 ![Listening: waterfall, tuning, S-meter](docs/screenshots/hoeren.png)
 
-## What it does
-
-- **Many listeners, one receiver.** Everyone tunes independently (FM, AM, USB, LSB, CW). Listeners on the same
-  frequency share one channel, so a hundred listeners cost little more than one.
-- **Several bands side by side.** One stick per band; switch bands on and off, they split the screen.
-- **Clean audio.** FFT channel filter with continuous phase, FM without pumping, Opus at 24 kHz (PCM fallback).
-- **Decoders that never sleep.** APRS (with RX iGate to APRS-IS), FT8 and SSTV run permanently as plugins.
-  Results show up on the **Digital** page: map, stations, packets, a range plot, SSTV gallery. Optional MQTT.
-- **For the listeners:** chat, a logbook ("who did you hear, from where") with distance and bearing,
-  share links with frequency and mode, recording to WAV, keyboard shortcuts, light and dark theme, phone layout.
-- **For the operator:** a web admin page (`/admin/`) for bands, decoders, users and the config file, one small
-  config file with sensible defaults, `crabsdr-server --check` before every restart, static binaries for x86-64,
-  ARM64 and ARMv7 (Raspberry Pi), Docker images, systemd service.
-- **Members and private bands.** Bands can be public, for signed-in members, or admin only; decoders can be
-  restricted the same way. Accounts, sessions and the admin page follow [docs/SECURITY.md](docs/SECURITY.md).
+- Many listeners on one receiver, each on their own frequency (FM, AM, USB, LSB, CW).
+- Several bands per station: RTL-SDR, `rtl_tcp`, HackRF, SoapySDR (`rx_sdr`).
+- Decoder plugins that always listen: APRS (with RX iGate), FT8, SSTV.
+- Chat, logbook, admin page for bands, decoders, users and the config file.
+- Static binaries for x86-64, ARM64 and ARMv7 (Raspberry Pi 2 and newer).
 
 | Two bands | Digital: APRS | Phone |
 |---|---|---|
 | ![Two bands](docs/screenshots/zwei-baender.png) | ![APRS map](docs/screenshots/digital-aprs.png) | ![Phone](docs/screenshots/handy.png) |
 
+## Install
 
-## Quick start
+Downloads: [Releases](https://github.com/do1xx/crabSDR/releases).
 
-You need an RTL-SDR stick, or any source that speaks `rtl_tcp`, a HackRF, or SoapySDR via `rx_sdr`.
-
-### Release archive (Debian, Ubuntu, Raspberry Pi OS)
-
-```bash
-tar xzf crabsdr-0.2.0.tar.gz && cd crabsdr-0.2.0
-sudo ./install.sh
-```
-
-`install.sh` installs `rtl-sdr`, blocks the DVB kernel driver, creates the service user, copies everything to
-`/opt/crabsdr` and a starting config to `/etc/crabsdr/config.toml`, checks it and starts the service.
-Open `http://<machine>:8080`. The admin page is `/admin/`; the first password for the account `admin` is printed
-once in the log (`journalctl -u crabsdr | grep Passwort`) and must be changed on first sign-in. After editing the config
-by hand:
+**Raspberry Pi OS, Debian, Ubuntu** – Debian package (`arm64`: Pi 3/4/5 with 64-bit OS, `armhf`: 32-bit OS on Pi 2 and
+newer, `amd64`: PC):
 
 ```bash
-sudo /opt/crabsdr/bin/crabsdr-server --check /etc/crabsdr/config.toml && sudo systemctl restart crabsdr
+sudo apt install ./crabsdr_0.2.0_arm64.deb
 ```
 
-### Docker
+Then open `http://<machine>:8080`. The admin page is behind the crab in the bottom right corner; the first password
+for the account `admin` is in the log (`journalctl -u crabsdr | grep Passwort`) and must be changed on first sign-in.
+Configuration: `/etc/crabsdr/config.toml` (or on the admin page). Updates never overwrite it.
+
+**Other Linux** – release archive:
 
 ```bash
-sh packaging/build-binaries.sh amd64      # or arm64 / armv7; needs Docker, builds static binaries into dist/bin
-docker compose -f packaging/docker-compose.yml up -d --build
+tar xzf crabsdr-0.2.0.tar.gz && cd crabsdr-0.2.0 && sudo ./install.sh
 ```
 
-The first start writes `data/config.toml` (next to the compose file) from the template. The full image contains
-the decoders (direwolf, WSJT-X, numpy); `packaging/Dockerfile.lite` builds a small image without them.
+**Docker** – the archive contains `docker-compose.yml`: `docker compose up -d`.
 
-### From source
+**From source** – Rust stable:
 
 ```bash
 cd backend-rs && cargo build --release
@@ -78,7 +59,7 @@ cd backend-rs && cargo build --release
 
 ## Configuration
 
-One TOML file. A station needs a name and one band; everything else has defaults.
+One TOML file; a station needs a name and one band.
 
 ```toml
 [station]
@@ -98,32 +79,25 @@ plugin = "aprs"
 freq = 144800000
 ```
 
-Every key is explained in [docs/CONFIG.md](docs/CONFIG.md) (German), a commented template is
-[packaging/config.example.toml](packaging/config.example.toml). A broken or unreadable config never starts silently
-with defaults: crabSDR stops with the line and column of the error, and `--check` reports typos, decoders outside
-all bands, missing programs and unreachable sources.
-
-A **site folder** (`site_dir`) adds your logo, quick-select presets, markers, a repeater list or your own info page
-without touching the program files.
+Check before restarting: `crabsdr-server --check /etc/crabsdr/config.toml`. All keys: [docs/CONFIG.md](docs/CONFIG.md)
+(German), commented template: [packaging/config.example.toml](packaging/config.example.toml).
 
 ## Decoders
 
-A decoder is a folder in `plugins/` with a `decoder.json` (what it needs: mode, sample rate, bandwidth, programs)
-and a program that reads audio on stdin and prints JSON lines. crabSDR starts it, feeds it, restarts it and passes
-its results on. Included:
-
 | Plugin | Needs | Result |
 |---|---|---|
-| `aprs` | direwolf | packets, stations (direct or via digipeater), repeaters, optional RX iGate |
-| `ft8` | jt9 (WSJT-X) | decodes, stations with locator over 90 days |
-| `sstv` | python3-numpy, python3-pil | images (Martin, Scottie, Robot, PD – the ISS uses PD 120) |
+| `aprs` | direwolf | packets, stations, optional RX iGate to APRS-IS |
+| `ft8` | jt9 (WSJT-X) | decodes, stations over 90 days |
+| `sstv` | python3-numpy, python3-pil | images (Martin, Scottie, Robot, PD) |
+
+A decoder is a folder in `plugins/` with a `decoder.json` and a program that reads audio on stdin and prints JSON
+lines ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).
 
 ## Development
 
 ```bash
-python3 tools/phase0/synth.py testdata/synth.cu8 --sec 30   # test signal for the DSP golden test
 (cd backend-rs && cargo test --workspace)
-tools/e2e/run.sh                                            # browser tests, see tools/e2e/README.md
+tools/e2e/run.sh            # browser tests, see tools/e2e/README.md
 ```
 
 The web interface in `web/` is plain HTML, CSS and JavaScript without a build step. Code comments and most
@@ -131,8 +105,4 @@ documentation are in German.
 
 ## License
 
-MIT – see [LICENSE](LICENSE). crabSDR contains no code from other WebSDR programs.
-
-## Author
-
-Dirk, DO1XX
+MIT – see [LICENSE](LICENSE). Dirk, DO1XX.

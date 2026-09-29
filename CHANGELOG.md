@@ -51,6 +51,8 @@ Eine einheitliche crabSDR-Fassung: gleiche Oberfläche für jede Station, alles 
 - Beschreibung aller Einstellungen: `docs/CONFIG.md`.
 - Ruhiges Protokoll: fehlt eine Quelle dauerhaft, meldet der Treiber das einmal und danach höchstens alle 10 min
   (Abstand 2 → 30 s); ohne Terminal keine Farbcodes; Standard-Stufe `info`.
+- Debian-Pakete für Raspberry Pi OS, Debian und Ubuntu (`arm64`, `armhf`, `amd64`); die Konfiguration fasst ein Update nie an.
+- Automatischer Bau nach jeder Änderung auf `main` (Vorabversion „Entwicklungsstand“), Release-Entwurf bei jedem Tag `v*`.
 
 ## 0.1.0 – 2026-03
 
