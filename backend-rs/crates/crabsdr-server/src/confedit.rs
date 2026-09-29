@@ -30,7 +30,7 @@ const DIRECTORY_KEYS: &[&str] = &["enabled"];
 const UI_KEYS: &[&str] = &["login", "chat", "logbook", "digital", "info", "recording", "status", "decoders", "banner", "impressum", "datenschutz", "admin"];
 const TOP_KEYS: &[&str] = &["builtin_chat"];
 const BAND_KEYS: &[&str] = &["id", "label", "note", "driver", "device", "host", "port", "center_freq", "sample_rate", "gain", "ppm", "mode",
-    "enabled", "guest", "admin_only", "bias_tee", "smeter_cal", "fft_size", "fft_fps", "format"];
+    "enabled", "guest", "admin_only", "bias_tee", "smeter_cal", "fft_size", "fft_fps", "format", "settings"];
 const DECODER_KEYS: &[&str] = &["plugin", "freq", "id", "band", "label", "enabled", "public", "options"];
 /// neuer Name → alter Name (steht der alte in der Datei, wird er geändert)
 const BAND_ALIASES: &[(&str, &str)] = &[("driver", "sdr_driver"), ("device", "sdr_device"), ("host", "sdr_tcp_host"), ("port", "sdr_tcp_port"), ("mode", "default_mode")];

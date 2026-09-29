@@ -378,7 +378,7 @@ impl SubprocessDriver {
                 // Eingang CS16 (rx_sdr rechnet um)
                 let fmt = c.iq_format();
                 let input = if fmt == IqFormat::Cu8 { IqFormat::Cs16 } else { fmt };
-                vec![
+                let mut v: Vec<String> = vec![
                     "rx_sdr".into(),
                     "-f".into(), c.center_freq.to_string(),
                     "-s".into(), c.sample_rate.to_string(),
@@ -386,8 +386,10 @@ impl SubprocessDriver {
                     "-d".into(), c.device.clone(),
                     "-I".into(), input.rx_sdr_name().into(),
                     "-F".into(), fmt.rx_sdr_name().into(),
-                    "-".into(),
-                ]
+                ];
+                if let Some(st) = c.settings.as_deref().filter(|s| !s.is_empty()) { v.push("-t".into()); v.push(st.to_string()); }
+                v.push("-".into());
+                v
             }
             other => {
                 error!("Unknown SDR driver: {}", other);

@@ -12,6 +12,7 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 - Hohe Abtastraten ohne Pfeifton: FFT-Größe automatisch nach Abtastrate (≈ 500-Hz-Bins), Kanal-Bins als Vielfaches
   von 4 (vorher fehlte je Block ein halbes Sample – auch bei 7-kHz-Filtern mit 2,048 MS/s).
 - Protokoll: IQ-Blöcke nur beim Start und etwa stündlich.
+- Band-Einstellung `settings` für SoapySDR-Geräte (`rx_sdr -t`), z. B. `transfer=BULK` für MSi2500/RSP1.
 
 ## 0.2.0 – 2026-09-29
 

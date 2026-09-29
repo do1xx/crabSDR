@@ -59,6 +59,10 @@ pub struct SdrInstanceConfig {
     /// Gleitkomma liefern), "cu8" (wie RTL-Sticks, halbe Datenmenge)
     #[serde(default)]
     pub format: Option<String>,
+    /// Nur driver = "rx_sdr": Geräte-Einstellungen für SoapySDR (rx_sdr -t), z. B. "transfer=BULK" (SoapyMiri: USB-Bulk
+    /// statt isochron) oder "biastee=true"
+    #[serde(default)]
+    pub settings: Option<String>,
 }
 
 /// Directory/tunnel site configuration for connecting to a central directory server.
@@ -447,6 +451,7 @@ impl Config {
             note: None,
             smeter_cal: None,
             format: None,
+            settings: None,
         };
         ServerConfig {
             port: self.port,
@@ -621,6 +626,11 @@ impl ServerConfig {
             if b.center_freq == 0 { err.push(format!("Band „{}“: center_freq fehlt", b.id)); }
             if !["rtl_sdr", "rtl_tcp", "hackrf", "rx_sdr", "soapy", "airspy", "airspyhf", "file", "iq_file"].contains(&b.sdr_driver.as_str()) {
                 warn.push(format!("Band „{}“: driver „{}“ unbekannt (rtl_sdr, rtl_tcp, hackrf, rx_sdr)", b.id, b.sdr_driver));
+            }
+            if let Some(st) = &b.settings {
+                if !st.chars().all(|c| c.is_ascii_alphanumeric() || "=,_.-".contains(c)) || !st.split(',').all(|kv| kv.split_once('=').map_or(false, |(k, v)| !k.is_empty() && !v.is_empty())) {
+                    err.push(format!("Band „{}“: settings „{}“ – Form key=wert,key2=wert2 (Buchstaben, Ziffern, _ . -)", b.id, st));
+                } else if !["rx_sdr", "soapy"].contains(&b.sdr_driver.as_str()) { warn.push(format!("Band „{}“: settings gilt nur für driver = \"rx_sdr\" – wird ignoriert", b.id)); }
             }
             if let Some(f) = &b.format {
                 if !["cs16", "cf32", "cu8"].contains(&f.to_ascii_lowercase().as_str()) { err.push(format!("Band „{}“: format „{}“ unbekannt (cs16, cf32, cu8)", b.id, f)); }

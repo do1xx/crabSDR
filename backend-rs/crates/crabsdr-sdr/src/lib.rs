@@ -94,6 +94,8 @@ pub struct SdrConfig {
     pub gain_elements: HashMap<String, f64>,
     /// Rohformat für rx_sdr (`format` im Band); None = Voreinstellung des Treibers
     pub format: Option<String>,
+    /// SoapySDR-Geräte-Einstellungen für rx_sdr -t (`settings` im Band)
+    pub settings: Option<String>,
 }
 
 impl SdrConfig {
@@ -119,6 +121,7 @@ impl From<&crabsdr_core::Config> for SdrConfig {
             ppm: c.ppm,
             bias_tee: false,
             format: None,
+            settings: None,
             gain_elements: HashMap::new(),
         }
     }
@@ -138,6 +141,7 @@ impl From<&crabsdr_core::SdrInstanceConfig> for SdrConfig {
             bias_tee: c.bias_tee,
             gain_elements: c.gain_elements.clone().unwrap_or_default(),
             format: c.format.clone(),
+            settings: c.settings.clone(),
         }
     }
 }
@@ -202,7 +206,7 @@ mod tests {
         let c = f32_to_complex(&f);
         assert!((c[0].re - 0.25).abs() < 1e-7 && (c[0].im + 1.0).abs() < 1e-7);
         let mut sc = SdrConfig { driver: "rx_sdr".into(), device: "driver=soapyMiri".into(), tcp_host: String::new(), tcp_port: 0,
-            center_freq: 145_000_000, sample_rate: 2_048_000, gain: 30.0, ppm: 0, bias_tee: false, gain_elements: HashMap::new(), format: None };
+            center_freq: 145_000_000, sample_rate: 2_048_000, gain: 30.0, ppm: 0, bias_tee: false, gain_elements: HashMap::new(), format: None, settings: None };
         assert_eq!(sc.iq_format(), IqFormat::Cs16);
         sc.format = Some("cf32".into()); assert_eq!(sc.iq_format(), IqFormat::Cf32);
         sc.driver = "rtl_sdr".into(); assert_eq!(sc.iq_format(), IqFormat::Cu8);
