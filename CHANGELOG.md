@@ -2,7 +2,9 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## Unveröffentlicht
+## 0.3.0 – 2026-09-30
+
+Mehr Empfänger: SoapySDR mit 16 Bit, MSi2500/SDRplay RSP1 mit freien Treibern, kein Pfeifton bei hohen Abtastraten.
 
 ### Empfänger
 - SoapySDR-Geräte (`driver = "rx_sdr"`) werden mit 16 Bit gelesen statt 8 Bit – volle Dynamik für Airspy, SDRplay/MSi2500,
@@ -12,7 +14,11 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 - Hohe Abtastraten ohne Pfeifton: FFT-Größe automatisch nach Abtastrate (≈ 500-Hz-Bins), Kanal-Bins als Vielfaches
   von 4 (vorher fehlte je Block ein halbes Sample – auch bei 7-kHz-Filtern mit 2,048 MS/s).
 - Protokoll: IQ-Blöcke nur beim Start und etwa stündlich.
-- Band-Einstellung `settings` für SoapySDR-Geräte (`rx_sdr -t`), z. B. `transfer=BULK` für MSi2500/RSP1.
+- Band-Einstellung `settings` für SoapySDR-Geräte (`rx_sdr -t`). `transfer=BULK` für MSi2500/RSP1 braucht SoapyMiri mit
+  `packaging/soapymiri-transfer.patch`.
+
+### Oberfläche
+- Zoom (Knöpfe und Tasten + / −) zoomt um das gehörte Signal statt um die Mitte des Ausschnitts.
 
 ## 0.2.0 – 2026-09-29
 

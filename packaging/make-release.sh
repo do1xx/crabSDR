@@ -7,7 +7,7 @@ V=${1:-$(git describe --tags --always 2>/dev/null || date +%Y%m%d)}
 R=dist/crabsdr-$V; rm -rf "$R"; mkdir -p "$R"
 cp -r dist/bin "$R/bin"; cp -r web "$R/web"
 mkdir -p "$R/plugins"; for p in aprs ft8 sstv; do cp -r plugins/$p "$R/plugins/"; done; find "$R/plugins" -name __pycache__ -prune -exec rm -rf {} +
-cp packaging/install.sh packaging/crabsdr.service packaging/config.example.toml packaging/docker-entrypoint.sh LICENSE "$R/"
+cp packaging/install.sh packaging/crabsdr.service packaging/config.example.toml packaging/docker-entrypoint.sh packaging/soapymiri-transfer.patch LICENSE "$R/"
 mkdir -p "$R/docs" && cp docs/CONFIG.md "$R/docs/"
 # Dockerfile und compose mit den flachen Pfaden des Archivs
 for f in Dockerfile Dockerfile.lite; do
