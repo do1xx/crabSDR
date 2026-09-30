@@ -218,12 +218,13 @@ details.card > :last-child { margin-bottom: 10px; }
 .smeter { margin: 0; }
 .smeter-scale { position: relative; height: 13px; font-size: 9px; color: var(--faint); letter-spacing: .04em; }
 .smeter-scale span { position: absolute; transform: translateX(-50%); }
+.smeter-scale span:first-child { transform: none; } .smeter-scale span:last-child { transform: translateX(-100%); }
 .smeter-track { position: relative; height: 12px; background: var(--bg2); border-radius: 3px; overflow: hidden; border: 1px solid var(--line2); }
 .smeter-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, var(--ok) 0 41%, var(--warn) 41% 60%, var(--bad) 60%); transition: width .08s linear; }
 .smeter-peak { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--strong); left: 0; transition: left .2s; }
 .smeter-num { margin-top: 5px; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
 .smeter-num b { color: var(--accent); font-size: 14px; margin-right: 6px; }
-.smeter-num .gsnr { color: var(--faint); }
+.smeter-num .gabs { color: var(--faint); }
 #volumecontrol2 { width: 100%; accent-color: var(--accent); }
 
 .wfbtns { display: flex; gap: 4px; flex-wrap: wrap; }

@@ -519,7 +519,7 @@
      K (ui.json smeter.cal) wird einmal gemessen und bezieht sich auf 0 dB Verstärkung; die aktuellen Verstärkungen
      liefert gains.json (Wächter), deshalb bleibt die Anzeige nach einer Verstärkungsänderung richtig.
      Bänder ohne K: alter Offset (smeter.bands/offset) als Übergang. Balken: −145 … −25 dBm. */
-  var gains = {}, SM_MIN = -145, SM_SPAN = 120, peak = SM_MIN, peakTimer = 0;
+  var gains = {}, SNR_SPAN = 60, peak = 0, peakTimer = 0;   // Balken: 0–60 dB über dem Rauschen
   function loadGains() {
     var x = new XMLHttpRequest(); x.open('GET', 'gains.json?' + Date.now());
     x.onload = function () { try { gains = JSON.parse(x.responseText).bands || {}; } catch (e) {} };
@@ -534,20 +534,22 @@
     var s = 0;
     try { s = crabAudio.smeter(); } catch (e) { return; }
     var bn = bi && bi[band] ? bi[band].name : '';
-    var dbm = smeterDbm(s / 100 - 127, bn);
-    var pct = function (v) { return Math.max(0, Math.min(100, (v - SM_MIN) / SM_SPAN * 100)); };
-    $('gfill').style.width = pct(dbm) + '%';
-    $('mfill').style.width = pct(dbm) + '%';
-    if (dbm > peak || --peakTimer <= 0) { peak = dbm; peakTimer = 15; }
+    // Hauptwert: Rauschabstand (SNR) – Signal über dem Rauschen des Kanals, den der Server mitmisst; stimmt ohne Kalibrierung
+    var snr = (typeof _crab !== 'undefined' && _crab.level > -150 && _crab.floor > -150) ? Math.max(0, _crab.level - _crab.floor) : 0;
+    var pct = function (v) { return Math.max(0, Math.min(100, v / SNR_SPAN * 100)); };
+    $('gfill').style.width = pct(snr) + '%';
+    $('mfill').style.width = pct(snr) + '%';
+    if (snr > peak || --peakTimer <= 0) { peak = snr; peakTimer = 15; }
     $('gpeak').style.left = pct(peak) + '%';
-    $('gdbm').textContent = dbm.toFixed(0);
-    var su = dbm <= -93 ? 'S' + Math.max(0, Math.min(9, 1 + Math.floor((dbm + 141) / 6))) : 'S9+' + Math.round(dbm + 93);
-    $('gsunit').textContent = su;
-    // Abstand zum Rauschen des Kanals (der Server misst den Boden mit): unabhängig von der Kalibrierung
-    var snr = (typeof _crab !== 'undefined' && _crab.level > -150 && _crab.floor > -150) ? Math.max(0, _crab.level - _crab.floor) : null;
-    var snrTxt = snr === null ? '' : '+' + Math.round(snr) + ' dB';
-    $('gsnr').textContent = snrTxt ? '· ' + snrTxt + (lang === 'de' ? ' über Rauschen' : ' above noise') : '';
-    var mt = $('mtext'); if (mt) mt.textContent = su + ' · ' + dbm.toFixed(0) + ' dBm' + (snrTxt ? ' · ' + snrTxt : '');
+    $('gsnr').textContent = '+' + Math.round(snr);
+    // Nebenwert: S-Stufe und dBm nur, wenn die Station kalibriert ist (ui.json smeter.cal für dieses Band)
+    var cal = (ui.smeter && ui.smeter.cal) || {}, abs = '';
+    if (cal[bn] != null) {
+      var dbm = smeterDbm(s / 100 - 127, bn);
+      abs = (dbm <= -93 ? 'S' + Math.max(0, Math.min(9, 1 + Math.floor((dbm + 141) / 6))) : 'S9+' + Math.round(dbm + 93)) + ' · ' + dbm.toFixed(0) + ' dBm';
+    }
+    $('gabs').textContent = abs ? '· ' + abs : '';
+    var mt = $('mtext'); if (mt) mt.textContent = '+' + Math.round(snr) + ' dB SNR' + (abs ? ' · ' + abs : '');
   }
 
   /* ================= Ton freischalten ================= */
