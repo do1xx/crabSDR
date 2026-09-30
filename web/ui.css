@@ -90,6 +90,10 @@ select:focus, input:focus { outline: 1px solid var(--accent); outline-offset: 0;
 /* Empfänger */
 .rx-host { padding: 8px 16px 4px; }
 .rx-wrap { position: relative; margin: 0 auto; overflow: hidden; border: 1px solid var(--line); background: #000; }
+/* Streifen über der ersten Skala für die Hörer-Marken (sonst lägen sie über dem Empfänger und würden abgeschnitten).
+   Höhe = MARKROW in ui.js und _crabFill in core.js */
+.rx-wrap { padding-top: 22px; }
+.rx-wrap > .scales, .rx-wrap > .lmarks { top: 22px; }
 .rx { width: 1024px; background: #000; touch-action: none; }
 .rx canvas { image-rendering: auto; }
 .scale { position: relative; }
@@ -134,6 +138,8 @@ select:focus, input:focus { outline: 1px solid var(--accent); outline-offset: 0;
 .lmarks em.multi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--gv); }
 .lmarks em.multi::after { width: calc(var(--n, 2) * 3px); margin-left: calc(var(--n, 2) * -1.5px); background: var(--gh); opacity: .9; }
 .lmarks em.multi.me::before { width: 4px; }
+/* eingestellte Frequenz als Linie durch den Wasserfall (halbtransparent, verdeckt keine Signale) */
+.lmarks i.tline { position: absolute; width: 1px; margin-left: -0.5px; background: rgba(248,113,113,.55); }
 
 /* App-Layout (Desktop): Kopf + Bandleiste oben, Empfänger scrollt in der Mitte, Bedienleiste fest unten.
    Auf dem Handy (<700 px) normaler Seitenfluss mit fester Kurzleiste (.mbar). */

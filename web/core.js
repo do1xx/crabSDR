@@ -139,7 +139,7 @@ function zoomToFreq(b, zoom, f) {
   var startBin = Math.round((f - (e.centerfreq - e.samplerate / 2)) / binkhz - 512 * bpp / sc);
   e.zoom = zoom; e.start = Math.max(0, Math.min(e.fft - 1024 * bpp / sc, startBin));
   _crabGeom(b);
-  var B = _crab.bands[b]; if (B) { B.prev = null; B.liveSinceHist = 0; _crabSendWf(b); }
+  var B = _crab.bands[b]; if (B) { B.prev = null; B.liveSinceHist = 0; B.clearOnNext = true; _crabSendWf(b); }   // alte Zeilen gehören zu einem anderen Ausschnitt
   if (b === band) drawPassband();
   try { loadMarks(b); } catch (e) { showMarks(b); }
 }
@@ -628,7 +628,7 @@ function _crabZstd(src) {
 /* ===== WebSocket je Band ===== */
 function _crabSendWf(b) {
   var B = _crab.bands[b], e = bi[b];
-  if (B && B.ws && B.ws.readyState === 1 && band2id(b) >= 0) B.ws.send(JSON.stringify({ type: 'set_waterfall', zoom: e.szoom, start_bin: e.sstart, hist_rows: (wfMode === 0 || !_crab.histReady) ? 0 : wfHeight, slow: wfSlow, fmt: 'jpeg', mode: wfMode }));
+  if (B && B.ws && B.ws.readyState === 1 && band2id(b) >= 0) B.ws.send(JSON.stringify({ type: 'set_waterfall', zoom: e.szoom, start_bin: e.sstart, hist_rows: (wfMode === 0 || !_crab.histReady) ? 0 : wfHeight, slow: wfSlow, fmt: _crabScale(e.zoom, e) === 1 ? 'jpeg' : 'rows', mode: wfMode }));   // gestreckt: Rohzeilen, das JPEG kann der Browser nicht strecken
 }
 function _crabSendAll(msg) { _crab.bands.forEach(function (B) { if (B.ws && B.ws.readyState === 1) B.ws.send(JSON.stringify(msg)); }); }
 function _crabToken(cb) {
@@ -835,7 +835,7 @@ function _crabFill() {
   var main = document.getElementById('main'), rx = document.getElementById('rx'), wrap = document.getElementById('rxwrap');
   if (!main || !rx || !wrap) return;
   var host = wrap.parentNode, cs = getComputedStyle(host), sc = rx.getBoundingClientRect().width / 1024 || 1;
-  var avail = main.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 2;
+  var avail = main.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 2 - 22;   // 22 = Streifen für Hörer-Marken
   var extra = rx.offsetHeight - wfHeight * nWaterfalls;              // Skalen + Markerleisten (unskaliert)
   var want = Math.floor((avail / sc - extra) / nWaterfalls);
   want = Math.max(60, Math.min(1200, want));

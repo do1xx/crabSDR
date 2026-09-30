@@ -19,6 +19,7 @@
   var SOON = [];   // Bänder ohne Empfänger stehen in ui.json bands_off (ausgegraut), nicht mehr hier
   var MODEFILTER = { fm: [-6, 6], am: [-4, 4], usb: [0.3, 2.7], lsb: [-2.7, -0.3], cw: [-0.95, -0.55] };
   var PHONE_MAX = 700;          // darunter: ein Band, Handy-Bedienleiste
+  var MARKROW = 22;            // Streifen über der ersten Skala für Hörer-Marken (ui.css .rx-wrap padding-top)
   var PHONE_ZOOM = 2;           // Startzoom auf dem Handy (2 = Viertel des Bandes sichtbar)
 
   var lang = 'de', snap = 12.5, viewPref = 'one';   // Desktop: 'one' = ein Band groß (Standard), 'all' = alle Bänder gestapelt
@@ -41,7 +42,7 @@
     scale = Math.max(0.2, Math.min(3, avail / 1024));   // auch hochskalieren, bis die Breite gefüllt ist
     rx.style.transform = 'scale(' + scale + ')';
     wrap.style.width = Math.round(1024 * scale) + 'px';
-    wrap.style.height = Math.round(rx.offsetHeight * scale) + 'px';
+    wrap.style.height = (Math.round(rx.offsetHeight * scale) + MARKROW) + 'px';   // + Streifen für Hörer-Marken (ui.css)
     renderScales(true);
     try { var tp = document.querySelector('.top'), bd = document.querySelector('.bands'), pn = document.querySelector('.panel'); document.documentElement.style.setProperty('--top-h', (tp.offsetHeight + bd.offsetHeight) + 'px'); document.documentElement.style.setProperty('--panel-h', (pn.offsetHeight + document.querySelector('.foot').offsetHeight) + 'px'); } catch (e) {}
     fillHeight(24);   // große Hysterese: Layout-Rundungen (z. B. Scrollleiste) dürfen keine Neuberechnung auslösen
@@ -52,7 +53,7 @@
     tol = tol || 6;
     if (typeof wfHeight === 'undefined' || typeof wfWaiting === 'undefined' || wfWaiting > 0 || !nWaterfalls) return;
     var main = $('main'), host = wrap.parentNode, cs = getComputedStyle(host);
-    var avail = main.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 2;   // 2 = Rahmen von .rx-wrap
+    var avail = main.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 2 - MARKROW;   // 2 = Rahmen von .rx-wrap
     var extra = rx.offsetHeight - wfHeight * nWaterfalls;                                          // Skalen + Markerleisten (unskaliert)
     var want = Math.floor((avail / scale - extra) / nWaterfalls);
     want = nWaterfalls > 1 ? Math.max(70, Math.min(200, want)) : Math.max(120, Math.min(700, want));
@@ -235,6 +236,12 @@
       var b = id2band(i), e = bi[b], clip = $('clipscale' + i);
       if (!clip || clip.offsetParent === null) continue;
       var top = Math.round((clip.offsetTop + clip.offsetParent.offsetTop) * scale) - 20;
+      // eingestellte Frequenz: dünne Linie von der Skala durch den ganzen Wasserfall des gehörten Bandes
+      var B = _crab.bands[b];
+      if (b === band && B && B.canvas) {
+        var tx = freq2x(freq, b) * scale, lr = lmarks.getBoundingClientRect(), cr = B.canvas.getBoundingClientRect();
+        if (tx >= 0 && tx <= 1024 * scale) html += '<i class="tline" style="left:' + tx.toFixed(1) + 'px;top:' + (top + 20) + 'px;height:' + Math.max(0, Math.round(cr.bottom - lr.top - top - 20)) + 'px"></i>';
+      }
       var items = [];
       for (var j = 0; j < lsNames.length; j++) {
         if (lsBands[j] !== b || !lsNames[j]) continue;
