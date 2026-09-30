@@ -2,6 +2,14 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Oberfläche
+- Rauschsperre mit Regler: Schwelle in dB über dem Rauschen (0–30, Voreinstellung 6), neben dem Squelch-Schalter.
+
+### Empfänger
+- Doku: `settings = "flavour=SDRplay"` schaltet beim RSP1 die Preselektor-Filter nach dessen eigenem Plan (docs/CONFIG.md).
+
 ## 0.3.0 – 2026-09-30
 
 Mehr Empfänger: SoapySDR mit 16 Bit, MSi2500/SDRplay RSP1 mit freien Treibern, kein Pfeifton bei hohen Abtastraten.

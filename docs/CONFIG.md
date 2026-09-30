@@ -94,7 +94,7 @@ nichts; jede weitere belegte Frequenz etwa 0,4 % CPU (x86), jedes Band mit 2,048
 | `fft_fps` | `50` | Wasserfall-Zeilen pro Sekunde |
 | `gain_elements` | – | Verstärkerstufen einzeln, z. B. `{ LNA = 24, Baseband = 30 }` (SoapySDR-Geräte) |
 | `format` | `cs16` | nur `rx_sdr`: Sample-Format – `cs16` (16 Bit, volle Dynamik), `cf32` (Module, die nur Gleitkomma liefern), `cu8` (8 Bit, halbe Datenmenge). Bei 16 Bit und Gleitkomma zieht crabSDR den Gleichanteil ab (Mittenspitze bei Null-ZF-Empfängern) |
-| `settings` | – | nur `rx_sdr`: Geräte-Einstellungen für SoapySDR (`rx_sdr -t`), z. B. `"biastee=true"`; MSi2500/RSP1 mit `"transfer=BULK"` (USB-Bulk statt isochron, stabiler am Pi 4) braucht SoapyMiri mit [packaging/soapymiri-transfer.patch](../packaging/soapymiri-transfer.patch) |
+| `settings` | – | nur `rx_sdr`: Geräte-Einstellungen für SoapySDR (`rx_sdr -t`), z. B. `"biastee=true"`; MSi2500/RSP1 mit `"transfer=BULK"` (USB-Bulk statt isochron, stabiler am Pi 4) braucht SoapyMiri mit [packaging/soapymiri-transfer.patch](../packaging/soapymiri-transfer.patch); `"flavour=SDRplay"` beim echten RSP1 (Preselektor-Filter nach dessen Plan, ohne die Angabe gilt der Plan des nackten MSi2500) |
 
 Alte Schlüsselnamen gelten weiter, `--check` weist darauf hin: `[[sdrs]]` → `[[bands]]`, `sdr_driver` → `driver`,
 `sdr_device` → `device`, `sdr_tcp_host` → `host`, `sdr_tcp_port` → `port`, `default_mode` → `mode`, die Tabelle
