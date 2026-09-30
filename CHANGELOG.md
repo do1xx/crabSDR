@@ -2,6 +2,11 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Oberfläche
+- Rauschsperre schließt am Ende eines Durchgangs sofort (vorher ≈ 0,5 s Rauschfahne); die Haltezeit überbrückt nur noch kurze Einbrüche.
+
 ## 0.4.0 – 2026-09-30
 
 Handy-Oberfläche neu, Rauschsperre mit Regler.

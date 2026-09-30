@@ -475,7 +475,7 @@ var crabAudio = {
   mute: function () { setMute(!_crab.audio.muted); }
 };
 function setMute(on) { var A = _crab.audio; A.muted = (on === undefined) ? !A.muted : !!on; if (A.gain) A.gain.gain.value = A.muted ? 0 : A.volume; var c = document.getElementById('mutecheckbox'); if (c) c.checked = A.muted; }
-function _crabSqMsg() { return { type: 'set_squelch', mode: _crab.squelchOn ? 'auto' : 'off', margin: _crab.sqMargin, hang_ms: 500 }; }
+function _crabSqMsg() { return { type: 'set_squelch', mode: _crab.squelchOn ? 'auto' : 'off', margin: _crab.sqMargin, hang_ms: 250 }; }   // Haltezeit nur für kurze Einbrüche; bei Trägerende schließt der Server sofort
 function setSquelch(on) {
   _crab.squelchOn = !!on; _crabSendAll(_crabSqMsg());
   if (mode === 'FM' && _crab.sqUser) try { localStorage.setItem('crab_sq_fm', on ? '1' : '0'); } catch (e) {}

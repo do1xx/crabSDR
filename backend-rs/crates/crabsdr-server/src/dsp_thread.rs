@@ -104,6 +104,8 @@ struct Channel {
 /// Ergebnis eines Kanals je Rahmen.
 struct ChannelOut {
     level_db: f32,
+    /// ungeglätteter Pegel dieses Rahmens (schnelles Schließen der Rauschsperre)
+    level_inst_db: f32,
     floor_db: f32,
     opus: Vec<Vec<u8>>,
     pcm: Option<Vec<u8>>,
@@ -135,7 +137,7 @@ impl Channel {
         let bins_in_bw = (self.key.bandwidth as f32 / bin_hz).max(1.0);
         let fl = floor_bin + 10.0 * bins_in_bw.log10() + 5.5;
         self.floor_db = if self.floor_db.is_nan() { fl } else { 0.9 * self.floor_db + 0.1 * fl };
-        let mut out = ChannelOut { level_db: self.level_db, floor_db: self.floor_db, opus: Vec::new(), pcm: None };
+        let mut out = ChannelOut { level_db: self.level_db, level_inst_db: level, floor_db: self.floor_db, opus: Vec::new(), pcm: None };
         let out_rate = if self.key.raw { self.key.out_rate } else { OPUS_RATE };
         let audio = self.demod.demodulate(
             &iq, self.plan.channel_rate, self.key.mode, 1, self.key.freq, self.key.bandwidth,
@@ -422,7 +424,12 @@ impl DspThread {
                             SquelchMode::Auto => o.level_db > o.floor_db + v.squelch.margin_db,
                         };
                         if open_now { rt_c.open_until = frame + hang_frames(v.squelch.hang_ms); }
-                        let send = open_now || frame <= rt_c.open_until;
+                        // Zu: sofort, wenn der ungeglättete Pegel unter die Schwelle fällt (Trägerende) – die Haltezeit
+                        // überbrückt nur kurze Einbrüche, in denen der Pegel knapp bleibt. Sonst rauscht es nach jedem
+                        // Durchgang so lange wie Glättung + Haltezeit (vorher ≈ 0,5 s).
+                        let thr = match v.squelch.mode { SquelchMode::Manual => v.squelch.db, SquelchMode::Auto => o.floor_db + v.squelch.margin_db, SquelchMode::Off => f32::MIN };
+                        let still_near = o.level_inst_db > thr - 3.0;
+                        let send = open_now || (frame <= rt_c.open_until && still_near);
                         if send {
                             if v.use_opus && !key.raw {
                                 for p in &o.opus { let _ = v.tx.try_send(protocol::encode_opus_audio(p)); }
