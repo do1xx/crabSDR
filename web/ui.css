@@ -414,7 +414,8 @@ body.sticky.allbands .rx-host { position: sticky; top: 0; z-index: 40; backgroun
 @media (max-width: 700px) {
   body.phone { padding-bottom: 0; overflow: hidden; height: 100dvh; }
   body.phone .top #myname, body.phone .top .users, body.phone .top #chatbtn, body.phone .top #themebtn { display: none; }
-  body.phone .top { flex-wrap: nowrap; padding-top: calc(4px + env(safe-area-inset-top, 0px)); }   /* PWA: Statusleiste des Handys nicht überdecken */
+  body.phone .top { flex-wrap: nowrap; padding-top: calc(4px + env(safe-area-inset-top, 0px)) !important; }   /* PWA: Statusleiste des Handys nicht überdecken (look.css setzt padding, deshalb !important) */
+  body.phone .sheetback, body.phone .chatdrawer { top: auto; }
   body.phone .top #audiobtn { display: none; }   /* Ton-Knopf gibt es unten in der Leiste */
   body.phone .top .topright { flex-wrap: nowrap; }
   body.phone .tabs.phonetabs { display: flex; gap: 2px; padding: 0 8px 4px; border-bottom: 1px solid var(--line2); }
