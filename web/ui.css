@@ -414,8 +414,10 @@ body.sticky.allbands .rx-host { position: sticky; top: 0; z-index: 40; backgroun
 @media (max-width: 700px) {
   body.phone { padding-bottom: 0; overflow: hidden; height: 100dvh; }
   body.phone .top #myname, body.phone .top .users, body.phone .top #chatbtn, body.phone .top #themebtn { display: none; }
-  body.phone .top .tabs { order: 10; flex-basis: 100%; display: flex; gap: 2px; }
-  body.phone .top .tabs .btn { flex: 1; text-align: center; padding: 5px 4px; font-size: 12px; }
+  body.phone .top { flex-wrap: nowrap; }
+  body.phone .top .topright { flex-wrap: nowrap; }
+  body.phone .tabs.phonetabs { display: flex; gap: 2px; padding: 0 8px 4px; border-bottom: 1px solid var(--line2); }
+  body.phone .tabs.phonetabs .btn { flex: 1; text-align: center; padding: 5px 4px; font-size: 12px; }
   body.phone .rx-host { flex: 1 1 auto; min-height: 0; padding-top: 4px; padding-bottom: 0; }
   body.phone .foot { display: none; }
   /* Einstellungen: Menü von unten */
@@ -428,8 +430,10 @@ body.sticky.allbands .rx-host { position: sticky; top: 0; z-index: 40; backgroun
   body.phone .sheetback { display: none; position: fixed; inset: 0; z-index: 55; background: rgba(0,0,0,.45); }
   body.phone.sheet-open .sheetback { display: block; }
   .sheethead { display: flex; align-items: center; gap: 8px; padding: 10px 0 8px; position: sticky; top: 0; background: var(--bg); z-index: 1; border-bottom: 1px solid var(--line2); margin-bottom: 8px; }
-  .sheethead .sheettitle { flex: 1; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
-  .sheethead .myname { width: 120px; }
+  .sheethead .sheettitle { display: none; }
+  .sheethead .myname { flex: 1 1 auto; min-width: 0; width: auto; }
+  .sheethead .users { white-space: nowrap; font-size: 11px; color: var(--muted); }
+  .sheethead .btn { flex: 0 0 auto; }
   .sheetfoot { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--line2); font-size: 10px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
   body.phone .panel .strip { gap: 10px 12px; }
   body.phone .panel .grp-vol, body.phone .panel .grp-sig { flex: 1 1 100%; }

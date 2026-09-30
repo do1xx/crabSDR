@@ -54,6 +54,8 @@
     var us = document.querySelector('.top .users'); if (us) head.appendChild(us);
     var cl = document.createElement('button'); cl.type = 'button'; cl.className = 'btn'; cl.textContent = '✕'; cl.setAttribute('aria-label', lang === 'de' ? 'Schließen' : 'Close'); cl.onclick = function () { openSheet(false); }; head.appendChild(cl);
     panel.insertBefore(head, panel.firstChild);
+    // Reiter als eigene Zeile unter dem Kopf (im Kopf bleiben Logo, Name, Ton, Sprache)
+    var tabs = document.querySelector('.top .tabs'), top = document.querySelector('.top'); if (tabs && top) { tabs.classList.add('phonetabs'); top.parentNode.insertBefore(tabs, top.nextSibling); }
     var sf = document.createElement('div'); sf.className = 'sheetfoot'; var foot = document.querySelector('.foot');
     while (foot && foot.firstChild) sf.appendChild(foot.firstChild);
     var tb = $('themebtn'); if (tb) sf.appendChild(tb);
