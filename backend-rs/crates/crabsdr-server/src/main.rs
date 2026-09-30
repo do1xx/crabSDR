@@ -695,6 +695,9 @@ async fn security_headers(req: axum::extract::Request, next: axum::middleware::N
     let h = res.headers_mut();
     h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
     h.entry(header::REFERRER_POLICY).or_insert(HeaderValue::from_static("strict-origin-when-cross-origin"));
+    // Oberfläche nach jedem Update sofort neu: Browser fragen kurz nach (304 ohne Inhalt, wenn unverändert). Ohne diesen
+    // Kopf behalten Browser JS/CSS nach eigener Schätzung tagelang und mischen alte Oberfläche mit neuem Server.
+    h.entry(header::CACHE_CONTROL).or_insert(HeaderValue::from_static("no-cache"));
     let admin = path == "/admin" || path.starts_with("/admin/") || path.starts_with("/api/admin/") || path.starts_with("/api/auth/");
     if admin {
         h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(
