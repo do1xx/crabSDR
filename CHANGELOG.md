@@ -2,10 +2,16 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## Unveröffentlicht
+## 0.4.0 – 2026-09-30
+
+Handy-Oberfläche neu, Rauschsperre mit Regler.
 
 ### Oberfläche
+- Handy: Wasserfall auf voller Höhe, feste Leiste unten (Frequenz, Betriebsart, Squelch, Stumm, Menü), alle
+  Einstellungen in einem Menü von unten; Zwei-Finger-Zoom im Wasserfall; Reiter als eigene Zeile.
 - Rauschsperre mit Regler: Schwelle in dB über dem Rauschen (0–30, Voreinstellung 6), neben dem Squelch-Schalter.
+- Durchlassbereich als Balken in der Skala sichtbar (einstellen weiter unten über die Bandbreite).
+- Fußzeile zeigt die Gesamtlast des Rechners statt der Last des Serverprozesses.
 
 ### Empfänger
 - Doku: `settings = "flavour=SDRplay"` schaltet beim RSP1 die Preselektor-Filter nach dessen eigenem Plan (docs/CONFIG.md).
