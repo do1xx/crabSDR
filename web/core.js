@@ -700,7 +700,7 @@ function _crabConnect(b) {
         var j; try { j = JSON.parse(new TextDecoder().decode(u8.subarray(1))); } catch (e) { return; }
         if (j.type === 'level') { if (b === band) { _crab.level = j.db; _crab.floor = j.floor; _crab.sq = j.sq; } }
         else if (j.type === 'listeners') { _crabListenersFromWs(b, j.list || []); }
-        else if (j.type === 'system_stats') { if (b === band) _crabStatus('Past 10 seconds: CPUload=' + (j.cpu_pct != null ? j.cpu_pct.toFixed(1) : '0.0') + '%, ' + j.clients + ' users; ' + j.channels + ' channels'); }
+        else if (j.type === 'system_stats') { if (b === band) { _crab.sysPct = (j.sys_pct != null) ? j.sys_pct : null; _crabStatus('Past 10 seconds: CPUload=' + (j.cpu_pct != null ? j.cpu_pct.toFixed(1) : '0.0') + '%, ' + j.clients + ' users; ' + j.channels + ' channels'); } }
       }
     };
     ws.onclose = function () {

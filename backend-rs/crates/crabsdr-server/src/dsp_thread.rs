@@ -38,6 +38,17 @@ fn read_proc_cpu_s() -> Option<f64> {
     Some(ticks / 100.0)
 }
 
+/// Gesamtlast des Rechners: (beschäftigte, alle) Jiffies aller Kerne aus /proc/stat (Linux; sonst None)
+fn read_sys_cpu_ticks() -> Option<(u64, u64)> {
+    let st = std::fs::read_to_string("/proc/stat").ok()?;
+    let line = st.lines().next()?;
+    let v: Vec<u64> = line.split_whitespace().skip(1).filter_map(|x| x.parse().ok()).collect();
+    if v.len() < 4 { return None; }
+    let idle = v[3] + v.get(4).copied().unwrap_or(0);   // idle + iowait
+    let total: u64 = v.iter().sum();
+    Some((total - idle, total))
+}
+
 fn read_cpu_load() -> Option<[f32; 3]> {
     let contents = std::fs::read_to_string("/proc/loadavg").ok()?;
     let parts: Vec<&str> = contents.split_whitespace().collect();
@@ -308,6 +319,8 @@ impl DspThread {
         let mut wf_hist: std::collections::VecDeque<Vec<u8>> = std::collections::VecDeque::with_capacity(WF_HIST_LINES + 1);
         let mut spec_ema: Option<Vec<f32>> = None;
         let mut cpu_prev: Option<(std::time::Instant, f64)> = None;
+        let mut sys_prev: Option<(u64, u64)> = None;
+        let mut sys_pct: Option<f32> = None;   // Gesamtlast in % (alle Kerne), None außerhalb von Linux
         let mut cpu_pct: f32 = 0.0;
         let mut listeners_sig: Option<String> = None;
         let mut listeners_sent: u64 = 0;
@@ -492,8 +505,12 @@ impl DspThread {
                             if let Some((t0, c0)) = cpu_prev { cpu_pct = ((c - c0) / now.duration_since(t0).as_secs_f64() * 100.0) as f32; }
                             cpu_prev = Some((now, c));
                         }
+                        if let Some((busy, total)) = read_sys_cpu_ticks() {
+                            if let Some((b0, t0)) = sys_prev { if total > t0 { sys_pct = Some(((busy - b0) as f32 / (total - t0) as f32 * 100.0 * 10.0).round() / 10.0); } }
+                            sys_prev = Some((busy, total));
+                        }
                         let stats = json!({"type": "system_stats", "cpu_load": read_cpu_load().unwrap_or([0.0; 3]),
-                                           "cpu_pct": (cpu_pct * 10.0).round() / 10.0, "clients": real.len(), "channels": results.len()});
+                                           "cpu_pct": (cpu_pct * 10.0).round() / 10.0, "sys_pct": sys_pct, "clients": real.len(), "channels": results.len()});
                         let _ = spectrum_tx.send(protocol::encode_json(&stats.to_string()));
                     }
                     let list: Vec<_> = real.iter().map(|v| json!([v.id, v.name,

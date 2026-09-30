@@ -101,7 +101,7 @@ select:focus, input:focus { outline: 1px solid var(--accent); outline-offset: 0;
 #edgelower:hover, #edgeupper:hover { filter: brightness(0) invert(1); }   /* Kante beim Überfahren weiß */
 #yellowbarr { background-color: #34d399; top: 2px; height: 1px; }
 #yellowbara:hover #yellowbarr { top: 2px; height: 2px; }
-.hideblind { display: inline; }
+.hideblind { display: none; }   /* Durchlass-Balken zeichnet ui.js in der Skala (.pband) */
 .showblind { display: none; }
 /* Kanal-Marker unter dem Wasserfall (von core.js erzeugt) */
 .statinfo0, .statinfo0l { float: left; white-space: nowrap; position: relative; font-size: 10px; line-height: 14px; padding: 0 5px; border-radius: 3px;
@@ -140,6 +140,8 @@ select:focus, input:focus { outline: 1px solid var(--accent); outline-offset: 0;
 .lmarks em.multi.me::before { width: 4px; }
 /* eingestellte Frequenz als Linie durch den Wasserfall (halbtransparent, verdeckt keine Signale) */
 .lmarks i.tline { position: absolute; width: 1px; margin-left: -0.5px; background: rgba(248,113,113,.55); }
+/* Durchlassbereich in der Skala (Anzeige, Einstellung unten über die Bandbreite) */
+.lmarks i.pband { position: absolute; height: 22px; background: rgba(52,211,153,.18); border-left: 1px solid rgba(52,211,153,.7); border-right: 1px solid rgba(52,211,153,.7); }
 
 /* App-Layout (Desktop): Kopf + Bandleiste oben, Empfänger scrollt in der Mitte, Bedienleiste fest unten.
    Auf dem Handy (<700 px) normaler Seitenfluss mit fester Kurzleiste (.mbar). */

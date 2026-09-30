@@ -236,10 +236,13 @@
       var b = id2band(i), e = bi[b], clip = $('clipscale' + i);
       if (!clip || clip.offsetParent === null) continue;
       var top = Math.round((clip.offsetTop + clip.offsetParent.offsetTop) * scale) - 20;
-      // eingestellte Frequenz: dünne Linie von der Skala durch den ganzen Wasserfall des gehörten Bandes
+      // gehörtes Band: Durchlassbereich als Balken in der Skala (nur Anzeige; Bandbreite stellt man unten ein)
+      // und eingestellte Frequenz als dünne Linie von der Skala durch den ganzen Wasserfall
       var B = _crab.bands[b];
       if (b === band && B && B.canvas) {
         var tx = freq2x(freq, b) * scale, lr = lmarks.getBoundingClientRect(), cr = B.canvas.getBoundingClientRect();
+        var xl = freq2x(freq + Math.min(lo, 0), b) * scale, xh = freq2x(freq + Math.max(hi, 0), b) * scale;
+        if (xh > 0 && xl < 1024 * scale) html += '<i class="pband" style="left:' + Math.max(0, xl).toFixed(1) + 'px;width:' + Math.max(2, Math.min(1024 * scale, xh) - Math.max(0, xl)).toFixed(1) + 'px;top:' + (top + 20) + 'px"></i>';
         if (tx >= 0 && tx <= 1024 * scale) html += '<i class="tline" style="left:' + tx.toFixed(1) + 'px;top:' + (top + 20) + 'px;height:' + Math.max(0, Math.round(cr.bottom - lr.top - top - 20)) + 'px"></i>';
       }
       var items = [];
@@ -283,6 +286,8 @@
     };
   }
   function serverStats() {
+    // Gesamtlast des Rechners (alle Kerne), wenn der Server sie liefert; sonst die Last des Serverprozesses
+    if (typeof _crab !== 'undefined' && _crab.sysPct != null) return _crab.sysPct;
     var t = $('stats').textContent || '', m = /CPUload=([\d.]+)%/.exec(t);
     return m ? Number(m[1]) : null;
   }
@@ -653,7 +658,7 @@
     var de = lang === 'de', parts = [];
     if (s.temp) parts.push('<span class="' + (s.temp > 75 ? 'bad' : s.temp > 65 ? 'warn' : 'ok') + '">CPU ' + s.temp + ' °C</span>');
     if (s.up_s != null || s.uptime) parts.push('<span>' + (de ? 'läuft seit ' : 'up ') + (s.up_s != null ? fmtDuration(s.up_s) : s.uptime) + '</span>');
-    var cpu = serverStats(); if (cpu !== null) parts.push('<span title="Auslastung des Servers in den letzten 10 s">CPU ' + Math.round(cpu) + ' %</span>');
+    var cpu = serverStats(); if (cpu !== null) parts.push('<span title="' + (de ? 'Gesamtlast des Rechners (alle Kerne)' : 'total CPU load (all cores)') + '">' + (de ? 'Last ' : 'load ') + Math.round(cpu) + ' %</span>');
     if (s.ts) parts.push('<span>' + (de ? 'Stand ' : 'as of ') + new Date(s.ts * 1000).toLocaleTimeString(de ? 'de-DE' : 'en-GB', { hour: '2-digit', minute: '2-digit' }) + '</span>');
     $('status').innerHTML = parts.join(' · ');
   }
