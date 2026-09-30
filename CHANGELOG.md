@@ -2,7 +2,7 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## Unveröffentlicht
+## 0.4.1 – 2026-09-30
 
 ### Oberfläche
 - Chat-Zeilen werden nach 24 h gelöscht (`chat_keep_hours`, 0 = behalten); das Logbuch bleibt.
