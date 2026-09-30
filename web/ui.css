@@ -223,6 +223,7 @@ details.card > :last-child { margin-bottom: 10px; }
 .smeter-peak { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--strong); left: 0; transition: left .2s; }
 .smeter-num { margin-top: 5px; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
 .smeter-num b { color: var(--accent); font-size: 14px; margin-right: 6px; }
+.smeter-num .gsnr { color: var(--faint); }
 #volumecontrol2 { width: 100%; accent-color: var(--accent); }
 
 .wfbtns { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -359,7 +360,9 @@ body.sticky.allbands .rx-host { position: sticky; top: 0; z-index: 40; backgroun
   .mbar .btn { min-width: 40px; padding: 6px 0; font-size: 16px; }
   .mfreq { background: var(--bg2); color: var(--accent); border: 1px solid var(--line); border-radius: var(--radius); font: 700 18px/1 "JetBrains Mono", monospace; padding: 9px 8px; text-align: left; min-height: 40px; }
   .mmode { min-width: 70px; }
-  .mmeter { grid-column: 1 / -1; position: relative; height: 3px; background: var(--bg2); border-radius: 2px; overflow: hidden; }
+  .mrow { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
+  .mmeter { flex: 1; position: relative; height: 3px; background: var(--bg2); border-radius: 2px; overflow: hidden; }
+  .mtext { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .audio-ready .mbar { grid-template-columns: 1fr auto 40px 40px 40px; }
 }
 

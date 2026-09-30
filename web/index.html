@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="{{STATION_NAME}}">
-<link rel="stylesheet" href="ui.css?v=46">
+<link rel="stylesheet" href="ui.css?v=47">
 <link rel="stylesheet" href="account.css?v=1">
 <script>
 // Einstellungen der Vorversion übernehmen (Schlüssel gartow_… und 1xx_… werden zu crab_…)
@@ -159,7 +159,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
           <span style="left:43.3%">S9</span><span style="left:60%">+20</span><span style="left:76.7%">+40</span><span style="left:93.3%">+60</span>
         </div>
         <div class="smeter-track"><div class="smeter-peak" id="gpeak"></div><div class="smeter-fill" id="gfill"></div></div>
-        <div class="smeter-num" title="S-Stufen nach IARU Region 1 für VHF/UHF: S9 = −93 dBm, 6 dB je Stufe"><b id="gsunit">–</b> <span id="gdbm">–</span> dBm</div>
+        <div class="smeter-num" title="S-Stufen nach IARU Region 1 für VHF/UHF: S9 = −93 dBm, 6 dB je Stufe"><b id="gsunit">–</b> <span id="gdbm">–</span> dBm <span class="gsnr" title="Signal über dem Rauschen des Kanals" id="gsnr"></span></div>
       </div>
       <div class="adv sgraphrow"><label><span data-de="Verlauf" data-en="Plot">Verlauf</span>
         <select id="sgraphchoice"><option value="0" selected data-de="aus" data-en="off">aus</option><option value="1" data-de="schnell" data-en="fast">schnell</option><option value="10" data-de="langsam" data-en="slow">langsam</option></select></label>
@@ -281,7 +281,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
   <button class="btn mmute" id="mmute" type="button" aria-label="Stumm" title="Stumm">🔇</button>
   <button class="btn mset" id="mset" type="button" aria-label="Einstellungen" title="Einstellungen">☰</button>
   <button class="btn btn-accent audio-btn" id="maudio" type="button" aria-label="Ton einschalten">🔊</button>
-  <div class="mmeter"><div class="smeter-fill" id="mfill"></div></div>
+  <div class="mrow"><div class="mmeter"><div class="smeter-fill" id="mfill"></div></div><span class="mtext" id="mtext"></span></div>
 </div>
 
 <!-- Unsichtbare Felder: Hörername (Cookie) und Zähler, die core.js füllt -->
@@ -291,7 +291,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </div>
 </div>
 
-<script src="ui.js?v=60"></script>
+<script src="ui.js?v=61"></script>
 <script src="account.js?v=1"></script>
 </body>
 </html>

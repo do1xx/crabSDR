@@ -541,7 +541,13 @@
     if (dbm > peak || --peakTimer <= 0) { peak = dbm; peakTimer = 15; }
     $('gpeak').style.left = pct(peak) + '%';
     $('gdbm').textContent = dbm.toFixed(0);
-    $('gsunit').textContent = dbm <= -93 ? 'S' + Math.max(0, Math.min(9, 1 + Math.floor((dbm + 141) / 6))) : 'S9+' + Math.round(dbm + 93);
+    var su = dbm <= -93 ? 'S' + Math.max(0, Math.min(9, 1 + Math.floor((dbm + 141) / 6))) : 'S9+' + Math.round(dbm + 93);
+    $('gsunit').textContent = su;
+    // Abstand zum Rauschen des Kanals (der Server misst den Boden mit): unabhängig von der Kalibrierung
+    var snr = (typeof _crab !== 'undefined' && _crab.level > -150 && _crab.floor > -150) ? Math.max(0, _crab.level - _crab.floor) : null;
+    var snrTxt = snr === null ? '' : '+' + Math.round(snr) + ' dB';
+    $('gsnr').textContent = snrTxt ? '· ' + snrTxt + (lang === 'de' ? ' über Rauschen' : ' above noise') : '';
+    var mt = $('mtext'); if (mt) mt.textContent = su + ' · ' + dbm.toFixed(0) + ' dBm' + (snrTxt ? ' · ' + snrTxt : '');
   }
 
   /* ================= Ton freischalten ================= */
