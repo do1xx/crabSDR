@@ -350,6 +350,8 @@ body.sticky.allbands .rx-host { position: sticky; top: 0; z-index: 40; backgroun
   .grp-freq, .grp-sig, .grp-vol { flex: 1 1 100%; max-width: none; }
   .freq-mhz { font-size: 26px; }
   .fscale { height: 26px; } .fscale b { font-size: 11px; top: 4px; }
+  .fscale-band { display: none; }   /* Handy: Bandname steht schon in der Bandleiste, hier verdeckt er die Zahlen */
+  .grp-freq label.snap { margin-left: 8px; }
   .logform { grid-template-columns: 1fr; } .myname { width: 110px; }
   .mbar {
     display: grid; grid-template-columns: 1fr auto 40px 40px 40px; gap: 4px; align-items: center;

@@ -34,6 +34,9 @@
   function $(id) { return document.getElementById(id); }
   var CHAT_SIDE_MIN = 1100;   // ab dieser Fensterbreite sitzt der Chat rechts neben dem Wasserfall, darunter unter ihm
   function isPhone() { return window.innerWidth < PHONE_MAX; }
+  // Wasserfallhöhe auf dem Handy: der Empfänger wird auf Bildschirmbreite verkleinert (1024 px → ~350 px), deshalb die
+  // Canvas-Höhe so wählen, dass auf dem Bildschirm etwa 230 px übrig bleiben (vorher fest 200 Canvas-Pixel = ~70 px)
+  function phoneWf() { var sc = Math.max(0.2, (window.innerWidth - 20) / 1024); return Math.round(Math.min(2000, 230 / sc)); }
 
   /* ================= Skalierung des Empfängerblocks ================= */
   function fit() {
@@ -671,7 +674,7 @@
     document.body.classList.toggle('phone', phone);
     if (phone) {
       applyView();
-      $('wfsize').value = '200'; setWfHeight(200);
+      $('wfsize').value = '200'; setWfHeight(phoneWf());
       setTimeout(function () { zoomToFreq(band, PHONE_ZOOM, freq); fit(); }, 400);
     } else {
       applyView();
@@ -806,7 +809,7 @@
     $('allbandschk').checked = Number(view) === Views.allbands;
     $('allbandschk').onchange = function () { viewPref = this.checked ? 'all' : 'one'; try { localStorage.setItem('crab_view', viewPref); } catch (e) {} applyView(); };
     $('wfsize').onchange = function () { if (this.value === 'auto') fillHeight(); else setWfHeight(Number(this.value)); };
-    if (phone) { $('wfsize').value = '200'; setWfHeight(200); setTimeout(function () { zoomToFreq(band, PHONE_ZOOM, freq); fit(); }, 700); }
+    if (phone) { $('wfsize').value = '200'; setWfHeight(phoneWf()); setTimeout(function () { zoomToFreq(band, PHONE_ZOOM, freq); fit(); }, 700); }
     else { $('wfsize').value = 'auto'; setTimeout(function () { fit(); fillHeight(); }, 700); }
     var x = new XMLHttpRequest();
     x.open('GET', 'presets.json?' + Date.now());
@@ -821,7 +824,7 @@
     // Startwerte: FM-Bandbreite 12 kHz statt 16 kHz; auf dem Handy höherer Wasserfall (wird auf Bildschirmbreite skaliert)
     setTimeout(function () {
       try { if (typeof mode !== 'undefined' && mode === 'FM' && Math.abs((hi - lo) - 16) < 0.01) setMode('fm', -6, 6); } catch (e) {}
-      try { if (phone && typeof setWfHeight === 'function') { setWfHeight(200); var ws = $('wfsize'); if (ws) ws.value = '200'; } } catch (e) {}
+      try { if (phone && typeof setWfHeight === 'function') { setWfHeight(phoneWf()); var ws = $('wfsize'); if (ws) ws.value = '200'; } } catch (e) {}
     }, 1500);
     var _douu = window.showListeners; window.showListeners = function () { _douu(); renderListeners(); };
     // Sobald alle Wasserfälle laufen (auch nach setView): Höhe „Bildschirm füllen" einmal sauber setzen

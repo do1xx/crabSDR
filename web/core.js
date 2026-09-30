@@ -232,7 +232,9 @@ function _crabBuildWaterfalls() {
     (function (bb) { setTimeout(function () { try { loadMarks(bb); } catch (e) { showMarks(bb); } }, 0); })(b);
     (function (bb) {
       wf.addEventListener('mousedown', function (ev) { scaleMouseDown(ev, bb); });
-      wf.addEventListener('touchstart', function (ev) { if (bb !== band) setBand(bb); touchFreq(ev); }, { passive: false });
+      wf.addEventListener('touchstart', function (ev) { if (bb !== band) setBand(bb); if (ev.touches.length >= 2) { _crabPinch(ev, true); return; } touchFreq(ev); }, { passive: false });
+      wf.addEventListener('touchmove', function (ev) { if (ev.touches.length >= 2) _crabPinch(ev, false); }, { passive: false });
+      wf.addEventListener('touchend', function () { _crab.pinch = null; });
       wf.addEventListener('wheel', function (ev) { ev.preventDefault(); if (bb !== band) setBand(bb); wheelStep(ev); }, { passive: false });
     })(b);
   }
@@ -312,6 +314,14 @@ function mouseup(e) { dragging = 0; }
 function touchFreq(ev) {
   ev.preventDefault();
   for (var i = 0; i < ev.touches.length; i++) { var p = mouseFreq(ev.touches[i]); setFreq(_crabFreqAtX(p.x) - (hi + lo) / 2); }
+}
+/* Zwei-Finger-Zoom im Wasserfall (Handy): auseinander = Stufe rein, zusammen = Stufe raus, um die gehörte Frequenz */
+function _crabPinch(ev, start) {
+  ev.preventDefault();
+  var a = ev.touches[0], b = ev.touches[1], d = Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
+  if (start || !_crab.pinch) { _crab.pinch = d; return; }
+  var r = d / _crab.pinch;
+  if (r > 1.25) { setZoom(0); _crab.pinch = d; } else if (r < 0.8) { setZoom(1); _crab.pinch = d; }
 }
 function touchPassband(ev) { ev.preventDefault(); if (ev.touches.length !== 1) return; setFreq(dragStartVal + (ev.touches[0].pageX - dragStartX) * khzPerPx); }
 function keydown(e) { return true; }
