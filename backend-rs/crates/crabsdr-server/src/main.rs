@@ -142,7 +142,7 @@ async fn main() {
         config: Arc::new(RwLock::new(config.clone())),
         manager: Arc::new(RwLock::new(manager)),
         auth: auth_state,
-        chat: Arc::new(if config.builtin_chat { chat::Chat::open(&config.data_dir, config.station.home()) } else { chat::Chat::disabled() }),
+        chat: Arc::new(if config.builtin_chat { chat::Chat::open(&config.data_dir, config.station.home(), config.chat_keep_hours) } else { chat::Chat::disabled() }),
         decoders: decoder_hub,
         config_lock: tokio::sync::Mutex::new(()),
         restart_pending: std::sync::atomic::AtomicBool::new(false),

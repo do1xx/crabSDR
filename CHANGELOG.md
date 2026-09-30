@@ -5,6 +5,7 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 ## Unveröffentlicht
 
 ### Oberfläche
+- Chat-Zeilen werden nach 24 h gelöscht (`chat_keep_hours`, 0 = behalten); das Logbuch bleibt.
 - Rauschsperre schließt am Ende eines Durchgangs sofort (vorher ≈ 0,5 s Rauschfahne); die Haltezeit überbrückt nur noch kurze Einbrüche.
 
 ## 0.4.0 – 2026-09-30

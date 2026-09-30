@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use tracing::{info, warn};
 
 fn default_true() -> bool { true }
+fn default_chat_keep_hours() -> u32 { 24 }
 
 /// Ein Band (`[[bands]]`, früher `[[sdrs]]`) = ein Empfänger. Neue Schlüsselnamen (driver, device, host, port, mode),
 /// die alten (sdr_driver, sdr_device, sdr_tcp_host, sdr_tcp_port, default_mode) gelten weiter.
@@ -266,6 +267,9 @@ pub struct ServerConfig {
     /// Chat und Logbuch der Hörer (SQLite in data_dir); false nur, wenn ein anderer Dienst sie übernimmt
     #[serde(default = "default_true")]
     pub builtin_chat: bool,
+    /// Chat-Zeilen nach so vielen Stunden löschen (0 = behalten); das Logbuch bleibt
+    #[serde(default = "default_chat_keep_hours")]
+    pub chat_keep_hours: u32,
     /// Stationsangaben für die neutrale Oberfläche (Platzhalter in index.html)
     #[serde(default)]
     pub station: StationConfig,
@@ -478,6 +482,7 @@ impl Config {
             opus_complexity: default_opus_complexity(),
             smeter_cal: HashMap::new(),
             builtin_chat: true,
+            chat_keep_hours: 24,
             station: StationConfig::default(),
             source: None,
         }

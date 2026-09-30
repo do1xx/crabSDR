@@ -31,10 +31,12 @@ pub struct Chat {
     notify: Notify,
     brake: Mutex<HashMap<(String, &'static str), Instant>>,
     home: Option<(f64, f64)>,
+    /// Chat-Zeilen älter als so viele Sekunden löschen (0 = behalten)
+    keep_s: i64,
 }
 
 impl Chat {
-    pub fn open(data_dir: &Path, home: Option<(f64, f64)>) -> Self {
+    pub fn open(data_dir: &Path, home: Option<(f64, f64)>, keep_hours: u32) -> Self {
         let path = data_dir.join("pinnwand.db");
         let db = match Connection::open(&path) {
             Ok(c) => {
@@ -51,11 +53,18 @@ impl Chat {
             }
             Err(e) => { warn!("Chat/Logbuch: {} nicht zu öffnen: {}", path.display(), e); None }
         };
-        Self { db: Mutex::new(db), notify: Notify::new(), brake: Mutex::new(HashMap::new()), home }
+        Self { db: Mutex::new(db), notify: Notify::new(), brake: Mutex::new(HashMap::new()), home, keep_s: keep_hours as i64 * 3600 }
+    }
+
+    /// Alte Chat-Zeilen löschen (chat_keep_hours); beim Lesen und Schreiben aufgerufen, billig
+    pub fn purge(&self) {
+        if self.keep_s <= 0 { return; }
+        let g = self.db.lock().unwrap();
+        if let Some(c) = g.as_ref() { let _ = c.execute("delete from chat where t < ?", [now_s() - self.keep_s]); }
     }
 
     /// Ohne Datenbank (builtin_chat = false): Routen sind dann gar nicht angemeldet
-    pub fn disabled() -> Self { Self { db: Mutex::new(None), notify: Notify::new(), brake: Mutex::new(HashMap::new()), home: None } }
+    pub fn disabled() -> Self { Self { db: Mutex::new(None), notify: Notify::new(), brake: Mutex::new(HashMap::new()), home: None, keep_s: 0 } }
 
     /// Für die Admin-Seite: letzte Chat-Zeilen (neueste zuerst)
     pub fn recent_chat(&self, n: i64) -> Vec<serde_json::Value> {
@@ -126,6 +135,7 @@ fn chat_rows(chat: &Chat, since: i64) -> (i64, Vec<serde_json::Value>) {
 
 pub async fn get_chat(State(state): State<Arc<AppState>>, Query(q): Query<SinceQuery>) -> impl IntoResponse {
     let chat = state.chat.clone();
+    chat.purge();
     let since = q.since.unwrap_or(0);
     let (mut id, mut lines) = chat_rows(&chat, since);
     if lines.is_empty() && q.wait == Some(1) {
@@ -140,6 +150,7 @@ pub struct Post { name: Option<String>, msg: Option<String>, call: Option<String
 
 pub async fn post_chat(State(state): State<Arc<AppState>>, headers: HeaderMap, Json(p): Json<Post>) -> impl IntoResponse {
     let chat = state.chat.clone();
+    chat.purge();
     let msg = clean(p.msg.as_deref(), MAX_MSG);
     if msg.is_empty() { return (StatusCode::BAD_REQUEST, Json(json!({"error": "leer"}))).into_response(); }
     if !chat.throttle(&sender(&headers), "chat", 2) { return (StatusCode::TOO_MANY_REQUESTS, Json(json!({"error": "langsamer"}))).into_response(); }
