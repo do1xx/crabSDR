@@ -480,7 +480,7 @@ function setSquelchLevel(v) {
   if (r && Number(r.value) !== v) r.value = v; if (t) t.textContent = v + ' dB';
   if (_crab.squelchOn) _crabSendAll(_crabSqMsg());
 }
-function _crabSqInit() { var v = 6; try { v = Number(localStorage.getItem('crab_sq_db')); } catch (e) {} if (!(v >= 0 && v <= 30)) v = 6; _crab.sqMargin = v; setSquelchLevel(v); }
+function _crabSqInit() { var v = 6; try { var st = localStorage.getItem('crab_sq_db'); if (st !== null) v = Number(st); } catch (e) {} if (!(v >= 0 && v <= 30)) v = 6; _crab.sqMargin = v; setSquelchLevel(v); }
 /* Rauschsperre folgt der Betriebsart: FM startet mit Sperre (wie am Funkgerät; eigene Wahl bleibt gespeichert),
    AM/SSB/CW ohne – dort sucht man gerade die schwachen Signale. */
 function _crabSqForMode() {
