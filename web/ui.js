@@ -49,10 +49,10 @@
   function initPhoneSheet() {
     if (sheetReady) return; sheetReady = true;
     var panel = document.querySelector('.panel'), head = document.createElement('div'); head.className = 'sheethead';
-    var title = document.createElement('span'); title.className = 'sheettitle'; title.textContent = T('Einstellungen', 'Settings'); head.appendChild(title);
+    var title = document.createElement('span'); title.className = 'sheettitle'; title.textContent = lang === 'de' ? 'Einstellungen' : 'Settings'; head.appendChild(title);
     ['myname', 'chatbtn'].forEach(function (id) { var e = $(id); if (e) head.appendChild(e); });
     var us = document.querySelector('.top .users'); if (us) head.appendChild(us);
-    var cl = document.createElement('button'); cl.type = 'button'; cl.className = 'btn'; cl.textContent = '✕'; cl.setAttribute('aria-label', T('Schließen', 'Close')); cl.onclick = function () { openSheet(false); }; head.appendChild(cl);
+    var cl = document.createElement('button'); cl.type = 'button'; cl.className = 'btn'; cl.textContent = '✕'; cl.setAttribute('aria-label', lang === 'de' ? 'Schließen' : 'Close'); cl.onclick = function () { openSheet(false); }; head.appendChild(cl);
     panel.insertBefore(head, panel.firstChild);
     var sf = document.createElement('div'); sf.className = 'sheetfoot'; var foot = document.querySelector('.foot');
     while (foot && foot.firstChild) sf.appendChild(foot.firstChild);
