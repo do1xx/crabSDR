@@ -224,7 +224,7 @@
       v.appendChild(h('form', { cls: 'adm-card', onsubmit: function (e) {
         e.preventDefault();
         var ops = [];
-        [['name', st.name], ['subtitle', st.subtitle], ['locator', st.locator], ['url', st.url]].forEach(function (x) {
+        [['name', st.name], ['subtitle', st.subtitle], ['locator', st.locator], ['url', st.url], ['operator', st.operator], ['address', st.address], ['contact', st.contact]].forEach(function (x) {
           var nv = inp[x[0]].value.trim(); if (nv !== (x[1] || '')) ops.push({ op: 'set', path: ['station', x[0]], value: nv || null });
         });
         for (var li = 0, LL = ['lat', 'lon']; li < LL.length; li++) {
@@ -242,6 +242,10 @@
         t('name', 'Name', st.name), t('subtitle', 'Untertitel', st.subtitle, 'z. B. Ort · Antenne · Höhe'),
         h('div', { cls: 'adm-cols' }, t('locator', 'Locator', st.locator), t('lat', 'Breite (Dezimalgrad)', st.lat, 'leer = aus dem Locator'), t('lon', 'Länge (Dezimalgrad)', st.lon)),
         t('url', 'Öffentliche Adresse', st.url, 'so erreichen Hörer die Station, z. B. https://sdr.example.org'),
+        h('h3', { text: 'Betreiber (Impressum)' }),
+        t('operator', 'Betreiber', st.operator, 'Name und Rufzeichen; mit Angabe zeigt die Info-Seite ein Impressum und der Fuß den Link'),
+        t('address', 'Anschrift', st.address, 'Zeilen mit " · " trennen, z. B. Musterweg 1 · 12345 Musterstadt'),
+        t('contact', 'Kontakt', st.contact, 'E-Mail-Adresse'),
         h('label', { cls: 'adm-check' }, listed, ' Im Verzeichnis auf ' + (dir.server || 'https://crabsdr.de').replace(/^https?:\/\//, '') + ' listen'),
         h('p', { cls: 'muted small', text: 'Die Station meldet alle 5 Minuten Name, Untertitel, Standort, die öffentlichen Bänder und Decoder und die Hörerzahl. Mitglieder- und Admin-Bänder bleiben unsichtbar. Das Verzeichnis prüft die Angaben über die öffentliche Adresse. Wirkt nach dem Neustart.' }),
         h('h3', { text: 'Oberfläche' }),

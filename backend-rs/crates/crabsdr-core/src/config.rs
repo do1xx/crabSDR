@@ -95,10 +95,17 @@ pub struct StationConfig {
     pub lat: Option<f64>,
     #[serde(default)]
     pub lon: Option<f64>,
+    /// Betreiber (Impressum auf der Info-Seite): Name/Rufzeichen, Anschrift (Zeilen mit \n), Kontakt (E-Mail)
+    #[serde(default)]
+    pub operator: String,
+    #[serde(default)]
+    pub address: String,
+    #[serde(default)]
+    pub contact: String,
 }
 fn default_station_name() -> String { "crabSDR".into() }
 impl Default for StationConfig {
-    fn default() -> Self { Self { name: default_station_name(), subtitle: String::new(), url: String::new(), locator: String::new(), lat: None, lon: None } }
+    fn default() -> Self { Self { name: default_station_name(), subtitle: String::new(), url: String::new(), locator: String::new(), lat: None, lon: None, operator: String::new(), address: String::new(), contact: String::new() } }
 }
 impl StationConfig {
     /// Standort: lat/lon, sonst Mitte des Locators (4/6/8 Zeichen), sonst None

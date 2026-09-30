@@ -66,6 +66,32 @@ sys();window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change
      <a href="https://github.com/do1xx/crabSDR" rel="noopener">github.com/do1xx/crabSDR</a>.
      <span id="ver" class="muted"></span></p>
   <p class="muted">Sysop: Verwaltung der Station unter <a href="../admin/">Admin</a> (Anmeldung nötig).</p>
+
+  <div id="impwrap" hidden>
+    <h2 id="impressum">Betreiber</h2>
+    <dl class="facts" id="imp"></dl>
+  </div>
+
+  <h2 id="datenschutz">Datenschutz</h2>
+  <p>Diese Station ist ein Hobbyprojekt im Amateurfunk. Beim Hören werden so wenige Daten wie möglich verarbeitet:</p>
+  <dl class="facts">
+    <dt>Verbindungsdaten</dt><dd>Der Server sieht die IP-Adresse deines Browsers, solange du verbunden bist. Sie steht kurzzeitig
+      im Systemprotokoll des Rechners (Fehlersuche, Schutz vor Missbrauch) und wird sonst nicht ausgewertet oder weitergegeben.</dd>
+    <dt>Name</dt><dd>Der Name, den du oben einträgst, wird anderen Hörern und im Chat gezeigt. Er bleibt in deinem Browser gespeichert
+      (Cookie) – lass ihn leer, wenn du nicht genannt werden willst.</dd>
+    <dt data-feature="chat">Chat und Logbuch</dt><dd data-feature="chat">Einträge werden mit dem gewählten Namen und der Uhrzeit auf der Station
+      gespeichert und allen Besuchern gezeigt. Zum Löschen eines Eintrags an den Betreiber wenden.</dd>
+    <dt>Einstellungen</dt><dd>Frequenz, Lautstärke, Rauschsperre, Ansicht und Sprache merkt sich dein Browser selbst (localStorage).
+      Nichts davon geht an den Server.</dd>
+    <dt>Ton</dt><dd>Der Ton wird nur zu dir gestreamt. Aufnahmen entstehen ausschließlich in deinem Browser.</dd>
+    <dt data-feature="digital">Decoder</dt><dd data-feature="digital">APRS, FT8 und ähnliche Aussendungen sind Amateurfunk und öffentlich; die Station
+      zeigt sie an und gibt sie an APRS-Netz und Karten weiter. Das betrifft Funkamateure, nicht Hörer.</dd>
+    <dt>Karten</dt><dd>Die Karte auf der Digital-Seite lädt Kacheln von OpenFreeMap (openfreemap.org); dabei sieht dieser Dienst deine
+      IP-Adresse.</dd>
+    <dt>Verzeichnis</dt><dd>Ist die Station auf crabsdr.de gelistet, meldet sie nur ihre eigenen Daten (Name, Standort, Bänder,
+      Hörerzahl) – keine Daten über Hörer.</dd>
+    <dt>Keine Auswertung</dt><dd>Keine Analyse-Werkzeuge, keine Werbung, keine Weitergabe an Dritte.</dd>
+  </dl>
 </main>
 
 <footer class="foot">
@@ -74,7 +100,7 @@ sys();window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change
 
 <script>(function(){var t=null;try{t=localStorage.getItem('crab_token')}catch(e){}document.write('<script src="../bandinfo.js?_=' + Date.now() + (t ? '&token=' + encodeURIComponent(t) : '') + '"><\/script>');})();</script>
 <script src="../common.js?v=2"></script>
-<script src="info.js?v=1"></script>
+<script src="info.js?v=2"></script>
 <script src="../account.js?v=1"></script>
 </body>
 </html>

@@ -10,6 +10,14 @@ crabReady(function (UI) {
   if (st.subtitle) rows.push(['Beschreibung', esc(st.subtitle)]);
   if (st.locator || st.lat != null) rows.push(['Lage', [st.locator ? esc(st.locator) : '', st.lat != null ? dms(st.lat, 'N', 'S') + ' · ' + dms(st.lon, 'O', 'W') : ''].filter(Boolean).join(', ')]);
   $('site').innerHTML = rows.map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('');
+  // Betreiber (Impressum), wenn der Sysop ihn eingetragen hat
+  if (st.operator) {
+    var imp = [['Betreiber', esc(st.operator)]];
+    if (st.address) imp.push(['Anschrift', esc(st.address).split(' · ').join('<br>')]);
+    if (st.contact) imp.push(['Kontakt', /@/.test(st.contact) ? '<a href="mailto:' + esc(st.contact) + '">' + esc(st.contact) + '</a>' : esc(st.contact)]);
+    $('imp').innerHTML = imp.map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('');
+    $('impwrap').hidden = false;
+  }
 
   var B = window.bandinfo || [];
   $('bands').innerHTML = B.length ? B.map(function (b) {

@@ -24,7 +24,7 @@ pub const LOCKED: &[&str] = &["port", "frontend_dir", "plugin_dir", "data_dir", 
 /// Station überschreiben oder z. B. über igate_passfile eine geheime Datei an einen fremden Server schicken lassen)
 pub const PATH_OPTIONS: &[&str] = &["logdir", "json", "log", "out", "igate_passfile", "passfile", "file", "path", "dir"];
 
-const STATION_KEYS: &[&str] = &["name", "subtitle", "locator", "lat", "lon", "url"];
+const STATION_KEYS: &[&str] = &["name", "subtitle", "locator", "lat", "lon", "url", "operator", "address", "contact"];
 /// Verzeichnis: nur Ein/Aus über die Admin-Seite; der Server steht in der Datei
 const DIRECTORY_KEYS: &[&str] = &["enabled"];
 const UI_KEYS: &[&str] = &["login", "chat", "logbook", "digital", "info", "recording", "status", "decoders", "banner", "impressum", "datenschutz", "admin"];

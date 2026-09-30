@@ -66,6 +66,7 @@ Umgebungsvariablen überschreiben: `PORT`, `PLUGIN_DIR`, `FRONTEND_DIR`, `DATA_D
 | `locator` | Maidenhead-Locator (4, 6 oder 8 Zeichen) |
 | `lat`, `lon` | Standort in Dezimalgrad; ohne Angabe die Mitte des Locators. Dient für Entfernungen im Logbuch, auf der Digital-Seite, für die Reichweite und als Standort der APRS-iGate-Bake |
 | `url` | öffentliche Adresse, z. B. `https://sdr.example.org` (optional; nötig für das Verzeichnis) |
+| `operator`, `address`, `contact` | Betreiber (Name/Rufzeichen), Anschrift (Zeilen mit ` · ` trennen), E-Mail. Mit `operator` zeigt die Info-Seite ein Impressum, der Fuß verlinkt es. Der Datenschutz-Hinweis auf der Info-Seite ist immer da (`[ui] datenschutz` überschreibt den Link) |
 
 ## `[[bands]]` – ein Eintrag je Empfänger
 

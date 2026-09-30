@@ -643,10 +643,14 @@ async fn ui_json(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         o.insert("build".into(), json!(option_env!("CRABSDR_GIT").unwrap_or("")));
         let home = station.home();
         o.insert("station".into(), json!({"name": station.name, "subtitle": station.subtitle, "locator": station.locator, "url": station.url,
-            "lat": home.map(|h| (h.0 * 1e5).round() / 1e5), "lon": home.map(|h| (h.1 * 1e5).round() / 1e5)}));
+            "lat": home.map(|h| (h.0 * 1e5).round() / 1e5), "lon": home.map(|h| (h.1 * 1e5).round() / 1e5),
+            "operator": station.operator, "address": station.address, "contact": station.contact}));
         // Admin-Link (nur bei Aufruf über private Adressen sichtbar): eigene Angabe, sonst die eingebaute Admin-Seite
         let admin_link = ui.admin.clone().or_else(|| state.auth.is_some().then(|| "admin/".to_string()));
-        o.insert("links".into(), json!({"impressum": ui.impressum, "datenschutz": ui.datenschutz, "admin": admin_link}));
+        // Impressum/Datenschutz: eigene Links, sonst die Abschnitte auf der Info-Seite (Impressum nur mit Betreiber-Angabe)
+        let impressum = ui.impressum.clone().or_else(|| (!station.operator.is_empty()).then(|| "info/#impressum".to_string()));
+        let datenschutz = ui.datenschutz.clone().unwrap_or_else(|| "info/#datenschutz".to_string());
+        o.insert("links".into(), json!({"impressum": impressum, "datenschutz": datenschutz, "admin": admin_link}));
     }
     if !cal.is_empty() {
         let sm = v.as_object_mut().map(|o| o.entry("smeter").or_insert_with(|| json!({})));
