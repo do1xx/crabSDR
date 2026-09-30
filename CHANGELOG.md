@@ -12,6 +12,8 @@ Handy-Oberfläche neu, Rauschsperre mit Regler.
 - Rauschsperre mit Regler: Schwelle in dB über dem Rauschen (0–30, Voreinstellung 6), neben dem Squelch-Schalter.
 - Durchlassbereich als Balken in der Skala sichtbar (einstellen weiter unten über die Bandbreite).
 - Fußzeile zeigt die Gesamtlast des Rechners statt der Last des Serverprozesses.
+- Signalanzeige: Rauschabstand (SNR, 0–60 dB) ist der Hauptwert; S-Stufe und dBm nur klein und nur auf kalibrierten Bändern.
+- PWA auf dem Handy: Kopf beginnt unter der Statusleiste des Handys.
 
 ### Empfänger
 - Doku: `settings = "flavour=SDRplay"` schaltet beim RSP1 die Preselektor-Filter nach dessen eigenem Plan (docs/CONFIG.md).
