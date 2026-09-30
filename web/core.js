@@ -28,7 +28,7 @@ var keysOn = true, dx = [], uu = [], hideMarks = false, wfModeNames = ['Spektrum
 var _crab = {
   token: null, bands: [], fft: 4096, px: 1024, wsBase: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + location.pathname.replace(/[^\/]*$/, ''),   // Basis-Pfad, damit /beta/ hinter nginx funktioniert
   audio: { gain: null, node: null, decoder: null, ts: 0, muted: false, volume: 1, pcm: typeof AudioDecoder !== 'function', rec: null },   // ohne WebCodecs (z. B. http:// im LAN) gleich PCM anfordern
-  level: -200, floor: -200, sq: true, squelchOn: false, notch: false, listenersTimer: null, palette: null,
+  level: -200, floor: -200, sq: true, squelchOn: false, sqMargin: 6, notch: false, listenersTimer: null, palette: null,
   dragRxX: 0, dragEdge: 0, started: false, sel: [0], bandsOff: [], features: {}, banner: '', links: {},
 };
 
@@ -465,11 +465,22 @@ var crabAudio = {
   mute: function () { setMute(!_crab.audio.muted); }
 };
 function setMute(on) { var A = _crab.audio; A.muted = (on === undefined) ? !A.muted : !!on; if (A.gain) A.gain.gain.value = A.muted ? 0 : A.volume; var c = document.getElementById('mutecheckbox'); if (c) c.checked = A.muted; }
+function _crabSqMsg() { return { type: 'set_squelch', mode: _crab.squelchOn ? 'auto' : 'off', margin: _crab.sqMargin, hang_ms: 500 }; }
 function setSquelch(on) {
-  _crab.squelchOn = !!on; _crabSendAll({ type: 'set_squelch', mode: on ? 'auto' : 'off', hang_ms: 500 });
+  _crab.squelchOn = !!on; _crabSendAll(_crabSqMsg());
   if (mode === 'FM' && _crab.sqUser) try { localStorage.setItem('crab_sq_fm', on ? '1' : '0'); } catch (e) {}
   var cb = document.getElementById('squelchcheckbox'); if (cb && cb.checked !== !!on) cb.checked = !!on;
+  var sc = document.getElementById('squelchcontrol'); if (sc) sc.classList.toggle('off', !on);
 }
+/* Schwelle der Rauschsperre in dB über dem Rauschboden des Kanals (Regler neben dem Squelch-Schalter, bleibt gespeichert) */
+function setSquelchLevel(v) {
+  v = Math.max(0, Math.min(30, Math.round(Number(v) || 0)));
+  _crab.sqMargin = v; try { localStorage.setItem('crab_sq_db', String(v)); } catch (e) {}
+  var r = document.getElementById('squelchlevel'), t = document.getElementById('squelchdb');
+  if (r && Number(r.value) !== v) r.value = v; if (t) t.textContent = v + ' dB';
+  if (_crab.squelchOn) _crabSendAll(_crabSqMsg());
+}
+function _crabSqInit() { var v = 6; try { v = Number(localStorage.getItem('crab_sq_db')); } catch (e) {} if (!(v >= 0 && v <= 30)) v = 6; _crab.sqMargin = v; setSquelchLevel(v); }
 /* Rauschsperre folgt der Betriebsart: FM startet mit Sperre (wie am Funkgerät; eigene Wahl bleibt gespeichert),
    AM/SSB/CW ohne – dort sucht man gerade die schwachen Signale. */
 function _crabSqForMode() {
@@ -669,7 +680,7 @@ function _crabConnect(b) {
       B.retry = 0;
       ws.send(JSON.stringify({ type: 'set_codec', audio: _crab.audio.pcm ? 'raw' : 'opus' }));
       var nm = (document.usernameform && document.usernameform.username.value || '').trim(); if (nm && nm !== 'Hörer') ws.send(JSON.stringify({ type: 'set_name', name: nm }));
-      if (_crab.squelchOn) ws.send(JSON.stringify({ type: 'set_squelch', mode: 'auto', hang_ms: 500 }));
+      if (_crab.squelchOn) ws.send(JSON.stringify(_crabSqMsg()));
       B.prev = null; B.clearOnNext = true; _crabSendWf(b);
       if (b === band) { _crabAudioFlush(); ws.send(JSON.stringify(_crabTuneMsg())); }
     };
@@ -883,6 +894,7 @@ function _crabPanelBuild() {
   if (share) put(r2, share, 'x1share');
   sep(r2);
   put(r2, q('.toggles'), 'x1audio');
+  put(r2, document.getElementById('squelchcontrol'), 'x1sq', 'Rauschsperre: dB über dem Rauschen');
   put(r2, document.getElementById('volumecontrol'), 'x1vol', 'Lautstärke');
   put(r2, document.getElementById('recbtn'), 'x1rec');
   sep(r2);
@@ -997,7 +1009,7 @@ function crabStart() {
   updateBw();
   window.addEventListener('mousemove', function () {});
   _crabPollListeners(); _crab.listenersTimer = setInterval(_crabPollListeners, 5000);
-  _crabSqForMode();
+  _crabSqInit(); _crabSqForMode();
   setTimeout(function () { _crabApplyFeatures(); _crabPanelBuild(); _crabShareInit(); }, 0);      // nach dem Ladeteil der Oberfläche (die setzt #wfsize erst nach crabStart auf „auto“)
   setInterval(_crabOfflineCheck, 1000);
   setTimeout(_crabSelMark, 200);

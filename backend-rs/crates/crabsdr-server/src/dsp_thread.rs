@@ -24,7 +24,6 @@ pub const OPUS_RATE: u32 = 24000;
 const WF_PX: usize = 1024;
 const WF_LINES_PER_S: u32 = 10;
 /// Rauschsperre „auto“: Schwelle = Rauschboden + Abstand
-const AUTO_SQUELCH_MARGIN_DB: f32 = 6.0;
 /// Ab so vielen Kanälen parallel (rayon) rechnen, darunter seriell
 const PAR_CHANNELS_MIN: usize = 64;
 /// Kanäle ohne Hörer nach so vielen Rahmen freigeben (5 s bei 50 fps)
@@ -407,7 +406,7 @@ impl DspThread {
                         let open_now = match v.squelch.mode {
                             SquelchMode::Off => true,
                             SquelchMode::Manual => o.level_db > v.squelch.db,
-                            SquelchMode::Auto => o.level_db > o.floor_db + AUTO_SQUELCH_MARGIN_DB,
+                            SquelchMode::Auto => o.level_db > o.floor_db + v.squelch.margin_db,
                         };
                         if open_now { rt_c.open_until = frame + hang_frames(v.squelch.hang_ms); }
                         let send = open_now || frame <= rt_c.open_until;

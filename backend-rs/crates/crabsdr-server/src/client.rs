@@ -36,14 +36,19 @@ pub struct Squelch {
     pub mode: SquelchMode,
     /// Schwelle in dBFS (Manual)
     pub db: f32,
+    /// Auto: öffnet, wenn der Pegel so viele dB über dem Rauschboden liegt (Regler in der Oberfläche)
+    pub margin_db: f32,
     pub hang_ms: u32,
 }
 
 impl Default for Squelch {
     fn default() -> Self {
-        Self { mode: SquelchMode::Off, db: -60.0, hang_ms: 500 }
+        Self { mode: SquelchMode::Off, db: -60.0, margin_db: AUTO_SQUELCH_MARGIN_DB, hang_ms: 500 }
     }
 }
+
+/// Voreinstellung für den Abstand über dem Rauschboden
+pub const AUTO_SQUELCH_MARGIN_DB: f32 = 6.0;
 
 /// Wasserfall-Abo: Zoomstufe (0 = ganzes Band, je Stufe halbe Breite) und Start-Bin.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

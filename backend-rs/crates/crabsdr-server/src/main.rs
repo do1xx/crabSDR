@@ -447,16 +447,17 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
             clients.untune(client_id);
         }
         "set_squelch" => {
-            // {"type":"set_squelch","mode":"off|auto|manual","db":-60,"hang_ms":500}
+            // {"type":"set_squelch","mode":"off|auto|manual","db":-60,"margin":6,"hang_ms":500}
             let mode = match msg.get("mode").and_then(|v| v.as_str()).unwrap_or("off") {
                 "auto" => SquelchMode::Auto,
                 "manual" => SquelchMode::Manual,
                 _ => SquelchMode::Off,
             };
             let db = msg.get("db").and_then(|v| v.as_f64()).unwrap_or(-60.0) as f32;
+            let margin_db = msg.get("margin").and_then(|v| v.as_f64()).map(|m| m.clamp(0.0, 40.0) as f32).unwrap_or(client::AUTO_SQUELCH_MARGIN_DB);
             let hang_ms = msg.get("hang_ms").and_then(|v| v.as_u64()).unwrap_or(500).min(10_000) as u32;
             let mut clients = pipeline.clients.lock().await;
-            clients.set_squelch(client_id, Squelch { mode, db, hang_ms });
+            clients.set_squelch(client_id, Squelch { mode, db, margin_db, hang_ms });
         }
         "set_name" => {
             let name = msg.get("name").and_then(|v| v.as_str()).unwrap_or("");
