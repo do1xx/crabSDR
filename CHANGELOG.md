@@ -19,6 +19,10 @@ Mehr Empfänger: SoapySDR mit 16 Bit, MSi2500/SDRplay RSP1 mit freien Treibern, 
 
 ### Oberfläche
 - Zoom (Knöpfe und Tasten + / −) zoomt um das gehörte Signal statt um die Mitte des Ausschnitts.
+- Zoom je Band mit eigener FFT-Größe; der Server zoomt, bis ein Pixel ein Bin ist (bei 8 MS/s zwei Stufen tiefer als
+  vorher), danach streckt der Browser. Beim Zoomen keine alten Zeilen mehr im Wasserfall.
+- Eigene Hörer-Marke auch beim obersten Band sichtbar; eingestellte Frequenz als dünne Linie durch den Wasserfall.
+- Oberfläche kommt nach einem Update sofort neu (Cache-Control: no-cache statt Schätzung des Browsers).
 
 ## 0.2.0 – 2026-09-29
 
