@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="{{STATION_NAME}}">
-<link rel="stylesheet" href="ui.css?v=42">
+<link rel="stylesheet" href="ui.css?v=43">
 <link rel="stylesheet" href="account.css?v=1">
 <script>
 // Einstellungen der Vorversion übernehmen (Schlüssel gartow_… und 1xx_… werden zu crab_…)
@@ -28,7 +28,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </script>
 <script>(function(){var t=null;try{t=localStorage.getItem('crab_token')}catch(e){}document.write('<script src="bandinfo.js?_=' + Date.now() + (t ? '&token=' + encodeURIComponent(t) : '') + '"><\/script>');})();</script>
 <script>window.STATION_NAME = '{{STATION_NAME_JS}}';</script>
-<script src="core.js?v=68"></script>
+<script src="core.js?v=69"></script>
 </head>
 <body class="hoeren">
 
@@ -277,8 +277,9 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
   <select class="mmode" id="mmode" aria-label="Betriebsart">
     <option value="fm">FM</option><option value="am">AM</option><option value="usb">USB</option><option value="lsb">LSB</option><option value="cw">CW</option>
   </select>
-  <button class="btn" type="button" onclick="setZoom(1)" aria-label="Zoom raus">−</button>
-  <button class="btn" type="button" onclick="setZoom(0)" aria-label="Zoom rein">+</button>
+  <button class="btn msq" id="msq" type="button" aria-label="Rauschsperre" title="Rauschsperre">SQ</button>
+  <button class="btn mmute" id="mmute" type="button" aria-label="Stumm" title="Stumm">🔇</button>
+  <button class="btn mset" id="mset" type="button" aria-label="Einstellungen" title="Einstellungen">☰</button>
   <button class="btn btn-accent audio-btn" id="maudio" type="button" aria-label="Ton einschalten">🔊</button>
   <div class="mmeter"><div class="smeter-fill" id="mfill"></div></div>
 </div>
@@ -290,7 +291,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </div>
 </div>
 
-<script src="ui.js?v=57"></script>
+<script src="ui.js?v=58"></script>
 <script src="account.js?v=1"></script>
 </body>
 </html>

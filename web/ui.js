@@ -29,14 +29,46 @@
   var snapUser = null; try { var sv = localStorage.getItem('crab_snap'); if (sv !== null) snapUser = Number(sv); } catch (e) {}
   if (snapUser !== null) snap = snapUser;
   var presets = [];
-  var rx, wrap, scalesBox, scale = 1, phone = false, lastSig = '', _setfreq0 = null;
+  var rx, wrap, scalesBox, scale = 1, phone = false, lastSig = '', _setfreq0 = null, layoutInit = false;
 
   function $(id) { return document.getElementById(id); }
   var CHAT_SIDE_MIN = 1100;   // ab dieser Fensterbreite sitzt der Chat rechts neben dem Wasserfall, darunter unter ihm
   function isPhone() { return window.innerWidth < PHONE_MAX; }
   // Wasserfallhöhe auf dem Handy: der Empfänger wird auf Bildschirmbreite verkleinert (1024 px → ~350 px), deshalb die
   // Canvas-Höhe so wählen, dass auf dem Bildschirm etwa 230 px übrig bleiben (vorher fest 200 Canvas-Pixel = ~70 px)
-  function phoneWf() { var sc = Math.max(0.2, (window.innerWidth - 20) / 1024); return Math.round(Math.min(2000, 230 / sc)); }
+  function phoneWf() {
+    var sc = Math.max(0.2, (window.innerWidth - 20) / 1024);
+    var top = document.querySelector('.top'), bd = document.querySelector('.bands'), mb = $('mbar');
+    var used = (top ? top.offsetHeight : 0) + (bd ? bd.offsetHeight : 0) + (mb ? mb.offsetHeight : 60) + MARKROW + 30;   // 30: Skala + Ränder
+    var avail = Math.max(160, window.innerHeight - used);
+    return Math.round(Math.min(2000, avail / sc));
+  }
+  /* Handy: Einstellungen als Menü von unten, Name/Chat/Fuß ziehen mit hinein; Leiste unten bekommt SQ/Stumm/Menü */
+  var sheetReady = false;
+  function openSheet(on) { document.body.classList.toggle('sheet-open', on === undefined ? !document.body.classList.contains('sheet-open') : !!on); }
+  function initPhoneSheet() {
+    if (sheetReady) return; sheetReady = true;
+    var panel = document.querySelector('.panel'), head = document.createElement('div'); head.className = 'sheethead';
+    var title = document.createElement('span'); title.className = 'sheettitle'; title.textContent = T('Einstellungen', 'Settings'); head.appendChild(title);
+    ['myname', 'chatbtn'].forEach(function (id) { var e = $(id); if (e) head.appendChild(e); });
+    var us = document.querySelector('.top .users'); if (us) head.appendChild(us);
+    var cl = document.createElement('button'); cl.type = 'button'; cl.className = 'btn'; cl.textContent = '✕'; cl.setAttribute('aria-label', T('Schließen', 'Close')); cl.onclick = function () { openSheet(false); }; head.appendChild(cl);
+    panel.insertBefore(head, panel.firstChild);
+    var sf = document.createElement('div'); sf.className = 'sheetfoot'; var foot = document.querySelector('.foot');
+    while (foot && foot.firstChild) sf.appendChild(foot.firstChild);
+    var tb = $('themebtn'); if (tb) sf.appendChild(tb);
+    panel.appendChild(sf);
+    var back = document.createElement('div'); back.className = 'sheetback'; back.onclick = function () { openSheet(false); }; document.body.appendChild(back);
+    $('mset').onclick = function () { openSheet(); };
+    $('msq').onclick = function () { setSquelch(!_crab.squelchOn); };
+    $('mmute').onclick = function () { setMute(); };
+  }
+  function phoneBar() {
+    if (!phone) return;
+    var sq = $('msq'), mu = $('mmute');
+    if (sq) { sq.classList.toggle('active', !!_crab.squelchOn); sq.classList.toggle('open', !!_crab.squelchOn && !!_crab.sq); }
+    if (mu) mu.classList.toggle('active', !!(_crab.audio && _crab.audio.muted));
+  }
 
   /* ================= Skalierung des Empfängerblocks ================= */
   function fit() {
@@ -477,6 +509,7 @@
     var ms = $('mmode'); if (ms.value !== mode.toLowerCase()) ms.value = mode.toLowerCase();
     renderScales(false);
     applyWfLevels();
+    phoneBar();
   }
 
   /* ================= S-Meter nach IARU Region 1 für VHF/UHF: S9 = −93 dBm, 6 dB je S-Stufe, S1 = −141 dBm =================
@@ -669,10 +702,12 @@
   /* ================= Handy / Desktop ================= */
   function applyLayout() {
     var p = isPhone();
-    if (p === phone) { fit(); return; }
+    if (p === phone) { fit(); if (phone) setWfHeight(phoneWf()); return; }
+    if (layoutInit) { location.reload(); return; }   // Wechsel Handy ↔ Desktop nach dem Start: sauber neu aufbauen
     phone = p;
     document.body.classList.toggle('phone', phone);
     if (phone) {
+      initPhoneSheet();
       applyView();
       $('wfsize').value = '200'; setWfHeight(phoneWf());
       setTimeout(function () { zoomToFreq(band, PHONE_ZOOM, freq); fit(); }, 400);
@@ -798,7 +833,7 @@
   window.addEventListener('load', function () {
     rx = $('rx'); wrap = $('rxwrap'); scalesBox = $('scales'); lmarks = $('lmarks');
     rx.style.transformOrigin = '0 0';
-    phone = isPhone(); document.body.classList.toggle('phone', phone);
+    phone = isPhone(); document.body.classList.toggle('phone', phone); if (phone) initPhoneSheet();
     createCookie('view', targetView(), 3652);
     createCookie('usejava', 'nn', 3652);
     buildBandBar();                        // muss VOR crabStart() laufen: base.js greift auf freqform.group0 zu
@@ -848,7 +883,7 @@
     ['click', 'keydown', 'touchstart'].forEach(function (ev) { document.addEventListener(ev, unlockAudio, true); });
     // Handy-Leiste
     $('mmode').onchange = function () { var f = MODEFILTER[this.value]; setMode(this.value, f[0], f[1]); };
-    $('mfreq').onclick = function () { var inp = document.freqform.frequency; inp.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(function () { inp.focus(); inp.select(); }, 400); };
+    $('mfreq').onclick = function () { var inp = document.freqform.frequency; openSheet(true); setTimeout(function () { inp.scrollIntoView({ block: 'center' }); inp.focus(); inp.select(); }, 250); };
     // Eigene Skala: Tippen und Ziehen
     scalesBox.addEventListener('pointerdown', function (ev) { scalesBox._down = true; scalePointer(ev); });
     scalesBox.addEventListener('pointermove', function (ev) { if (scalesBox._down) scalePointer(ev); });
@@ -857,7 +892,7 @@
     // Handy: Kurzleiste nur zeigen, solange das volle Bedienfeld nicht im Bild ist
     if (window.IntersectionObserver) new IntersectionObserver(function (es) { document.body.classList.toggle('panel-visible', es[0].isIntersecting); }, { threshold: 0.15 }).observe(document.querySelector('.strip'));
     if (window.ResizeObserver) { var ro = new ResizeObserver(function () { fit(); }); ro.observe(rx); ro.observe($('main')); ro.observe(document.querySelector('.panel')); }   // main: Leiste/Fuß/Fonts ändern die freie Höhe nachträglich
-    fit();
+    fit(); layoutInit = true;
     setInterval(refresh, 250);
     setInterval(meter, 100);
     setInterval(updateAudioBtn, 1000);
