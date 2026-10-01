@@ -494,7 +494,7 @@
      Der Server schickt je Band jede Sekunde die Träger > 10 dB über dem Rauschboden ("activity"). Ist die Rauschsperre zu und
      seit HOLD ms niemand zu hören, stimmt der Scanner auf das stärkste aktive Signal ab, das zu einem bekannten Kanal passt.
      Öffnet die Sperre dort nicht innerhalb DWELL ms (Dauerträger), wird der Kanal eine Minute übersprungen. */
-  var scan = { on: false, skip: {}, lastOpen: 0, openSince: 0, since: 0, cur: null, cnt: {}, lastAct: 0, quietSince: 0, HOLD: 4000, DWELL: 8000, MAXOPEN: 180000, QUIET: 10000, QUIET_RMS: 0.01 };
+  var scan = { on: false, skip: {}, lastOpen: 0, openSince: 0, since: 0, cur: null, cnt: {}, lastAct: 0, quietSince: 0, exclude: [], HOLD: 4000, DWELL: 8000, MAXOPEN: 180000, QUIET: 10000, QUIET_RMS: 0.01 };
   // Bekannte Kanäle des Bandes (Schnellwahl + Relaisliste), kHz → Betriebsart; null = keine Liste, dann alle Kanäle im 12,5-kHz-Raster
   function scanCandidates(b) {
     var e = bi[b]; if (!e) return {};
@@ -534,6 +534,7 @@
     for (var h in hits) {
       var c = hits[h];
       if ((scan.cnt[h] || 0) < 2 || (scan.skip[c.f] || 0) > now || c.f === freq) continue;
+      if (scan.exclude.some(function (x) { return Math.abs(x - c.f) <= 7; })) continue;   // Decoder-Kanäle (APRS, FT8 …): Daten, kein Gespräch
       if (!best || c.db > best.db) best = c;
     }
     if (best) { scan.cur = best.f; scan.since = now; tuneTo(best.f, best.mode); toast('Scan → ' + (best.f / 1000).toFixed(4).replace('.', ',') + ' MHz'); }
@@ -542,7 +543,11 @@
     scan.on = !!on; scan.skip = {}; scan.lastOpen = 0; scan.cur = null; scan.cnt = {}; scan.openSince = 0;
     var cb = $('scancheckbox'); if (cb && cb.checked !== scan.on) cb.checked = scan.on;
     var sk = $('scanskip'); if (sk) sk.hidden = !scan.on;
-    if (scan.on) { if (!_crab.squelchOn) setSquelch(true); toast(lang === 'de' ? 'Scanner an: springt auf aktive Kanäle' : 'Scanner on'); scanTick(); }
+    if (scan.on) {
+      if (!_crab.squelchOn) setSquelch(true);
+      fetch('api/decoders').then(function (r) { return r.json(); }).then(function (j) { scan.exclude = (j.decoders || []).map(function (d) { return d.freq / 1000; }); }).catch(function () {});
+      toast(lang === 'de' ? 'Scanner an: springt auf aktive Kanäle' : 'Scanner on'); scanTick();
+    }
   };
   window.scanSkip = function () { scan.skip[freq] = Date.now() + 60000; scan.lastOpen = 0; scan.cur = null; scanTick(); };
   function tunePreset(p, idx) {
