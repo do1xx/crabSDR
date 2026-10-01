@@ -732,8 +732,9 @@ impl ClientState {
     fn make_audio_filter(mode: DemodMode, bandwidth: u32, channel_rate: u32) -> (Option<Biquad>, Option<Biquad>) {
         let ch_rate = channel_rate as f32;
         let cutoff = match mode {
-            // SSB: audio goes from ~0 to bandwidth Hz
-            DemodMode::Usb | DemodMode::Lsb => (bandwidth as f32).min(ch_rate * 0.45),
+            // SSB: das Seitenbandfilter (SsbFilter) begrenzt schon exakt auf [lo, hi]; ein zusätzlicher Tiefpass bei hi
+            // nähme nur Höhen weg (dumpf). Deshalb keiner.
+            DemodMode::Usb | DemodMode::Lsb => return (None, None),
             // AM/SAM: RF bandwidth is double the audio bandwidth
             DemodMode::Am | DemodMode::Sam => (bandwidth as f32 * 0.5).min(ch_rate * 0.45),
             // CW: narrow around the 700 Hz BFO tone
@@ -1111,6 +1112,7 @@ impl Demodulator {
                         }
                         _ => {
                             let release_db = match agc_mode { AgcMode::Fast => 0.3, AgcMode::Slow => 0.04, _ => 0.1 };   // je 20-ms-Rahmen
+                            let old = state.agc_level;
                             if target_gain < state.agc_level {
                                 state.agc_level = target_gain;
                                 state.agc_hang = AGC_HANG_FRAMES;
@@ -1119,7 +1121,9 @@ impl Demodulator {
                             } else {
                                 state.agc_level = (state.agc_level * 10f32.powf(release_db / 20.0)).min(target_gain);
                             }
-                            for s in &mut audio { *s *= state.agc_level; }
+                            // Verstärkung über den Rahmen hinweg gleitend von alt nach neu, kein Sprung alle 20 ms (Zipper)
+                            let n = audio.len().max(1) as f32;
+                            for (i, s) in audio.iter_mut().enumerate() { *s *= old + (state.agc_level - old) * (i as f32 + 1.0) / n; }
                         }
                     }
                 }
