@@ -2,6 +2,13 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Oberfläche
+- Scanner („Scan“ neben Squelch): der Server meldet je Band jede Sekunde die aktiven Träger, der Scanner springt auf den
+  stärksten, der zu einem Schnellwahl-Kanal oder Relais passt, bleibt, solange gesprochen wird, wartet kurz auf die Antwort
+  und sucht weiter. „Weiter“ überspringt einen Kanal für eine Minute.
+
 ## 0.4.1 – 2026-09-30
 
 ### Oberfläche

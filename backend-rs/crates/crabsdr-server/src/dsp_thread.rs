@@ -186,6 +186,43 @@ fn quantize_db(db: f32) -> u8 {
 
 /// Rauschboden je Bin (dBFS) in der Umgebung eines Kanals: 20. Perzentil der Spektrum-Bins ±200 kHz um den Kanal,
 /// ohne die Kanalbins selbst. Damit hängt die Auto-Rauschsperre nicht vom eigenen Signal ab.
+/// Aktive Träger im Band: Rauschboden je Abschnitt von 64 Bins (20. Perzentil), alles ab 10 dB darüber zu Trägern
+/// zusammengefasst (zusammenhängende Bins, Spitze = Frequenz). Höchstens 30, stärkste zuerst: [[Hz, dB über Boden], …].
+/// Die äußeren 5 % des Bandes bleiben außen vor (Filterflanken der Sticks).
+fn find_activity(spec: &[f32], center: u64, rate: u32, bin_hz: f32) -> Vec<(u64, f32)> {
+    let n = spec.len(); if n < 256 { return vec![]; }
+    let seg = 64usize;
+    let mut floor = vec![0f32; n];
+    for s in (0..n).step_by(seg) {
+        let e = (s + seg).min(n);
+        let mut v: Vec<f32> = spec[s..e].to_vec();
+        v.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let f = v[v.len() / 5];
+        for x in &mut floor[s..e] { *x = f; }
+    }
+    let (lo, hi) = (n / 20, n - n / 20);
+    let mut peaks: Vec<(u64, f32)> = Vec::new();
+    let mut i = lo;
+    while i < hi {
+        if spec[i] - floor[i] > 10.0 {
+            let (mut j, mut best_db) = (i, spec[i] - floor[i]);
+            while j < hi && spec[j] - floor[j] > 10.0 { let d = spec[j] - floor[j]; if d > best_db { best_db = d; } j += 1; }
+            if j - i >= 2 {
+                // Mitte des Bereichs, der höchstens 3 dB unter der Spitze liegt (flache Träger: Kanalmitte statt erster Bin)
+                let top: Vec<usize> = (i..j).filter(|&b| spec[b] - floor[b] >= best_db - 3.0).collect();
+                let best = (top[0] + top[top.len() - 1]) as f64 / 2.0;
+                let f = center as f64 + (best - n as f64 / 2.0) * bin_hz as f64;
+                if f > 0.0 { peaks.push((f.round() as u64, (best_db * 10.0).round() / 10.0)); }
+            }
+            i = j;
+        } else { i += 1; }
+    }
+    let _ = rate;
+    peaks.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    peaks.truncate(30);
+    peaks
+}
+
 fn neighbourhood_floor(spec: &[f32], center_bin: isize, half_ch_bins: isize, bin_hz: f32) -> f32 {
     let n = spec.len() as isize;
     let reach = ((200_000.0 / bin_hz) as isize).max(half_ch_bins * 4);
@@ -503,6 +540,13 @@ impl DspThread {
                     }
                 }
 
+                // === Aktivität im Band (Scanner): einmal je Sekunde Träger > 10 dB über dem örtlichen Rauschboden ===
+                if frame % fps as u64 == 0 && spectrum_tx.receiver_count() > 0 {
+                    let peaks = find_activity(spec, center, rate, bin_hz);
+                    let msg = json!({"type": "activity", "peaks": peaks});
+                    let _ = spectrum_tx.send(protocol::encode_json(&msg.to_string()));
+                }
+
                 // === Alle 2 s Systemwerte; Hörerliste [id, name, freq, mode] sofort bei Änderung (max. 2×/s), sonst alle 5 s ===
                 if spectrum_tx.receiver_count() > 0 {
                     let real: Vec<_> = views.iter().filter(|v| v.id < PLUGIN_CLIENT_BASE).collect();
@@ -588,6 +632,22 @@ mod tests {
         let line = build_line(&spec, WaterfallSub { zoom: 4, start_bin: 9000 });
         assert_eq!(line[3], quantize_db(-25.0));
         assert_eq!(line[4], quantize_db(-100.0));
+    }
+
+    #[test]
+    fn aktivitaet_findet_traeger() {
+        // 4096 Bins, 2,048 MS/s um 145 MHz: Träger bei Bin 2400 (+176 kHz) und Bin 1000 (−524 kHz), Rauschen −90 dB
+        let mut spec = vec![-90.0f32; 4096];
+        for b in 2398..2403 { spec[b] = -50.0; }
+        for b in 999..1002 { spec[b] = -70.0; }
+        let p = find_activity(&spec, 145_000_000, 2_048_000, 500.0);
+        assert_eq!(p.len(), 2);
+        assert_eq!(p[0].0, 145_000_000 + (2400 - 2048) * 500);
+        assert!(p[0].1 > 35.0);
+        assert_eq!(p[1].0, 145_000_000 - (2048 - 1000) * 500);
+        // einzelner Bin (Störspitze) zählt nicht
+        let mut s2 = vec![-90.0f32; 4096]; s2[3000] = -40.0;
+        assert!(find_activity(&s2, 145_000_000, 2_048_000, 500.0).is_empty());
     }
 
     #[test]
