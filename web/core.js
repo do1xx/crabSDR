@@ -477,6 +477,14 @@ var crabAudio = {
   mute: function () { setMute(!_crab.audio.muted); }
 };
 function setMute(on) { var A = _crab.audio; A.muted = (on === undefined) ? !A.muted : !!on; if (A.gain) A.gain.gain.value = A.muted ? 0 : A.volume; var c = document.getElementById('mutecheckbox'); if (c) c.checked = A.muted; }
+/* Regelung AM/SSB/CW: schnell/mittel/langsam (Server set_agc); bleibt im Browser gespeichert; bei FM ohne Wirkung */
+function setAgc(v) {
+  v = (v === 'fast' || v === 'slow') ? v : 'medium'; _crab.agcMode = v;
+  try { localStorage.setItem('crab_agc', v); } catch (e) {}
+  var s = document.getElementById('agcsel'); if (s && s.value !== v) s.value = v;
+  _crabSendAll({ type: 'set_agc', mode: v });
+}
+function _crabAgcInit() { var v = 'medium'; try { v = localStorage.getItem('crab_agc') || 'medium'; } catch (e) {} _crab.agcMode = v; var s = document.getElementById('agcsel'); if (s) s.value = v; }
 function _crabSqMsg() { return { type: 'set_squelch', mode: _crab.squelchOn ? 'auto' : 'off', margin: _crab.sqMargin, hang_ms: 250 }; }   // Haltezeit nur für kurze Einbrüche; bei Trägerende schließt der Server sofort
 function setSquelch(on) {
   _crab.squelchOn = !!on; _crabSendAll(_crabSqMsg());
@@ -693,6 +701,7 @@ function _crabConnect(b) {
       ws.send(JSON.stringify({ type: 'set_codec', audio: _crab.audio.pcm ? 'raw' : 'opus' }));
       var nm = (document.usernameform && document.usernameform.username.value || '').trim(); if (nm && nm !== 'Hörer') ws.send(JSON.stringify({ type: 'set_name', name: nm }));
       if (_crab.squelchOn) ws.send(JSON.stringify(_crabSqMsg()));
+      if (_crab.agcMode && _crab.agcMode !== 'medium') ws.send(JSON.stringify({ type: 'set_agc', mode: _crab.agcMode }));
       B.prev = null; B.clearOnNext = true; _crabSendWf(b);
       if (b === band) { _crabAudioFlush(); ws.send(JSON.stringify(_crabTuneMsg())); }
     };
@@ -907,6 +916,7 @@ function _crabPanelBuild() {
   sep(r2);
   put(r2, q('.toggles'), 'x1audio');
   put(r2, document.getElementById('squelchcontrol'), 'x1sq', 'Rauschsperre: dB über dem Rauschen');
+  put(r2, document.getElementById('agccontrol'), 'x1agc', 'Regelung (AM/SSB/CW): wie schnell die Lautstärke nachgeführt wird');
   put(r2, document.getElementById('volumecontrol'), 'x1vol', 'Lautstärke');
   put(r2, document.getElementById('recbtn'), 'x1rec');
   sep(r2);
@@ -1008,6 +1018,9 @@ function crabStart() {
   var mt = /[?&]tune=([\d.]+)(fm|am|usb|lsb|cw)?/i.exec(location.search);
   if (mt) { var f0 = parseFloat(mt[1]); for (var k = 0; k < bi.length; k++) { var r = _crabBandRange(k); if (f0 >= r.lo && f0 <= r.hi) { start.b = k; start.f = f0; start.m = mt[2] ? mt[2].toLowerCase() : null; } } }
   if (start.m) { var mf = start.m === 'fm' ? [-8, 8] : _crabMODEFILTER[start.m]; mode = start.m.toUpperCase(); lo = mf[0]; hi = mf[1]; }
+  // Durchlassbereich aus dem Link (&pb=lo,hi in kHz), z. B. SSB 0.30,2.70
+  var mp = /[?&]pb=(-?[\d.]+),(-?[\d.]+)/.exec(location.search);
+  if (mt && mp) { var plo = parseFloat(mp[1]), phi = parseFloat(mp[2]); if (isFinite(plo) && isFinite(phi) && phi > plo && phi - plo <= 50) { lo = plo; hi = phi; } }
   _crabLoadLook();
   _crabAudioInit();
   start.b = _crabSelLoad(start.b, !!mt);
@@ -1021,7 +1034,7 @@ function crabStart() {
   updateBw();
   window.addEventListener('mousemove', function () {});
   _crabPollListeners(); _crab.listenersTimer = setInterval(_crabPollListeners, 5000);
-  _crabSqInit(); _crabSqForMode();
+  _crabSqInit(); _crabAgcInit(); _crabSqForMode();
   setTimeout(function () { _crabApplyFeatures(); _crabPanelBuild(); _crabShareInit(); }, 0);      // nach dem Ladeteil der Oberfläche (die setzt #wfsize erst nach crabStart auf „auto“)
   setInterval(_crabOfflineCheck, 1000);
   setTimeout(_crabSelMark, 200);

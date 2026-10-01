@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="{{STATION_NAME}}">
-<link rel="stylesheet" href="ui.css?v=48">
+<link rel="stylesheet" href="ui.css?v=49">
 <link rel="stylesheet" href="account.css?v=1">
 <script>
 // Einstellungen der Vorversion übernehmen (Schlüssel gartow_… und 1xx_… werden zu crab_…)
@@ -28,7 +28,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </script>
 <script>(function(){var t=null;try{t=localStorage.getItem('crab_token')}catch(e){}document.write('<script src="bandinfo.js?_=' + Date.now() + (t ? '&token=' + encodeURIComponent(t) : '') + '"><\/script>');})();</script>
 <script>window.STATION_NAME = '{{STATION_NAME_JS}}';</script>
-<script src="core.js?v=73"></script>
+<script src="core.js?v=74"></script>
 </head>
 <body class="hoeren">
 
@@ -136,6 +136,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
         <label class="toggle"><input id="squelchcheckbox" type="checkbox" onclick="setSquelch(this.checked)"><span>Squelch</span></label>
         <span id="squelchcontrol" class="volrow sqrow" title="Rauschsperre: öffnet, wenn das Signal so viele dB über dem Rauschen liegt"><input type="range" id="squelchlevel" min="0" max="30" step="1" value="6"
           oninput="setSquelchLevel(this.value)" onchange="setSquelchLevel(this.value)"><span id="squelchdb">6 dB</span></span>
+        <span id="agccontrol" class="volrow agcrow" title="Regelung: wie schnell die Lautstärke bei AM/SSB/CW nachgeführt wird"><span class="x1lbl">AGC</span><select id="agcsel" onchange="setAgc(this.value)"><option value="fast" data-de="schnell" data-en="fast">schnell</option><option value="medium" selected data-de="mittel" data-en="medium">mittel</option><option value="slow" data-de="langsam" data-en="slow">langsam</option></select></span>
         <label class="toggle adv"><input id="autonotchcheckbox" type="checkbox" onclick="setAutoNotch(this.checked)"><span>Notch</span></label>
         <label class="toggle"><input id="mutecheckbox" type="checkbox" onclick="setMute(this.checked)"><span data-de="Stumm" data-en="Mute">Stumm</span></label>
       </div>
@@ -291,7 +292,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </div>
 </div>
 
-<script src="ui.js?v=62"></script>
+<script src="ui.js?v=63"></script>
 <script src="account.js?v=1"></script>
 </body>
 </html>

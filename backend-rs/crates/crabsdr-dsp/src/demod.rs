@@ -1111,7 +1111,7 @@ impl Demodulator {
                             for s in &mut audio { *s *= 0.5; }
                         }
                         _ => {
-                            let release_db = match agc_mode { AgcMode::Fast => 0.3, AgcMode::Slow => 0.04, _ => 0.1 };   // je 20-ms-Rahmen
+                            let release_db = match agc_mode { AgcMode::Fast => 0.5, AgcMode::Slow => 0.06, _ => 0.2 };   // je 20-ms-Rahmen: 25 / 3 / 10 dB je s
                             let old = state.agc_level;
                             if target_gain < state.agc_level {
                                 state.agc_level = target_gain;

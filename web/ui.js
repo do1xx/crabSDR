@@ -334,7 +334,7 @@
     var t = $('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
     t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove('show'); }, 1800);
   }
-  function tuneLink() { return location.origin + location.pathname + '?tune=' + dialFreq().toFixed(3) + mode.toLowerCase(); }
+  function tuneLink() { return location.origin + location.pathname + '?tune=' + dialFreq().toFixed(3) + mode.toLowerCase() + '&pb=' + lo.toFixed(2) + ',' + hi.toFixed(2); }   // pb = Durchlassbereich lo,hi in kHz
   // Teilen: auf Handys das System-Menü (WhatsApp, Telegram, …), sonst Link + kurzer Text in die Zwischenablage
   function copyLink() {
     var url = tuneLink(), f = (dialFreq() / 1000).toFixed(4).replace('.', ',') + ' MHz ' + mode;
@@ -512,6 +512,7 @@
     renderScales(false);
     applyWfLevels();
     phoneBar();
+    var ag = $('agccontrol'); if (ag) ag.classList.toggle('off', mode === 'FM');
   }
 
   /* ================= S-Meter nach IARU Region 1 für VHF/UHF: S9 = −93 dBm, 6 dB je S-Stufe, S1 = −141 dBm =================
@@ -602,6 +603,9 @@
       var ts = new Date(recT0), p2 = function (n) { return ('0' + n).slice(-2); };
       var fname = String(window.STATION_NAME || 'crabSDR').replace(/[^A-Za-z0-9-]+/g, '_') + '_' + ts.getFullYear() + p2(ts.getMonth() + 1) + p2(ts.getDate()) + '-' + p2(ts.getHours()) + p2(ts.getMinutes()) + p2(ts.getSeconds()) + '_' + dialFreq().toFixed(1) + 'kHz_' + mode + '.wav';
       out.innerHTML = '<a href="' + recUrl + '" download="' + fname + '">⬇ ' + (lang === 'de' ? 'speichern' : 'save') + ' (' + fmtMs(dur) + ')</a>';
+      // direkt herunterladen (das Bedienfeld mit dem Link ist auf dem Desktop ausgeblendet)
+      var a = document.createElement('a'); a.href = recUrl; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+      toast((lang === 'de' ? 'Aufnahme gespeichert: ' : 'Recording saved: ') + fname);
     } else {
       if (audioState() !== 'running') { toast(lang === 'de' ? 'Erst den Ton einschalten' : 'Start audio first'); return; }
       out.innerHTML = ''; recT0 = Date.now();

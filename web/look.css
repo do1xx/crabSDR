@@ -158,6 +158,8 @@ body.look-crab .x1bar .bwpresets .btn.active { border-color: var(--accent); }
 .x1bar .sqrow input[type=range] { width: 80px; }
 .sqrow #squelchdb { font-variant-numeric: tabular-nums; min-width: 34px; }
 .sqrow.off { opacity: .35; }
+.agcrow.off { display: none; }
+.agcrow select { font-size: 12px; }
 .x1bar .recbtn { border-color: transparent; }
 .x1share .btn span { display: none; }
 @media (min-width: 1500px) { .x1share .btn span { display: inline; } }

@@ -4,6 +4,11 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 
 ## Unveröffentlicht
 
+### Oberfläche
+- Aufnahme: die Datei wird beim Stopp direkt heruntergeladen (der Link lag im ausgeblendeten Bedienfeld).
+- AGC-Wahl schnell/mittel/langsam neben der Rauschsperre (AM/SSB/CW).
+- Teilen-Link nimmt den Durchlassbereich mit (`&pb=lo,hi`), bei SSB kommt die Bandbreite so mit an.
+
 ### Ton
 - SSB: neuer Demodulator mit durchlaufendem Seitenbandfilter (Mischer + FIR statt blockweiser FFT) – kein Kratzen an den
   Rahmengrenzen mehr, und die untere Bandkante (300 Hz) gilt jetzt, vorher kam alles ab 0 Hz durch (dumpf, basslastig).
