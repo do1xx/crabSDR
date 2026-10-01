@@ -494,34 +494,47 @@
      Der Server schickt je Band jede Sekunde die Träger > 10 dB über dem Rauschboden ("activity"). Ist die Rauschsperre zu und
      seit HOLD ms niemand zu hören, stimmt der Scanner auf das stärkste aktive Signal ab, das zu einem bekannten Kanal passt.
      Öffnet die Sperre dort nicht innerhalb DWELL ms (Dauerträger), wird der Kanal eine Minute übersprungen. */
-  var scan = { on: false, skip: {}, lastOpen: 0, since: 0, cur: null, HOLD: 4000, DWELL: 8000 };
+  var scan = { on: false, skip: {}, lastOpen: 0, openSince: 0, since: 0, cur: null, cnt: {}, lastAct: 0, HOLD: 4000, DWELL: 8000, MAXOPEN: 180000 };
+  // Bekannte Kanäle des Bandes (Schnellwahl + Relaisliste), kHz → Betriebsart; null = keine Liste, dann alle Kanäle im 12,5-kHz-Raster
   function scanCandidates(b) {
     var e = bi[b]; if (!e) return {};
-    var lo_ = e.centerfreq - e.samplerate / 2, hi_ = e.centerfreq + e.samplerate / 2, out = {};
-    presets.forEach(function (p) { if (p.freq >= lo_ && p.freq <= hi_) out[p.freq] = (p.mode || 'fm').toLowerCase(); });
-    markers.forEach(function (m) { if (m.freq >= lo_ && m.freq <= hi_ && !out[m.freq]) out[m.freq] = (m.mode || 'fm').toLowerCase(); });
-    return out;
+    var lo_ = e.centerfreq - e.samplerate / 2, hi_ = e.centerfreq + e.samplerate / 2, out = {}, n = 0;
+    presets.forEach(function (p) { if (p.freq >= lo_ && p.freq <= hi_) { out[p.freq] = (p.mode || 'fm').toLowerCase(); n++; } });
+    markers.forEach(function (m) { if (m.freq >= lo_ && m.freq <= hi_ && !out[m.freq]) { out[m.freq] = (m.mode || 'fm').toLowerCase(); n++; } });
+    return n ? out : null;
   }
   function scanTick() {
     if (!scan.on) return;
     var now = Date.now();
-    if (_crab.squelchOn && _crab.sq) { scan.lastOpen = now; return; }          // jemand spricht: bleiben
+    if (_crab.squelchOn && _crab.sq) {                                          // jemand spricht: bleiben …
+      if (!scan.openSince) scan.openSince = now;
+      if (now - scan.openSince > scan.MAXOPEN) { scan.skip[freq] = now + 600000; scan.openSince = 0; scan.lastOpen = 0; }   // … außer Dauerträger
+      else { scan.lastOpen = now; return; }
+    } else scan.openSince = 0;
     if (now - scan.lastOpen < scan.HOLD) return;                                // kurz auf die Antwort warten
     if (scan.cur === freq && now - scan.since > scan.DWELL) scan.skip[freq] = now + 60000;   // Träger ohne Öffnen: überspringen
     var act = (_crab.activity || {})[band]; if (!act || now - act.t > 3000) return;
-    var cands = scanCandidates(band), best = null;
+    var cands = scanCandidates(band), hits = {};
     act.peaks.forEach(function (pk) {
       var fk = pk[0] / 1000;
-      for (var f in cands) {
-        var ff = Number(f); if (Math.abs(ff - fk) > 7) continue;
-        if ((scan.skip[ff] || 0) > now || ff === freq) continue;
-        if (!best || pk[1] > best.db) best = { f: ff, mode: cands[f], db: pk[1] };
-      }
+      if (cands) { for (var f in cands) if (Math.abs(Number(f) - fk) <= 7) hits[f] = { f: Number(f), mode: cands[f], db: pk[1] }; }
+      else { var ff = Math.round(fk / 12.5) * 12.5; hits[ff] = { f: ff, mode: 'fm', db: pk[1] }; }
     });
+    if (act.t !== scan.lastAct) {                                               // neue Meldung: Treffer müssen zweimal in Folge da sein
+      scan.lastAct = act.t; var cnt = {};
+      for (var k in hits) cnt[k] = (scan.cnt[k] || 0) + 1;
+      scan.cnt = cnt;
+    }
+    var best = null;
+    for (var h in hits) {
+      var c = hits[h];
+      if ((scan.cnt[h] || 0) < 2 || (scan.skip[c.f] || 0) > now || c.f === freq) continue;
+      if (!best || c.db > best.db) best = c;
+    }
     if (best) { scan.cur = best.f; scan.since = now; tuneTo(best.f, best.mode); toast('Scan → ' + (best.f / 1000).toFixed(4).replace('.', ',') + ' MHz'); }
   }
   window.setScan = function (on) {
-    scan.on = !!on; scan.skip = {}; scan.lastOpen = 0; scan.cur = null;
+    scan.on = !!on; scan.skip = {}; scan.lastOpen = 0; scan.cur = null; scan.cnt = {}; scan.openSince = 0;
     var cb = $('scancheckbox'); if (cb && cb.checked !== scan.on) cb.checked = scan.on;
     var sk = $('scanskip'); if (sk) sk.hidden = !scan.on;
     if (scan.on) { if (!_crab.squelchOn) setSquelch(true); toast(lang === 'de' ? 'Scanner an: springt auf aktive Kanäle' : 'Scanner on'); scanTick(); }
