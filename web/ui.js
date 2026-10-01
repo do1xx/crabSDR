@@ -494,7 +494,7 @@
      Der Server schickt je Band jede Sekunde die Träger > 10 dB über dem Rauschboden ("activity"). Ist die Rauschsperre zu und
      seit HOLD ms niemand zu hören, stimmt der Scanner auf das stärkste aktive Signal ab, das zu einem bekannten Kanal passt.
      Öffnet die Sperre dort nicht innerhalb DWELL ms (Dauerträger), wird der Kanal eine Minute übersprungen. */
-  var scan = { on: false, skip: {}, lastOpen: 0, openSince: 0, since: 0, cur: null, cnt: {}, lastAct: 0, HOLD: 4000, DWELL: 8000, MAXOPEN: 180000 };
+  var scan = { on: false, skip: {}, lastOpen: 0, openSince: 0, since: 0, cur: null, cnt: {}, lastAct: 0, quietSince: 0, HOLD: 4000, DWELL: 8000, MAXOPEN: 180000, QUIET: 10000, QUIET_RMS: 0.01 };
   // Bekannte Kanäle des Bandes (Schnellwahl + Relaisliste), kHz → Betriebsart; null = keine Liste, dann alle Kanäle im 12,5-kHz-Raster
   function scanCandidates(b) {
     var e = bi[b]; if (!e) return {};
@@ -508,9 +508,14 @@
     var now = Date.now();
     if (_crab.squelchOn && _crab.sq) {                                          // jemand spricht: bleiben …
       if (!scan.openSince) scan.openSince = now;
-      if (now - scan.openSince > scan.MAXOPEN) { scan.skip[freq] = now + 600000; scan.openSince = 0; scan.lastOpen = 0; }   // … außer Dauerträger
-      else { scan.lastOpen = now; return; }
-    } else scan.openSince = 0;
+      // … außer Dauerträger: Sperre offen, aber kein Ton (unmodulierter Träger) seit QUIET ms, oder länger als MAXOPEN offen
+      var quiet = _crab.audioT && now - _crab.audioT < 2000 && _crab.audioRms < scan.QUIET_RMS;
+      if (quiet) { if (!scan.quietSince) scan.quietSince = now; } else scan.quietSince = 0;
+      if (now - scan.openSince > scan.MAXOPEN || (scan.quietSince && now - scan.quietSince > scan.QUIET)) {
+        scan.skip[freq] = now + 600000; scan.openSince = 0; scan.quietSince = 0; scan.lastOpen = 0;
+        toast(lang === 'de' ? 'Scan: Dauerträger übersprungen' : 'Scan: carrier skipped');
+      } else { scan.lastOpen = now; return; }
+    } else { scan.openSince = 0; scan.quietSince = 0; }
     if (now - scan.lastOpen < scan.HOLD) return;                                // kurz auf die Antwort warten
     if (scan.cur === freq && now - scan.since > scan.DWELL) scan.skip[freq] = now + 60000;   // Träger ohne Öffnen: überspringen
     var act = (_crab.activity || {})[band]; if (!act || now - act.t > 3000) return;

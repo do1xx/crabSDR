@@ -446,6 +446,10 @@ function _crabScriptFallback(ctx) {
 function _crabAudioPush(f32) {
   var A = _crab.audio; _crab.audioFrames = (_crab.audioFrames || 0) + 1; if (A.node) A.node.port.postMessage(f32);
   if (A.rec) A.rec.push(f32);
+  // Tonpegel (RMS, geglättet) für den Scanner: unmodulierter Träger = fast Stille, Sprache deutlich darüber
+  var s = 0; for (var i = 0; i < f32.length; i += 4) s += f32[i] * f32[i];
+  var rms = Math.sqrt(s / Math.max(1, f32.length / 4));
+  _crab.audioRms = (_crab.audioRms == null) ? rms : 0.8 * _crab.audioRms + 0.2 * rms; _crab.audioT = Date.now();
 }
 function _crabAudioFlush() { var A = _crab.audio; if (A.node) A.node.port.postMessage('flush'); }   // Zeitstempel bleiben monoton (Decoder verwirft sonst Pakete)
 function _crabDecoderInit() {
