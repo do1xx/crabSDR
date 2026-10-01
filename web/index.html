@@ -28,7 +28,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </script>
 <script>(function(){var t=null;try{t=localStorage.getItem('crab_token')}catch(e){}document.write('<script src="bandinfo.js?_=' + Date.now() + (t ? '&token=' + encodeURIComponent(t) : '') + '"><\/script>');})();</script>
 <script>window.STATION_NAME = '{{STATION_NAME_JS}}';</script>
-<script src="core.js?v=71"></script>
+<script src="core.js?v=70"></script>
 </head>
 <body class="hoeren">
 
@@ -134,8 +134,6 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
       </div>
       <div class="toggles">
         <label class="toggle"><input id="squelchcheckbox" type="checkbox" onclick="setSquelch(this.checked)"><span>Squelch</span></label>
-        <label class="toggle" title="Scanner: springt auf Schnellwahl-Kanäle und Relais, sobald dort ein Signal ist"><input id="scancheckbox" type="checkbox" onclick="setScan(this.checked)"><span>Scan</span></label>
-        <button id="scanskip" class="btn" type="button" hidden onclick="scanSkip()" title="diesen Kanal eine Minute überspringen" data-de="Weiter" data-en="Next">Weiter</button>
         <span id="squelchcontrol" class="volrow sqrow" title="Rauschsperre: öffnet, wenn das Signal so viele dB über dem Rauschen liegt"><input type="range" id="squelchlevel" min="0" max="30" step="1" value="6"
           oninput="setSquelchLevel(this.value)" onchange="setSquelchLevel(this.value)"><span id="squelchdb">6 dB</span></span>
         <label class="toggle adv"><input id="autonotchcheckbox" type="checkbox" onclick="setAutoNotch(this.checked)"><span>Notch</span></label>
@@ -293,7 +291,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </div>
 </div>
 
-<script src="ui.js?v=63"></script>
+<script src="ui.js?v=62"></script>
 <script src="account.js?v=1"></script>
 </body>
 </html>

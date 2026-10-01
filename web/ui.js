@@ -490,43 +490,6 @@
     setFreqText(String(kHz));
     if (phone) zoomToFreq(band, PHONE_ZOOM, kHz);
   }
-  /* ================= Scanner: springt auf Schnellwahl-Kanäle/Relais, sobald der Server dort Aktivität meldet =================
-     Der Server schickt je Band jede Sekunde die Träger > 10 dB über dem Rauschboden ("activity"). Ist die Rauschsperre zu und
-     seit HOLD ms niemand zu hören, stimmt der Scanner auf das stärkste aktive Signal ab, das zu einem bekannten Kanal passt.
-     Öffnet die Sperre dort nicht innerhalb DWELL ms (Dauerträger), wird der Kanal eine Minute übersprungen. */
-  var scan = { on: false, skip: {}, lastOpen: 0, since: 0, cur: null, HOLD: 4000, DWELL: 8000 };
-  function scanCandidates(b) {
-    var e = bi[b]; if (!e) return {};
-    var lo_ = e.centerfreq - e.samplerate / 2, hi_ = e.centerfreq + e.samplerate / 2, out = {};
-    presets.forEach(function (p) { if (p.freq >= lo_ && p.freq <= hi_) out[p.freq] = (p.mode || 'fm').toLowerCase(); });
-    markers.forEach(function (m) { if (m.freq >= lo_ && m.freq <= hi_ && !out[m.freq]) out[m.freq] = (m.mode || 'fm').toLowerCase(); });
-    return out;
-  }
-  function scanTick() {
-    if (!scan.on) return;
-    var now = Date.now();
-    if (_crab.squelchOn && _crab.sq) { scan.lastOpen = now; return; }          // jemand spricht: bleiben
-    if (now - scan.lastOpen < scan.HOLD) return;                                // kurz auf die Antwort warten
-    if (scan.cur === freq && now - scan.since > scan.DWELL) scan.skip[freq] = now + 60000;   // Träger ohne Öffnen: überspringen
-    var act = (_crab.activity || {})[band]; if (!act || now - act.t > 3000) return;
-    var cands = scanCandidates(band), best = null;
-    act.peaks.forEach(function (pk) {
-      var fk = pk[0] / 1000;
-      for (var f in cands) {
-        var ff = Number(f); if (Math.abs(ff - fk) > 7) continue;
-        if ((scan.skip[ff] || 0) > now || ff === freq) continue;
-        if (!best || pk[1] > best.db) best = { f: ff, mode: cands[f], db: pk[1] };
-      }
-    });
-    if (best) { scan.cur = best.f; scan.since = now; tuneTo(best.f, best.mode); toast('Scan → ' + (best.f / 1000).toFixed(4).replace('.', ',') + ' MHz'); }
-  }
-  window.setScan = function (on) {
-    scan.on = !!on; scan.skip = {}; scan.lastOpen = 0; scan.cur = null;
-    var cb = $('scancheckbox'); if (cb && cb.checked !== scan.on) cb.checked = scan.on;
-    var sk = $('scanskip'); if (sk) sk.hidden = !scan.on;
-    if (scan.on) { if (!_crab.squelchOn) setSquelch(true); toast(lang === 'de' ? 'Scanner an: springt auf aktive Kanäle' : 'Scanner on'); scanTick(); }
-  };
-  window.scanSkip = function () { scan.skip[freq] = Date.now() + 60000; scan.lastOpen = 0; scan.cur = null; scanTick(); };
   function tunePreset(p, idx) {
     if (band !== idx) setBand(idx);
     var f = MODEFILTER[p.mode] || MODEFILTER.fm;
@@ -941,7 +904,6 @@
     if (window.ResizeObserver) { var ro = new ResizeObserver(function () { fit(); }); ro.observe(rx); ro.observe($('main')); ro.observe(document.querySelector('.panel')); }   // main: Leiste/Fuß/Fonts ändern die freie Höhe nachträglich
     fit(); layoutInit = true;
     setInterval(refresh, 250);
-    setInterval(scanTick, 500);
     setInterval(meter, 100);
     setInterval(updateAudioBtn, 1000);
     loadStatus(); setInterval(loadStatus, 60000);
