@@ -48,7 +48,7 @@ fn run(fs: u32, offset: f64, n: usize) -> (f32, f32) {
             Complex32::new(0.05 * ph.cos() as f32 + 0.02 * noise(&mut seed), 0.05 * ph.sin() as f32 + 0.02 * noise(&mut seed)) }).collect();
         let out = ch.process(&iq);
         let c = ch.extract_with_plan(&mut plan, &out.fft_blocks);
-        if let Some(a) = dem.demodulate(&c, plan.channel_rate, DemodMode::Fm, 1, tune, 12000, 24000, false, plan.residual_hz, AgcMode::Medium) {
+        if let Some(a) = dem.demodulate(&c, plan.channel_rate, DemodMode::Fm, 1, tune, 12000, 24000, false, plan.residual_hz, AgcMode::Medium, 0) {
             audio.extend(a.iter().map(|&s| s as f32 / 32768.0));
         }
     }

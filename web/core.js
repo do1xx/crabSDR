@@ -57,7 +57,9 @@ function _crabTuneMsg() {
   var m = mode.toLowerCase(), f, bw;
   if (m === 'usb' || m === 'lsb') { f = freq; bw = Math.max(Math.abs(hi), Math.abs(lo)); }
   else { f = freq + (lo + hi) / 2; bw = hi - lo; }
-  return { type: 'tune', freq: Math.round(f * 1000), mode: m, bandwidth: Math.max(100, Math.round(bw * 1000)) };
+  var msg = { type: 'tune', freq: Math.round(f * 1000), mode: m, bandwidth: Math.max(100, Math.round(bw * 1000)) };
+  if (m === 'usb' || m === 'lsb') msg.lo = Math.round(Math.min(Math.abs(hi), Math.abs(lo)) * 1000);   // untere Kante (300 Hz)
+  return msg;
 }
 function _crabRetune() {
   var B = _crab.bands[band];

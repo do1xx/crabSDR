@@ -63,7 +63,7 @@ fn golden_synth_a_sinad() {
         iq.extend(chunk.chunks_exact(2).map(|p| Complex32::new((p[0] as f32 - 127.5) / 127.5, (p[1] as f32 - 127.5) / 127.5)));
         let out = chz.process(&iq);
         let ch = chz.extract_with_plan(&mut plan, &out.fft_blocks);
-        if let Some(a) = demod.demodulate(&ch, plan.channel_rate, DemodMode::Fm, 1, tune, 12_500, 24_000, false, plan.residual_hz, AgcMode::Medium) {
+        if let Some(a) = demod.demodulate(&ch, plan.channel_rate, DemodMode::Fm, 1, tune, 12_500, 24_000, false, plan.residual_hz, AgcMode::Medium, 0) {
             audio.extend(a);
         }
     }

@@ -22,6 +22,8 @@ pub struct ChannelKey {
     pub out_rate: u32,
     /// Rohton ohne AGC/Filter (Decoder-Plugins)
     pub raw: bool,
+    /// SSB: untere Kante des Durchlassbereichs in Hz (z. B. 300); sonst 0
+    pub pass_lo: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,6 +64,7 @@ pub struct ClientState {
     pub tune_freq: Option<u64>,
     pub mode: DemodMode,
     pub bandwidth: u32,
+    pub pass_lo: u32,
     pub use_opus: bool,
     pub output_sample_rate: u32,
     pub raw_audio: bool,
@@ -116,6 +119,7 @@ impl ClientManager {
                 tune_freq: None,
                 mode: DemodMode::Fm,
                 bandwidth: 12500,
+                pass_lo: 0,
                 use_opus: false,
                 output_sample_rate: 48000,
                 raw_audio: false,
@@ -138,10 +142,14 @@ impl ClientManager {
     }
 
     pub fn update_tune(&mut self, id: u64, freq: u64, mode: DemodMode, bandwidth: u32) {
+        self.update_tune_lo(id, freq, mode, bandwidth, 0);
+    }
+    pub fn update_tune_lo(&mut self, id: u64, freq: u64, mode: DemodMode, bandwidth: u32, pass_lo: u32) {
         if let Some(c) = self.clients.get_mut(&id) {
             c.tune_freq = Some(freq);
             c.mode = mode;
             c.bandwidth = bandwidth;
+            c.pass_lo = pass_lo;
         }
     }
 
@@ -214,6 +222,7 @@ impl ClientManager {
                     agc: c.agc_mode,
                     out_rate: c.output_sample_rate,
                     raw: c.raw_audio,
+                    pass_lo: c.pass_lo,
                 }),
                 use_opus: c.use_opus,
                 squelch: c.squelch,

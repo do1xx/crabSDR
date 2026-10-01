@@ -141,7 +141,7 @@ impl Channel {
         let out_rate = if self.key.raw { self.key.out_rate } else { OPUS_RATE };
         let audio = self.demod.demodulate(
             &iq, self.plan.channel_rate, self.key.mode, 1, self.key.freq, self.key.bandwidth,
-            out_rate, self.key.raw, self.plan.residual_hz, self.key.agc,
+            out_rate, self.key.raw, self.plan.residual_hz, self.key.agc, self.key.pass_lo,
         );
         if let Some(a) = audio {
             if self.key.raw {

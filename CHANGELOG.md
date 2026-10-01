@@ -2,6 +2,14 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Ton
+- SSB: neuer Demodulator mit durchlaufendem Seitenbandfilter (Mischer + FIR statt blockweiser FFT) – kein Kratzen an den
+  Rahmengrenzen mehr, und die untere Bandkante (300 Hz) gilt jetzt, vorher kam alles ab 0 Hz durch (dumpf, basslastig).
+- Regelung (AM/SSB/CW) in dB: Angriff sofort, Haltezeit 1 s, Lösen mit fester Rate. Vorher übersteuerte ein starkes
+  Signal nach einer Pause sekundenlang, und in Sprechpausen schoss das Rauschen hoch (laut/leise).
+
 ## 0.4.1 – 2026-09-30
 
 ### Oberfläche

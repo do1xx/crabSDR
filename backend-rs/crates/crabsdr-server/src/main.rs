@@ -392,8 +392,10 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
                 .map(|v| v as u32)
                 .unwrap_or_else(|| mode.default_bandwidth());
 
+            // SSB: untere Kante des Durchlassbereichs (Browser schickt lo in Hz, Voreinstellung 300)
+            let pass_lo = msg.get("lo").and_then(|v| v.as_u64()).map(|v| v.min(5000) as u32).unwrap_or(300);
             let mut clients = pipeline.clients.lock().await;
-            clients.update_tune(client_id, freq, mode, bandwidth);
+            clients.update_tune_lo(client_id, freq, mode, bandwidth, pass_lo);
 
             info!(
                 "[{}] Client {} tuned to {} Hz ({})",

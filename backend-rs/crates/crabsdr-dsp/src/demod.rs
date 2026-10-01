@@ -691,6 +691,40 @@ struct ClientState {
     agc_hang: u32,
     /// NFM: Audio highpass to remove CTCSS subaudible tones (< 300 Hz)
     audio_hpf: Option<Biquad>,
+    /// SSB: durchlaufendes Seitenbandfilter (Mischer um die Bandmitte, komplexer FIR-Tiefpass, zurückmischen)
+    ssb: Option<SsbFilter>,
+}
+
+/// SSB-Demodulation ohne Blockartefakte: Das gewünschte Seitenband [lo, hi] (USB positiv, LSB negativ) wird um seine
+/// Mitte auf 0 Hz gemischt, mit einem komplexen FIR-Tiefpass (Kaiser, 127 Taps) ausgeschnitten und wieder hoch-
+/// gemischt; der Realteil ist der Ton. Mischerphase und Filterspeicher laufen über die Rahmen hinweg weiter.
+struct SsbFilter {
+    fi: Fir,
+    fq: Fir,
+    phase: f64,
+    step: f64,
+}
+
+impl SsbFilter {
+    fn new(upper: bool, lo_hz: f32, hi_hz: f32, rate: f32) -> Self {
+        let center = (lo_hz + hi_hz) / 2.0 * if upper { 1.0 } else { -1.0 };
+        let cutoff = ((hi_hz - lo_hz) / 2.0).max(100.0).min(rate * 0.45);
+        let taps = design_lowpass_fir(127, cutoff / rate, 7.86);
+        Self { fi: Fir::new(taps.clone()), fq: Fir::new(taps), phase: 0.0, step: 2.0 * std::f64::consts::PI * center as f64 / rate as f64 }
+    }
+    fn process(&mut self, iq: &[Complex32]) -> Vec<f32> {
+        let mut out = Vec::with_capacity(iq.len());
+        for s in iq {
+            let (sn, cs) = self.phase.sin_cos();
+            let down = s * Complex32::new(cs as f32, -sn as f32);           // Bandmitte → 0 Hz
+            let f = Complex32::new(self.fi.process(down.re), self.fq.process(down.im));
+            let up = f * Complex32::new(cs as f32, sn as f32);               // zurück an die Stelle → Ton = Realteil
+            out.push(2.0 * up.re);
+            self.phase += self.step;
+            if self.phase > 2.0 * std::f64::consts::PI { self.phase -= 2.0 * std::f64::consts::PI; }
+        }
+        out
+    }
 }
 
 impl ClientState {
@@ -838,10 +872,16 @@ impl Demodulator {
         raw_audio: bool,
         residual_hz: f64,
         agc_mode: AgcMode,
+        pass_lo: u32,
     ) -> Option<Vec<i16>> {
         if channel_iq.len() < 4 {
             return None;
         }
+        let ssb_filter = |m: DemodMode, bw: u32, rate: u32| match m {
+            DemodMode::Usb => Some(SsbFilter::new(true, pass_lo as f32, bw as f32, rate as f32)),
+            DemodMode::Lsb => Some(SsbFilter::new(false, pass_lo as f32, bw as f32, rate as f32)),
+            _ => None,
+        };
 
         let ch_rate = channel_rate as u32;
         let out_rate = output_rate;
@@ -874,6 +914,7 @@ impl Demodulator {
                 iq_fir: ClientState::make_iq_filter(mode, bandwidth, ch_rate),
                 agc_hang: 0,
                 audio_hpf: ClientState::make_audio_hpf(mode, ch_rate),
+                ssb: ssb_filter(mode, bandwidth, ch_rate),
             }
         });
 
@@ -907,6 +948,7 @@ impl Demodulator {
             state.iq_fir = ClientState::make_iq_filter(mode, bandwidth, ch_rate);
             state.agc_hang = 0;
             state.audio_hpf = ClientState::make_audio_hpf(mode, ch_rate);
+            state.ssb = ssb_filter(mode, bandwidth, ch_rate);
         }
 
         // Apply frequency correction for SSB/CW modes.
@@ -954,8 +996,10 @@ impl Demodulator {
             DemodMode::Fm | DemodMode::Wfm => demod_fm(demod_iq, state),
             DemodMode::Am => demod_am(demod_iq, state),
             DemodMode::Sam => demod_sam(demod_iq, channel_rate, state),
-            DemodMode::Usb => demod_ssb(demod_iq, true, &mut self.fft_planner),
-            DemodMode::Lsb => demod_ssb(demod_iq, false, &mut self.fft_planner),
+            DemodMode::Usb | DemodMode::Lsb => match state.ssb.as_mut() {
+                Some(f) => f.process(demod_iq),
+                None => demod_ssb(demod_iq, mode == DemodMode::Usb, &mut self.fft_planner),
+            },
             DemodMode::Cw => demod_cw(demod_iq, channel_rate, state, &mut self.fft_planner),
         };
 
@@ -1055,27 +1099,25 @@ impl Demodulator {
                 let gain = 0.4 * (state.channel_rate as f32 / 2.0) / dev_ref;
                 for s in &mut audio { *s *= gain; }
             } else {
-                // AM/SSB/CW: Regelung mit schnellem Angriff, Haltezeit 1 s nach jeder lauten Stelle, dann langsames Lösen
+                // AM/SSB/CW: Regelung in dB. Angriff sofort (ein Rahmen = 20 ms, sonst übersteuert ein starkes Signal
+                // sekundenlang), Haltezeit 1 s, dann Lösen mit fester Rate in dB je Rahmen – vorher lief das Lösen linear
+                // auf einen riesigen Zielwert zu und riss in Sprechpausen in zwei Rahmen das Rauschen hoch (Pumpen).
                 let rms = (audio.iter().map(|s| s * s).sum::<f32>() / audio.len() as f32).sqrt();
                 if rms > 1e-6 {
-                    let target_gain = 0.15 / rms;
+                    let target_gain = (0.15 / rms).min(AGC_MAX_GAIN);
                     match agc_mode {
                         AgcMode::Off => {
                             for s in &mut audio { *s *= 0.5; }
                         }
                         _ => {
-                            let (attack, release) = match agc_mode {
-                                AgcMode::Fast => (0.05, 0.002),
-                                AgcMode::Slow => (0.005, 0.0001),
-                                _ => (0.02, 0.0005),
-                            };
+                            let release_db = match agc_mode { AgcMode::Fast => 0.3, AgcMode::Slow => 0.04, _ => 0.1 };   // je 20-ms-Rahmen
                             if target_gain < state.agc_level {
-                                state.agc_level = state.agc_level * (1.0 - attack) + target_gain * attack;
+                                state.agc_level = target_gain;
                                 state.agc_hang = AGC_HANG_FRAMES;
                             } else if state.agc_hang > 0 {
                                 state.agc_hang -= 1;
                             } else {
-                                state.agc_level = (state.agc_level * (1.0 - release) + target_gain * release).min(AGC_MAX_GAIN);
+                                state.agc_level = (state.agc_level * 10f32.powf(release_db / 20.0)).min(target_gain);
                             }
                             for s in &mut audio { *s *= state.agc_level; }
                         }
@@ -1296,7 +1338,7 @@ mod tests {
             })
             .collect();
 
-        let result = demod.demodulate(&iq, rate, DemodMode::Fm, 1, 100_000_000, 12500, 48000, false, 0.0, AgcMode::Medium);
+        let result = demod.demodulate(&iq, rate, DemodMode::Fm, 1, 100_000_000, 12500, 48000, false, 0.0, AgcMode::Medium, 300);
         assert!(result.is_some());
         let audio = result.unwrap();
         assert!(!audio.is_empty());
@@ -1333,6 +1375,7 @@ mod tests {
             iq_fir: None,
             agc_hang: 0,
             audio_hpf: None,
+            ssb: None,
         };
         let audio = demod_am(&iq, &mut state);
         assert_eq!(audio.len(), 100);
@@ -1358,14 +1401,59 @@ mod tests {
             })
             .collect();
 
-        let r1 = demod.demodulate(&iq1, rate, DemodMode::Fm, 1, 100_000_000, 12500, 48000, false, 0.0, AgcMode::Medium).unwrap();
-        let r2 = demod.demodulate(&iq2, rate, DemodMode::Fm, 1, 100_000_000, 12500, 48000, false, 0.0, AgcMode::Medium).unwrap();
+        let r1 = demod.demodulate(&iq1, rate, DemodMode::Fm, 1, 100_000_000, 12500, 48000, false, 0.0, AgcMode::Medium, 300).unwrap();
+        let r2 = demod.demodulate(&iq2, rate, DemodMode::Fm, 1, 100_000_000, 12500, 48000, false, 0.0, AgcMode::Medium, 300).unwrap();
 
         // Check continuity at boundary
         if let (Some(&a), Some(&b)) = (r1.last(), r2.first()) {
             let diff = (b as i32 - a as i32).unsigned_abs();
             assert!(diff < 2000, "Audio discontinuity at frame boundary: {} -> {} (diff={})", a, b, diff);
         }
+    }
+
+    /// USB-Demodulation mit Seitenbandfilter: Töne im Durchlassbereich (500 Hz, 2 kHz) kommen durch, der Ton im
+    /// unteren Seitenband (−1 kHz) und der Ton unter der Bandkante (100 Hz) nicht. Rahmen von 20 ms wie im Betrieb,
+    /// gemessen über die letzten Rahmen (Filter eingeschwungen), Ton über die Rahmengrenzen hinweg stetig.
+    #[test]
+    fn usb_filter_seitenband_und_bass() {
+        let mut demod = Demodulator::new();
+        let rate = 8000.0f32; let frame = 160usize; let n = frame * 40;
+        let iq: Vec<Complex32> = (0..n).map(|i| {
+            let t = i as f32 / rate;
+            let mut s = Complex32::new(0.0, 0.0);
+            for &f in &[500.0f32, 2000.0, -1000.0, 100.0] { s += Complex32::new(0.0, 2.0 * PI * f * t).exp() * 0.2; }
+            s
+        }).collect();
+        let mut audio: Vec<f32> = Vec::new();
+        for c in iq.chunks(frame) {
+            let out = demod.demodulate(c, rate, DemodMode::Usb, 7, 144_260_000, 2700, 8000, false, 0.0, AgcMode::Off, 300).unwrap();
+            audio.extend(out.iter().map(|&v| v as f32 / 32767.0));
+        }
+        let tail = &audio[audio.len() - frame * 10..];
+        let e = |f: f32| goertzel_energy(tail, 8000.0, f);
+        let (e500, e2000, e1000, e100) = (e(500.0), e(2000.0), e(1000.0), e(100.0));
+        assert!(e1000 < e500 * 0.01, "LSB-Ton nicht unterdrückt: {} vs {}", e1000, e500);
+        assert!(e100 < e500 * 0.05, "Bass unter 300 Hz nicht unterdrückt: {} vs {}", e100, e500);
+        assert!(e2000 > e500 * 0.3, "2 kHz zu schwach: {} vs {}", e2000, e500);
+        // keine Sprünge an den Rahmengrenzen: größte Differenz benachbarter Werte bleibt klein (reine Töne ≤ 2 kHz)
+        let maxstep = tail.windows(2).map(|w| (w[1] - w[0]).abs()).fold(0.0f32, f32::max);
+        assert!(maxstep < 0.9, "Knackser an Rahmengrenzen: {}", maxstep);
+    }
+
+    /// Regelung: ein starkes Signal nach Rauschen darf nicht sekundenlang übersteuern – ab dem ersten Rahmen unter Vollpegel
+    #[test]
+    fn agc_sofortiger_angriff() {
+        let mut demod = Demodulator::new();
+        let rate = 8000.0f32; let frame = 160usize;
+        let tone = |amp: f32, i0: usize| -> Vec<Complex32> { (0..frame).map(|i| Complex32::new(0.0, 2.0 * PI * 1000.0 * (i0 + i) as f32 / rate).exp() * amp).collect() };
+        for k in 0..100 { let c = tone(0.001, k * frame); demod.demodulate(&c, rate, DemodMode::Usb, 9, 144_260_000, 2700, 8000, false, 0.0, AgcMode::Medium, 300); }   // leise: Regelung dreht auf
+        let mut clipped = 0usize;
+        for k in 100..105 {
+            let c = tone(1.0, k * frame);
+            let out = demod.demodulate(&c, rate, DemodMode::Usb, 9, 144_260_000, 2700, 8000, false, 0.0, AgcMode::Medium, 300).unwrap();
+            clipped += out.iter().filter(|&&v| v.abs() >= 31000).count();
+        }
+        assert_eq!(clipped, 0, "Übersteuerung nach lautem Einsatz");
     }
 
     #[test]
@@ -1380,7 +1468,7 @@ mod tests {
             })
             .collect();
 
-        let result = demod.demodulate(&iq, rate, DemodMode::Usb, 1, 100_000_000, 2700, 48000, false, 0.0, AgcMode::Medium);
+        let result = demod.demodulate(&iq, rate, DemodMode::Usb, 1, 100_000_000, 2700, 48000, false, 0.0, AgcMode::Medium, 300);
         assert!(result.is_some());
         let audio = result.unwrap();
         assert!(!audio.is_empty());
@@ -1471,7 +1559,7 @@ mod tests {
 
         // With residual_hz = 200 (the channel is 200 Hz too low),
         // the correction mixer shifts by -200 Hz, bringing the tone to 1000 Hz
-        let result = demod.demodulate(&iq, rate, DemodMode::Usb, 1, 100_000_000, 2700, 48000, false, 200.0, AgcMode::Medium);
+        let result = demod.demodulate(&iq, rate, DemodMode::Usb, 1, 100_000_000, 2700, 48000, false, 200.0, AgcMode::Medium, 300);
         assert!(result.is_some());
         let audio = result.unwrap();
         assert!(!audio.is_empty());
