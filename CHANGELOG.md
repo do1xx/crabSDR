@@ -2,7 +2,9 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## Unveröffentlicht
+## 0.4.5 – 2026-10-03
+
+Hörerzahl zählt Personen; „ganzes Band“ im Bereich.
 
 ### Oberfläche
 - Bereich: Eintrag „ganzes Band“ führt zurück zur vollen Breite.
