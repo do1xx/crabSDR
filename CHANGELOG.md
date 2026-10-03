@@ -2,6 +2,12 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Oberfläche
+- Auswahl „Bereich“ bei den Zoom-Knöpfen: Wasserfall auf einen Abschnitt des IARU-Bandplans zoomen (CW, SSB, Baken,
+  FM-Simplex, Relaisausgaben …), passende Betriebsart wird gesetzt. Eigene Liste je Station über `segments.json`.
+
 ## 0.4.3 – 2026-10-03
 
 Aufgeräumt und Bedienung per Tastatur; CW über das neue Seitenbandfilter.

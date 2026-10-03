@@ -454,6 +454,57 @@
     lastSig = ''; renderScales(true); renderListeners(); applyWfLevels();   // sofort auf das neue Band umstellen
   }
 
+  /* ================= Bereiche (IARU-Region-1-Bandplan): Wasserfall auf einen Ausschnitt zoomen =================
+     Voreinstellung für 2 m und 70 cm; eine Station überschreibt sie mit segments.json im Stationsordner:
+     [{"lo": 144150, "hi": 144400, "label": "SSB", "mode": "usb", "call": 144300}, …] (kHz). */
+  var BANDPLAN = [
+    { lo: 144000, hi: 144150, label: 'CW / EME', mode: 'cw', call: 144050 },
+    { lo: 144150, hi: 144400, label: 'SSB', mode: 'usb', call: 144300 },
+    { lo: 144400, hi: 144500, label: 'Baken', mode: 'cw' },
+    { lo: 144500, hi: 144800, label: 'Allmode (SSTV, RTTY, FAX)', mode: 'usb', call: 144500 },
+    { lo: 144800, hi: 144990, label: 'APRS / Packet', mode: 'fm', call: 144800 },
+    { lo: 144975, hi: 145200, label: 'Relaiseingaben', mode: 'fm' },
+    { lo: 145200, hi: 145600, label: 'FM-Simplex', mode: 'fm', call: 145500 },
+    { lo: 145575, hi: 145800, label: 'Relaisausgaben', mode: 'fm' },
+    { lo: 145800, hi: 146000, label: 'Satelliten', mode: 'fm', call: 145800 },
+    { lo: 430000, hi: 431975, label: 'Relaiseingaben (7,6 MHz)', mode: 'fm' },
+    { lo: 432000, hi: 432100, label: 'CW / EME', mode: 'cw', call: 432050 },
+    { lo: 432100, hi: 432400, label: 'SSB', mode: 'usb', call: 432200 },
+    { lo: 432400, hi: 432500, label: 'Baken', mode: 'cw' },
+    { lo: 432500, hi: 433000, label: 'Allmode / Simplex', mode: 'fm', call: 432500 },
+    { lo: 433000, hi: 433400, label: 'Relaiseingaben (1,6 MHz)', mode: 'fm' },
+    { lo: 433400, hi: 433600, label: 'FM-Simplex', mode: 'fm', call: 433500 },
+    { lo: 433600, hi: 434000, label: 'Allmode / Digital', mode: 'fm' },
+    { lo: 434600, hi: 435000, label: 'Relaisausgaben (1,6 MHz)', mode: 'fm' },
+    { lo: 435000, hi: 438000, label: 'Satelliten', mode: 'usb' },
+    { lo: 438650, hi: 439425, label: 'Relaisausgaben (7,6 MHz)', mode: 'fm' },
+    { lo: 10368000, hi: 10368200, label: 'Baken', mode: 'cw' },
+    { lo: 10368200, hi: 10368400, label: 'SSB / CW', mode: 'usb', call: 10368200 }
+  ];
+  var segments = null, segBand = -1;
+  function bandSegments(b) {
+    var e = bi[b]; if (!e) return [];
+    var lo_ = e.centerfreq - e.samplerate / 2, hi_ = e.centerfreq + e.samplerate / 2;
+    return (segments || BANDPLAN).filter(function (s) { return s.hi > lo_ && s.lo < hi_ && (!s.band || s.band === e.name); })
+      .map(function (s) { return { lo: Math.max(s.lo, lo_), hi: Math.min(s.hi, hi_), label: s.label, mode: s.mode, call: s.call }; })
+      .filter(function (s) { return s.hi - s.lo >= 10; });
+  }
+  function buildSegments() {
+    var sel = $('segsel'); if (!sel) return;
+    var list = bandSegments(band); segBand = band;
+    sel.innerHTML = ''; var o0 = document.createElement('option'); o0.value = ''; o0.textContent = lang === 'en' ? 'Range…' : 'Bereich…'; sel.appendChild(o0);
+    list.forEach(function (s, i) { var o = document.createElement('option'); o.value = String(i); o.textContent = s.label + '  ' + (s.lo / 1000).toFixed(3) + '–' + (s.hi / 1000).toFixed(3); sel.appendChild(o); });
+    sel.hidden = !list.length;
+  }
+  function zoomSegment(s) {
+    var e = bi[band], width = (s.hi - s.lo) * 1.04, z = 0;
+    while (z < _crabMaxZoom(e) && e.samplerate / Math.pow(2, z + 1) >= width) z++;
+    if (s.mode && MODEFILTER[s.mode]) { var f = MODEFILTER[s.mode]; setMode(s.mode, f[0], f[1]); }
+    var target = s.call && s.call >= s.lo && s.call <= s.hi ? s.call : (s.lo + s.hi) / 2;
+    if (Math.abs(freq - target) > 0.01 && (freq < s.lo || freq > s.hi)) setFreqText(String(target));
+    zoomToFreq(band, z, (s.lo + s.hi) / 2);
+  }
+
   /* ================= Schnellwahl ================= */
   function buildPresets() {
     presets = presets.filter(function (p) { return !bandOff(p.band); });
@@ -514,6 +565,7 @@
     renderScales(false);
     applyWfLevels();
     phoneBar();
+    if (segBand !== band) buildSegments();
     var ag = $('agccontrol'); if (ag) ag.classList.toggle('off', mode === 'FM');
   }
 
@@ -876,6 +928,11 @@
     sel.onchange = function () { snap = Number(this.value); snapUser = snap; try { localStorage.setItem('crab_snap', String(snap)); } catch (e) {} if (snap > 0) setFreq(freq); };
     loadUi(); initName(); initAdvanced(); loadMarkers(); initPwa(); initChat();
     $('linkbtn').onclick = copyLink;
+    // Bereiche: eigene segments.json der Station, sonst der eingebaute Bandplan
+    (function () { var sx = new XMLHttpRequest(); sx.open('GET', 'segments.json?' + Date.now());
+      sx.onload = function () { if (sx.status === 200) { try { var j = JSON.parse(sx.responseText); if (Array.isArray(j) && j.length) segments = j; } catch (e) {} } buildSegments(); };
+      sx.onerror = function () { buildSegments(); }; sx.send(); })();
+    $('segsel').onchange = function () { var list = bandSegments(band), s = list[Number(this.value)]; this.value = ''; if (s) zoomSegment(s); };
     // Startwerte: FM-Bandbreite 12 kHz statt 16 kHz; auf dem Handy höherer Wasserfall (wird auf Bildschirmbreite skaliert)
     setTimeout(function () {
       try { if (typeof mode !== 'undefined' && mode === 'FM' && Math.abs((hi - lo) - 16) < 0.01) setMode('fm', -6, 6); } catch (e) {}

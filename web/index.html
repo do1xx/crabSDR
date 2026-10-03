@@ -183,6 +183,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
         <button class="btn" type="button" onclick="setZoom(0)" title="Zoom rein">+</button>
         <button class="btn" type="button" onclick="setZoom(4)" data-de="ganzes Band" data-en="whole band">ganzes Band</button>
         <button class="btn adv" type="button" onclick="setZoom(2)" data-de="max. Zoom" data-en="max zoom">max. Zoom</button>
+        <select id="segsel" class="segsel" title="Bereich des Bandplans: Wasserfall auf diesen Ausschnitt zoomen"></select>
       </div>
       <div class="viewsel">
         <label class="toggle"><input id="allbandschk" type="checkbox"><span data-de="Alle Bänder zeigen" data-en="Show all bands">Alle Bänder zeigen</span></label>
@@ -292,7 +293,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </div>
 </div>
 
-<script src="ui.js?v=66"></script>
+<script src="ui.js?v=67"></script>
 <script src="account.js?v=1"></script>
 </body>
 </html>

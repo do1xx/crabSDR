@@ -171,6 +171,10 @@ Alles ist an, solange es etwas zu zeigen gibt. Nur eintragen, was abweichen soll
 
 ## Stationsordner (`site_dir`)
 
+Optionale `segments.json` ersetzt den eingebauten IARU-Bandplan für die Auswahl „Bereich“ (Wasserfall auf einen
+Ausschnitt zoomen): `[{"lo": 144150, "hi": 144400, "label": "SSB", "mode": "usb", "call": 144300}]` in kHz,
+optional `"band": "<id>"`.
+
 Ein Ordner mit Dateien, die Vorrang vor der Oberfläche haben. Alles ist optional:
 
 | Datei | Inhalt |
