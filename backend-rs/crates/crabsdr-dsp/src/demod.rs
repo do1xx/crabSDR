@@ -895,7 +895,7 @@ impl Demodulator {
             let (lpf1, lpf2) = ClientState::make_audio_filter(mode, bandwidth, ch_rate);
             ClientState {
                 last_iq: None,
-                agc_level: 0.1,
+                agc_level: 0.0,   // 0 = noch nicht gesetzt: erster Block springt direkt auf den Zielwert
                 freq: tune_freq,
                 mode,
                 bandwidth,
@@ -929,7 +929,7 @@ impl Demodulator {
         {
             let (lpf1, lpf2) = ClientState::make_audio_filter(mode, bandwidth, ch_rate);
             state.last_iq = None;
-            state.agc_level = 0.1;
+            state.agc_level = 0.0;
             state.freq = tune_freq;
             state.mode = mode;
             state.bandwidth = bandwidth;
@@ -1116,6 +1116,7 @@ impl Demodulator {
                     while i < audio.len() {
                         let end = (i + blk).min(audio.len());
                         let rms = (audio[i..end].iter().map(|s| s * s).sum::<f32>() / (end - i) as f32).sqrt();
+                        if rms > 1e-6 && state.agc_level <= 0.0 { state.agc_level = (0.15 / rms).min(AGC_MAX_GAIN); }   // nach Wechsel: sofort passend, kein Einblenden
                         let old = state.agc_level;
                         if rms > 1e-6 {
                             let target_gain = (0.15 / rms).min(AGC_MAX_GAIN);
@@ -1381,6 +1382,22 @@ mod tests {
         // keine Sprünge an den Rahmengrenzen: größte Differenz benachbarter Werte bleibt klein (reine Töne ≤ 2 kHz)
         let maxstep = tail.windows(2).map(|w| (w[1] - w[0]).abs()).fold(0.0f32, f32::max);
         assert!(maxstep < 0.9, "Knackser an Rahmengrenzen: {}", maxstep);
+    }
+
+    /// Regelung: nach einem Frequenzwechsel sofort normal laut, kein langsames Einblenden
+    #[test]
+    fn agc_kein_einblenden_nach_wechsel() {
+        let mut demod = Demodulator::new();
+        let rate = 8000.0f32; let frame = 160usize;
+        let tone = |amp: f32, i0: usize| -> Vec<Complex32> { (0..frame).map(|i| Complex32::new(0.0, 2.0 * PI * 1000.0 * (i0 + i) as f32 / rate).exp() * amp).collect() };
+        let level = |out: &Vec<i16>| (out.iter().map(|&v| (v as f32 / 32767.0).powi(2)).sum::<f32>() / out.len() as f32).sqrt();
+        let first = level(&demod.demodulate(&tone(0.01, 0), rate, DemodMode::Usb, 11, 144_300_000, 2700, 8000, false, 0.0, AgcMode::Medium, 300).unwrap());
+        let mut last = 0.0;
+        for k in 1..50 { last = level(&demod.demodulate(&tone(0.01, k * frame), rate, DemodMode::Usb, 11, 144_300_000, 2700, 8000, false, 0.0, AgcMode::Medium, 300).unwrap()); }
+        assert!(first > last * 0.5, "erster Rahmen zu leise: {} vs später {}", first, last);
+        // Frequenzwechsel (neue tune_freq): wieder sofort laut
+        let after = level(&demod.demodulate(&tone(0.01, 50 * frame), rate, DemodMode::Usb, 11, 144_315_000, 2700, 8000, false, 0.0, AgcMode::Medium, 300).unwrap());
+        assert!(after > last * 0.5, "nach Wechsel zu leise: {} vs {}", after, last);
     }
 
     /// Regelung: ein starkes Signal nach Rauschen darf nicht sekundenlang übersteuern – ab dem ersten Rahmen unter Vollpegel
