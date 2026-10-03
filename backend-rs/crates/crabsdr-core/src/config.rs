@@ -29,6 +29,11 @@ pub struct SdrInstanceConfig {
     pub gain: f64,
     #[serde(default)]
     pub ppm: i32,
+    /// Frequenzkorrektur in Software (ppm, mit Nachkommastellen, jeder Treiber): Anzeige und Abstimmung werden um diesen
+    /// Faktor verschoben. Positiv, wenn bekannte Signale zu tief angezeigt werden. Für Empfänger ohne TCXO (z. B. RSP1),
+    /// deren Hardware-`ppm` nur ganze Werte kennt oder nicht greift.
+    #[serde(default)]
+    pub freq_correction_ppm: f64,
     /// Punkte der FFT; 0 (Voreinstellung) = automatisch, so dass ein Bin etwa 500 Hz breit ist (2,048 MS/s → 4096,
     /// 8 MS/s → 16384). Mit gröberen Bins pfeift der Kanalfilter im Blocktakt (MSi2500 bei 8 MS/s, 29.09.).
     #[serde(default)]
@@ -437,6 +442,7 @@ impl Config {
             sample_rate: self.sample_rate,
             gain: self.gain,
             ppm: self.ppm,
+            freq_correction_ppm: 0.0,
             fft_size: self.fft_size,
             fft_fps: self.fft_fps,
             enabled: true,

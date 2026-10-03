@@ -299,14 +299,16 @@ pub struct DspThread {
     fft_size: usize,
     sample_rate: Arc<AtomicU32>,
     center_freq: Arc<AtomicU64>,
+    /// Software-Frequenzkorrektur in ppm (siehe Config)
+    corr_ppm: f64,
     fft_fps: u32,
     opus_bitrate: i32,
     opus_complexity: i32,
 }
 
 impl DspThread {
-    pub fn new(fft_size: usize, sample_rate: Arc<AtomicU32>, center_freq: Arc<AtomicU64>, fft_fps: u32, opus_bitrate: u32, opus_complexity: u32) -> Self {
-        Self { fft_size, sample_rate, center_freq, fft_fps,
+    pub fn new(fft_size: usize, sample_rate: Arc<AtomicU32>, center_freq: Arc<AtomicU64>, corr_ppm: f64, fft_fps: u32, opus_bitrate: u32, opus_complexity: u32) -> Self {
+        Self { fft_size, sample_rate, center_freq, corr_ppm, fft_fps,
                opus_bitrate: opus_bitrate.clamp(8_000, 128_000) as i32, opus_complexity: opus_complexity.min(10) as i32 }
     }
 
@@ -374,7 +376,7 @@ impl DspThread {
                 for v in &views {
                     if let Some(k) = v.tuned { groups.entry(k).or_default().push(v); }
                 }
-                let center = self.center_freq.load(Ordering::Relaxed);
+                let center = crate::sdr_pipeline::corrected_center(self.center_freq.load(Ordering::Relaxed), self.corr_ppm);
                 for key in groups.keys() {
                     if !channels.contains_key(key) {
                         if let Some(plan) = channelizer.plan_channel(center, key.freq, Channel::extraction_bw(key)) {

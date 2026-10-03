@@ -297,7 +297,7 @@ async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, is_admin: 
 
     // Send initial config
     {
-        let current_center = pipeline.center_freq.load(std::sync::atomic::Ordering::Relaxed);
+        let current_center = crate::sdr_pipeline::corrected_center(pipeline.center_freq.load(std::sync::atomic::Ordering::Relaxed), pipeline.corr_ppm);
         let config_msg = json!({
             "type": "config",
             "client_id": client_id,
@@ -421,9 +421,10 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
                     .send(crabsdr_sdr::DriverCommand::SetFrequency(freq))
                     .await;
                 // Broadcast update to all clients
+                let shown = crate::sdr_pipeline::corrected_center(freq, pipeline.corr_ppm);
                 pipeline.broadcast_json(&json!({
                     "type": "center_freq_update",
-                    "center_freq": freq,
+                    "center_freq": shown,
                 }));
                 info!("[{}] Admin set center_freq to {} Hz", pipeline.id, freq);
             }
@@ -535,6 +536,7 @@ async fn bandinfo_js(State(state): State<Arc<AppState>>, Query(q): Query<TokenQu
             Some(p) => (p.center_freq.load(std::sync::atomic::Ordering::Relaxed), p.sample_rate.load(std::sync::atomic::Ordering::Relaxed)),
             None => (sdr.center_freq, sdr.sample_rate),
         };
+        let center = crate::sdr_pipeline::corrected_center(center, sdr.freq_correction_ppm);
         entries.push(json!({"name": sdr.id, "label": sdr.label, "centerfreq": center as f64 / 1000.0,
                             "samplerate": rate as f64 / 1000.0, "fft_size": sdr.fft_size, "note": sdr.note,
                             "access": admin::access_name(sdr.guest, sdr.admin_only),

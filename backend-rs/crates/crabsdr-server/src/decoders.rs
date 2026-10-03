@@ -203,7 +203,7 @@ impl DecoderHub {
             let band = match &c.band {
                 Some(b) => pipelines.get(b).cloned(),
                 None => pipelines.values().find(|p| {
-                    let cf = p.center_freq.load(std::sync::atomic::Ordering::Relaxed);
+                    let cf = crate::sdr_pipeline::corrected_center(p.center_freq.load(std::sync::atomic::Ordering::Relaxed), p.corr_ppm);
                     let half = p.sample_rate.load(std::sync::atomic::Ordering::Relaxed) as u64 / 2;
                     let margin = bw / 2 + 10_000;
                     c.freq >= cf.saturating_sub(half) + margin && c.freq + margin <= cf + half

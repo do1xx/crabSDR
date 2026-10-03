@@ -2,6 +2,12 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Empfänger
+- `freq_correction_ppm` je Band: Frequenzkorrektur in Software mit Nachkommastellen, unabhängig vom Treiber (RSP1 ohne TCXO).
+- rx_sdr bekommt das Hardware-`ppm` als `-p` durchgereicht.
+
 ## 0.4.5 – 2026-10-03
 
 Hörerzahl zählt Personen; „ganzes Band“ im Bereich.

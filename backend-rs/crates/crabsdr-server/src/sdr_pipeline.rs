@@ -32,6 +32,9 @@ pub struct PipelineStatus {
 
 
 /// A complete SDR processing pipeline.
+/// Software-Frequenzkorrektur: Mitte des Bandes, wie Anzeige und Abstimmung sie sehen
+pub fn corrected_center(hw_center: u64, ppm: f64) -> u64 { (hw_center as f64 * (1.0 + ppm / 1e6)).round() as u64 }
+
 pub struct SdrPipeline {
     pub id: String,
     pub label: String,
@@ -39,6 +42,8 @@ pub struct SdrPipeline {
     pub config: RwLock<SdrInstanceConfig>,
     /// FFT size (immutable after creation)
     pub fft_size: usize,
+    /// Software-Frequenzkorrektur in ppm (fest nach dem Start)
+    pub corr_ppm: f64,
     pub spectrum_tx: broadcast::Sender<Vec<u8>>,
     pub sdr_cmd_tx: mpsc::Sender<DriverCommand>,
     pub clients: Arc<Mutex<ClientManager>>,
@@ -81,6 +86,7 @@ impl SdrPipeline {
             config.fft_size,
             sample_rate.clone(),
             center_freq.clone(),
+            config.freq_correction_ppm,
             config.fft_fps,
             opus_bitrate,
             opus_complexity,
@@ -101,12 +107,14 @@ impl SdrPipeline {
         let status = Arc::new(RwLock::new(PipelineStatus::default()));
 
         let fft_size = config.fft_size;
+        let corr_ppm = config.freq_correction_ppm;
         let pipeline = Arc::new(Self {
             admin_only: AtomicBool::new(config.admin_only),
             guest: AtomicBool::new(config.guest),
             id,
             label,
             fft_size,
+            corr_ppm,
             config: RwLock::new(config),
             spectrum_tx,
             sdr_cmd_tx,
@@ -148,7 +156,7 @@ impl SdrPipeline {
         let clients = self.clients.lock().await;
         let status = self.status.read().await;
         let config = self.config.read().await;
-        let current_center = self.center_freq.load(std::sync::atomic::Ordering::Relaxed);
+        let current_center = corrected_center(self.center_freq.load(std::sync::atomic::Ordering::Relaxed), self.corr_ppm);
         json!({
             "id": self.id,
             "label": self.label,
