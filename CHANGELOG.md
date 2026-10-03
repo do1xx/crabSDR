@@ -13,8 +13,8 @@ Aufgeräumt und Bedienung per Tastatur; CW über das neue Seitenbandfilter.
 
 ### Ton
 - CW nutzt dasselbe durchlaufende Seitenbandfilter wie SSB (700 Hz ± halbe Bandbreite), keine Blockartefakte mehr.
-- Regelung in 2-ms-Blöcken: sofortiger Angriff ohne hörbares Übersteuern, gleitend ohne Zipper.
-- Nach einem Frequenzwechsel ist der Ton sofort normal laut (vorher blendete die Regelung sekundenlang ein).
+- Regelung wie im Transceiver: Hüllkurve je Abtastwert mit 8 ms Vorausschau, Angriff 2 ms, Haltezeit 1 s, Lösen
+  25/10/3 dB je s (schnell/mittel/langsam). Nichts übersteuert, kein Zipper, nach einem Frequenzwechsel sofort normal laut.
 
 ### Aufgeräumt
 - Reste der alten Svelte-Oberfläche (Vollspektrum 0x81) und der experimentelle Verzeichnis-Tunnel (`[site]`) entfernt,

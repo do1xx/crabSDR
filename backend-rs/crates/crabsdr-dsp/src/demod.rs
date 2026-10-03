@@ -14,8 +14,13 @@ use crate::design_lowpass_fir;
 
 /// Obergrenze der AGC-Verstärkung (60 dB): Rauschen auf leerem Kanal wird nicht endlos hochgezogen.
 const AGC_MAX_GAIN: f32 = 1000.0;
-/// Haltezeit der AM/SSB-Regelung nach einer lauten Stelle (Rahmen à 20 ms → 1 s)
-const AGC_HANG_FRAMES: u32 = 50;
+/// Regelung AM/SSB/CW wie im Transceiver: Hüllkurve je Abtastwert, Vorausschau (der Ton läuft AGC_LOOKAHEAD_S später
+/// aus als die Messung), Angriff AGC_ATTACK_S, Haltezeit AGC_HANG_S, dann Lösen mit fester Rate in dB/s (schnell/mittel/langsam).
+const AGC_LOOKAHEAD_S: f32 = 0.008;
+const AGC_ATTACK_S: f32 = 0.002;
+const AGC_HANG_S: f32 = 1.0;
+const AGC_ENV_RELEASE_S: f32 = 0.02;   // Hüllkurvenfolger: 20 ms Abfall, folgt Silben, zittert nicht mit der Tonfrequenz
+const AGC_TARGET: f32 = 0.3;           // Spitzenwert nach der Regelung (−10 dBFS)
 
 /// FIR-Filter (Direktform, Ringpuffer) für reelle Signale; für IQ je einer für I und Q.
 struct Fir {
@@ -686,8 +691,10 @@ struct ClientState {
     rds_frame_count: u32,
     /// NFM: ZF-Filter vor dem Diskriminator (FIR, Kaiser ~80 dB), je I und Q
     iq_fir: Option<(Fir, Fir)>,
-    /// AM/SSB-Regelung: verbleibende Halte-Rahmen
+    /// AM/SSB-Regelung: verbleibende Halte-Abtastwerte, Hüllkurve, Verzögerungsleitung für die Vorausschau
     agc_hang: u32,
+    agc_env: f32,
+    agc_delay: std::collections::VecDeque<f32>,
     /// NFM: Audio highpass to remove CTCSS subaudible tones (< 300 Hz)
     audio_hpf: Option<Biquad>,
     /// SSB: durchlaufendes Seitenbandfilter (Mischer um die Bandmitte, komplexer FIR-Tiefpass, zurückmischen)
@@ -918,6 +925,8 @@ impl Demodulator {
                 rds_frame_count: 0,
                 iq_fir: ClientState::make_iq_filter(mode, bandwidth, ch_rate),
                 agc_hang: 0,
+                agc_env: 0.0,
+                agc_delay: std::collections::VecDeque::new(),
                 audio_hpf: ClientState::make_audio_hpf(mode, ch_rate),
                 ssb: ssb_filter(mode, bandwidth, ch_rate),
             }
@@ -952,6 +961,8 @@ impl Demodulator {
             state.rds_frame_count = 0;
             state.iq_fir = ClientState::make_iq_filter(mode, bandwidth, ch_rate);
             state.agc_hang = 0;
+            state.agc_env = 0.0;
+            state.agc_delay.clear();
             state.audio_hpf = ClientState::make_audio_hpf(mode, ch_rate);
             state.ssb = ssb_filter(mode, bandwidth, ch_rate);
         }
@@ -1100,33 +1111,31 @@ impl Demodulator {
                 let gain = 0.4 * (state.channel_rate as f32 / 2.0) / dev_ref;
                 for s in &mut audio { *s *= gain; }
             } else {
-                // AM/SSB/CW: Regelung in dB, in Blöcken von 2 ms. Angriff sofort je Block (sonst übersteuert ein starkes
-                // Signal), Verstärkung innerhalb des Blocks gleitend (kein Zipper), Haltezeit 1 s, dann Lösen mit fester
-                // Rate in dB – vorher lief das Lösen linear auf einen riesigen Zielwert zu und riss in Sprechpausen das
-                // Rauschen hoch (Pumpen).
+                // AM/SSB/CW: Regelung wie im Transceiver (siehe Konstanten oben). Die Hüllkurve wird am frischen
+                // Abtastwert gemessen, die Verstärkung aber auf den um AGC_LOOKAHEAD_S verzögerten Wert angewendet –
+                // so ist sie schon unten, wenn die laute Stelle ausgegeben wird, ohne harten Sprung (Angriff 2 ms).
+                // Nach einem Frequenzwechsel startet die Verstärkung direkt passend (kein Einblenden).
                 if agc_mode == AgcMode::Off {
                     for s in &mut audio { *s *= 0.5; }
                 } else {
-                    let release_db_frame = match agc_mode { AgcMode::Fast => 0.5, AgcMode::Slow => 0.06, _ => 0.2 };   // je 20 ms: 25 / 3 / 10 dB je s
-                    let blk = ((state.channel_rate as usize) / 500).max(8);                  // 2 ms
-                    let blocks_per_frame = (audio.len() / blk).max(1) as f32;
-                    let release = 10f32.powf(release_db_frame / blocks_per_frame / 20.0);
-                    let hang_blocks = AGC_HANG_FRAMES * blocks_per_frame as u32;
-                    let mut i = 0;
-                    while i < audio.len() {
-                        let end = (i + blk).min(audio.len());
-                        let rms = (audio[i..end].iter().map(|s| s * s).sum::<f32>() / (end - i) as f32).sqrt();
-                        if rms > 1e-6 && state.agc_level <= 0.0 { state.agc_level = (0.15 / rms).min(AGC_MAX_GAIN); }   // nach Wechsel: sofort passend, kein Einblenden
-                        let old = state.agc_level;
-                        if rms > 1e-6 {
-                            let target_gain = (0.15 / rms).min(AGC_MAX_GAIN);
-                            if target_gain < state.agc_level { state.agc_level = target_gain; state.agc_hang = hang_blocks; }
-                            else if state.agc_hang > 0 { state.agc_hang -= 1; }
-                            else { state.agc_level = (state.agc_level * release).min(target_gain); }
-                        }
-                        let n = (end - i) as f32;
-                        for (k, s) in audio[i..end].iter_mut().enumerate() { *s *= old + (state.agc_level - old) * (k as f32 + 1.0) / n; }
-                        i = end;
+                    let rate = state.channel_rate as f32;
+                    let release_db_s = match agc_mode { AgcMode::Fast => 25.0, AgcMode::Slow => 3.0, _ => 10.0 };
+                    let release = 10f32.powf(release_db_s / rate / 20.0);
+                    let attack = 1.0 - (-1.0 / (rate * AGC_ATTACK_S)).exp();
+                    let env_decay = (-1.0 / (rate * AGC_ENV_RELEASE_S)).exp();
+                    let hang_n = (rate * AGC_HANG_S) as u32;
+                    let delay_n = (rate * AGC_LOOKAHEAD_S) as usize;
+                    for s in &mut audio {
+                        let x = *s;
+                        state.agc_env = x.abs().max(state.agc_env * env_decay);
+                        let target = if state.agc_env > 1e-6 { (AGC_TARGET / state.agc_env).min(AGC_MAX_GAIN) } else { AGC_MAX_GAIN };
+                        if state.agc_level <= 0.0 { state.agc_level = target; }
+                        if target < state.agc_level { state.agc_level += (target - state.agc_level) * attack; state.agc_hang = hang_n; }
+                        else if state.agc_hang > 0 { state.agc_hang -= 1; }
+                        else { state.agc_level = (state.agc_level * release).min(target); }
+                        state.agc_delay.push_back(x);
+                        let y = if state.agc_delay.len() > delay_n { state.agc_delay.pop_front().unwrap_or(0.0) } else { 0.0 };
+                        *s = y * state.agc_level;
                     }
                 }
             }
@@ -1318,6 +1327,8 @@ mod tests {
             rds_frame_count: 0,
             iq_fir: None,
             agc_hang: 0,
+            agc_env: 0.0,
+            agc_delay: std::collections::VecDeque::new(),
             audio_hpf: None,
             ssb: None,
         };
@@ -1414,8 +1425,8 @@ mod tests {
             let n = out.iter().filter(|&&v| v.abs() >= 31000).count();
             if k == 100 { first = n; } else { later += n; }
         }
-        // gleitende Regelung: höchstens 1 ms (8 Samples) am Einsatz, danach nichts mehr
-        assert!(first <= 8, "Übersteuerung am Einsatz: {} Samples", first);
+        // Vorausschau: die Regelung ist schon unten, wenn die laute Stelle ausgegeben wird – nichts übersteuert
+        assert_eq!(first, 0, "Übersteuerung am Einsatz: {} Samples", first);
         assert_eq!(later, 0, "Übersteuerung nach dem Einsatz");
     }
 
