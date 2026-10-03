@@ -107,7 +107,7 @@ function freqStep(st) {
 /* ↑ ↓: auf den nächsten vollen Schritt springen (1 kHz; mit Umschalt 10 kHz), z. B. 144 802,0 → 144 803,0 bzw. 144 810,0 */
 function freqSnap(dir, stepKhz) {
   var k = stepKhz || 1, cur = freq / k, next = dir > 0 ? Math.floor(cur + 1e-6) + 1 : Math.ceil(cur - 1e-6) - 1;
-  setFreq(Math.round(next * k * 1000) / 1000);
+  (window.setFreqExact || setFreq)(Math.round(next * k * 1000) / 1000);   // am Kanalraster vorbei
 }
 function setMode(m, l, h) {
   mode = String(m).toUpperCase(); lo = Number(l); hi = Number(h);

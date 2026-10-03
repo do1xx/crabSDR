@@ -128,8 +128,10 @@
     // Raster-Einrasten: gilt für Klick/Tipp/Ziehen, nicht für getippte Frequenzen (setFreqText setzt das Flag)
     _setfreq0 = window.setFreq;
     var _setfreq = _setfreq0;
+    window.setFreqExact = _setfreq0;                   // ohne Raster (↑ ↓, getippte Frequenz)
+    function rasterMode() { return mode === 'FM' || mode === 'AM'; }   // SSB/CW haben kein Kanalraster
     window.setFreq = function (f) {
-      if (snap > 0 && !freqTextLock) {
+      if (snap > 0 && !freqTextLock && rasterMode()) {
         var off = isCw() ? (hi + lo) / 2 : 0;
         f = Math.round((f + off) / snap) * snap - off;
       }
@@ -137,7 +139,7 @@
     };
     var _freqstep = window.freqStep;
     window.freqStep = function (st) {
-      if (snap > 0) {
+      if (snap > 0 && rasterMode()) {
         var n = Math.abs(st) === 1 ? 1 : Math.abs(st) === 2 ? 4 : 20;
         var off = isCw() ? (hi + lo) / 2 : 0;
         var cur = Math.round((freq + off) / snap) * snap;
