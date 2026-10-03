@@ -320,7 +320,7 @@
     var c = readCookie('username');
     if (c) { hidden.value = decodeURIComponent(c); inp.value = hidden.value; }
     inp.onchange = function () {
-      var v = inp.value.trim().slice(0, 20) || 'Hörer';
+      var v = inp.value.trim().slice(0, 20) || _crabGuestName();
       hidden.value = v; saveName();
     };
   }
@@ -860,10 +860,12 @@
       if (!$('myname').value.trim() && chatName.value.trim()) {
         $('myname').value = chatName.value.trim().slice(0, 20); $('myname').onchange(); syncNameField();
       } else if (!$('myname').value.trim()) {
-        chatName.hidden = false; chatName.focus(); toast(lang === 'de' ? 'Wie heißt du? Name oder Rufzeichen – dann Senden.' : 'Your name or call sign, then Send.');
+        // Platzhalter vorschlagen: sichtbar im Feld, kann durch Name/Call ersetzt werden, Senden übernimmt ihn
+        chatName.hidden = false; chatName.value = _crabGuestName(); chatName.focus(); chatName.select();
+        toast(lang === 'de' ? 'Du schreibst als ' + chatName.value + ' – oder Name/Rufzeichen eintragen, dann Senden.' : 'You write as ' + chatName.value + ' – or enter your name/call, then Send.');
         return false;
       }
-      var nm = $('myname').value.trim().slice(0, 20) || 'Hörer';
+      var nm = $('myname').value.trim().slice(0, 20) || _crabGuestName();
       api('POST', 'chat', { name: nm, msg: msg }, function (st, r) { if (st !== 200) toast((r && r.error) || 'Senden fehlgeschlagen'); });
       inp.value = ''; return false;
     };

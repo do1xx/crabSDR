@@ -38,9 +38,17 @@ function createCookie(name, value, days) {
   var exp = days ? '; max-age=' + (days * 86400) : '';
   document.cookie = name + '=' + value + exp + '; path=/; SameSite=Lax';
 }
+/* Platzhalter je Browser, wenn kein Name gesetzt ist: „Hörer-47“ statt überall nur „Hörer“ – so bleiben Hörer in
+   Chat und Hörerliste unterscheidbar; die Nummer merkt sich der Browser (localStorage) */
+function _crabGuestName() {
+  var g = null; try { g = localStorage.getItem('crab_guest'); } catch (e) {}
+  if (!g) { g = 'Hörer-' + (10 + Math.floor(Math.random() * 90)); try { localStorage.setItem('crab_guest', g); } catch (e) {} }
+  return g;
+}
 function saveName() {
-  var v = (document.usernameform && document.usernameform.username.value || '').trim().slice(0, 20);
-  createCookie('username', encodeURIComponent(v || 'Hörer'), 3652);
+  var v = (document.usernameform && document.usernameform.username.value || '').trim().slice(0, 20) || _crabGuestName();
+  if (document.usernameform) document.usernameform.username.value = v;
+  createCookie('username', encodeURIComponent(v), 3652);
   _crabSendAll({ type: 'set_name', name: v });
 }
 
@@ -707,7 +715,7 @@ function _crabConnect(b) {
     ws.onopen = function () {
       B.retry = 0;
       ws.send(JSON.stringify({ type: 'set_codec', audio: _crab.audio.pcm ? 'raw' : 'opus' }));
-      var nm = (document.usernameform && document.usernameform.username.value || '').trim(); if (nm && nm !== 'Hörer') ws.send(JSON.stringify({ type: 'set_name', name: nm }));
+      var nm = (document.usernameform && document.usernameform.username.value || '').trim() || _crabGuestName(); ws.send(JSON.stringify({ type: 'set_name', name: nm }));
       if (_crab.squelchOn) ws.send(JSON.stringify(_crabSqMsg()));
       if (_crab.agcMode && _crab.agcMode !== 'medium') ws.send(JSON.stringify({ type: 'set_agc', mode: _crab.agcMode }));
       B.prev = null; B.clearOnNext = true; _crabSendWf(b);
@@ -1030,7 +1038,7 @@ function crabStart() {
   _crab.bands = bi.map(function () { return { ws: null }; });
   for (var b = 0; b < bi.length; b++) _crabGeom(b);
   var cv = readCookie('view'); view = (cv === null || cv === '') ? Views.oneband : Number(cv);
-  var un = readCookie('username'); if (un && document.usernameform) document.usernameform.username.value = decodeURIComponent(un);
+  var un = readCookie('username'); if (document.usernameform) document.usernameform.username.value = (un && decodeURIComponent(un) !== 'Hörer') ? decodeURIComponent(un) : _crabGuestName();
   // Deep-Link ?tune=<kHz><modus>
   var start = { b: 0, f: null, m: null };
   var mt = /[?&]tune=([\d.]+)(fm|am|usb|lsb|cw)?/i.exec(location.search);
