@@ -2,7 +2,9 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## Unveröffentlicht
+## 0.4.3 – 2026-10-03
+
+Aufgeräumt und Bedienung per Tastatur; CW über das neue Seitenbandfilter.
 
 ### Oberfläche
 - Tastatur: FM/AM steppen alle Pfeile einen Rasterkanal; SSB/CW: ← → 100 Hz, ↑ ↓ auf den nächsten vollen kHz (Umschalt 10 kHz); Belegung auf der Info-Seite.
