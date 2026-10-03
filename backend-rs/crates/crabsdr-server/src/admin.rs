@@ -133,7 +133,7 @@ fn default_role() -> String { ROLE_USER.into() }
 /// Ohne Passwort wird eines erzeugt (einmal in der Antwort); das Konto muss es beim ersten Anmelden ändern.
 pub async fn create_user(State(state): State<Arc<AppState>>, headers: HeaderMap, Json(req): Json<NewUser>) -> Response {
     let p = admin!(state, headers);
-    let generated = req.password.as_deref().map_or(true, |s| s.is_empty());
+    let generated = req.password.as_deref().is_none_or(|s| s.is_empty());
     let pw = if generated { crabsdr_auth::random_password(16) } else { req.password.clone().unwrap() };
     if let Err(e) = crabsdr_auth::validate_username(&req.username).and(crabsdr_auth::validate_role(&req.role)).and(crabsdr_auth::validate_password(&pw)) {
         return err(StatusCode::BAD_REQUEST, e.to_string());
@@ -173,7 +173,7 @@ pub async fn update_user(State(state): State<Arc<AppState>>, headers: HeaderMap,
     let res = with_db(&state, move |db| -> Result<String, String> {
         let u = db.get_user(&id2).map_err(|e| e.to_string())?.ok_or("Konto gibt es nicht")?;
         let (name, role, active, bands, decs) = r2;
-        let demote = role.as_deref().map_or(false, |r| r != ROLE_ADMIN) && u.role == ROLE_ADMIN;
+        let demote = role.as_deref().is_some_and(|r| r != ROLE_ADMIN) && u.role == ROLE_ADMIN;
         let disable = active == Some(false) && u.active;
         if id2 == me && (demote || disable) { return Err("Das eigene Konto lässt sich nicht herabstufen oder sperren".into()); }
         if u.role == ROLE_ADMIN && u.active && (demote || disable) && db.count_active_admins().map_err(|e| e.to_string())? <= 1 {
@@ -389,7 +389,10 @@ pub async fn delete_log(State(state): State<Arc<AppState>>, headers: HeaderMap, 
 
 fn rtl_index(all: &[crabsdr_sdr::probe::DetectedDevice], target: &crabsdr_sdr::probe::DetectedDevice) -> Option<u32> {
     let mut i = 0u32;
-    for d in all { if std::ptr::eq(d, target) { return Some(i); } if d.driver == "rtlsdr" { i += 1; } }
+    for d in all {
+        if std::ptr::eq(d, target) { return Some(i); }
+        if d.driver == "rtlsdr" { i += 1; }
+    }
     None
 }
 

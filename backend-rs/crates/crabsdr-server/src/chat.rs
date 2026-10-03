@@ -83,11 +83,11 @@ impl Chat {
     }
     pub fn delete_chat(&self, id: i64) -> bool {
         let g = self.db.lock().unwrap();
-        g.as_ref().map_or(false, |c| c.execute("delete from chat where id = ?", [id]).map_or(false, |n| n > 0))
+        g.as_ref().is_some_and(|c| c.execute("delete from chat where id = ?", [id]).is_ok_and(|n| n > 0))
     }
     pub fn delete_log(&self, id: i64) -> bool {
         let g = self.db.lock().unwrap();
-        g.as_ref().map_or(false, |c| c.execute("delete from log where id = ?", [id]).map_or(false, |n| n > 0))
+        g.as_ref().is_some_and(|c| c.execute("delete from log where id = ?", [id]).is_ok_and(|n| n > 0))
     }
 
     fn throttle(&self, who: &str, kind: &'static str, secs: u64) -> bool {

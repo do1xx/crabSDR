@@ -26,6 +26,7 @@ pub enum AgcMode {
 }
 
 impl AgcMode {
+    #[allow(clippy::should_implement_trait)]   // liefert Option statt Result, bewusst kein FromStr
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "off" => Some(AgcMode::Off),
@@ -62,6 +63,7 @@ impl DemodMode {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "wfm" => Some(DemodMode::Wfm),

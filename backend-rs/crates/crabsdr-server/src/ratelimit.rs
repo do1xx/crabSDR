@@ -39,7 +39,7 @@ impl LoginLimiter {
         let mut wait = 0u64;
         for (k, rule) in self.keys(user, ip) {
             if let Some(q) = g.get_mut(&k) {
-                while q.front().map_or(false, |t| now.duration_since(*t) > rule.window) { q.pop_front(); }
+                while q.front().is_some_and(|t| now.duration_since(*t) > rule.window) { q.pop_front(); }
                 if q.len() >= rule.max {
                     let oldest = *q.front().unwrap();
                     wait = wait.max(rule.window.saturating_sub(now.duration_since(oldest)).as_secs() + 1);
@@ -54,7 +54,7 @@ impl LoginLimiter {
         let mut g = self.hits.lock().unwrap();
         if g.len() > 20_000 {
             // Speicher begrenzen: abgelaufene Einträge weg (längstes Fenster = 15 min)
-            g.retain(|_, q| q.back().map_or(false, |t| now.duration_since(*t) < Duration::from_secs(15 * 60)));
+            g.retain(|_, q| q.back().is_some_and(|t| now.duration_since(*t) < Duration::from_secs(15 * 60)));
         }
         for (k, _) in self.keys(user, ip) { g.entry(k).or_default().push_back(now); }
     }

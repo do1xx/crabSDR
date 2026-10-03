@@ -49,7 +49,7 @@ pub async fn login(State(state): State<Arc<AppState>>, ConnectInfo(peer): Connec
     if let Err(wait) = auth.limiter.check(&name, &ip) {
         warn!("Anmeldung gebremst: „{}“ von {} ({} s)", name, ip, wait);
         return (StatusCode::TOO_MANY_REQUESTS, [(header::RETRY_AFTER, wait.to_string())],
-            Json(json!({"error": format!("Zu viele Versuche. Bitte in {} Minuten erneut.", (wait + 59) / 60), "retry_after": wait}))).into_response();
+            Json(json!({"error": format!("Zu viele Versuche. Bitte in {} Minuten erneut.", wait.div_ceil(60)), "retry_after": wait}))).into_response();
     }
     let (db, pw, n2) = (auth.db.clone(), req.password.clone(), name.clone());
     // Konto holen und Passwort prüfen im eigenen Thread (bcrypt dauert); unbekannter Name dauert gleich lange

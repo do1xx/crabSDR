@@ -42,21 +42,10 @@ impl SubprocessDriver {
                     sdr_label, restart_count
                 );
                 let _ = health_tx.send(false);
-                // Park the task and wait for a reconfigure command to try again
-                loop {
-                    match cmd_rx.recv().await {
-                        Some(DriverCommand::SetFrequency(_))
-                        | Some(DriverCommand::SetGain(_))
-                        | Some(DriverCommand::SetGainElements(_))
-                        | Some(DriverCommand::SetBiasTee(_))
-                        | Some(DriverCommand::SetPpm(_))
-                        | Some(DriverCommand::SetSampleRate(_)) => {
-                            info!("[{}] Received reconfigure command — retrying SDR", sdr_label);
-                            restart_count = 0;
-                            break;
-                        }
-                        Some(DriverCommand::Stop) | None => return,
-                    }
+                // Warten, bis ein Befehl zum Umkonfigurieren kommt – dann noch einmal versuchen
+                match cmd_rx.recv().await {
+                    Some(DriverCommand::Stop) | None => return,
+                    Some(_) => { info!("[{}] Received reconfigure command — retrying SDR", sdr_label); restart_count = 0; }
                 }
             }
 
@@ -174,7 +163,7 @@ impl SubprocessDriver {
                             }
                             iq_send_count += 1;
                             // erster Block nach dem Start, danach etwa stündlich (8 Bit: 250 Blöcke/s, 16 Bit: 500/s)
-                            if iq_send_count == 1 || iq_send_count % 1_000_000 == 0 {
+                            if iq_send_count == 1 || iq_send_count.is_multiple_of(1_000_000) {
                                 info!("[{}] IQ-Block #{} ({} Bytes)", sdr_label, iq_send_count, buf.len());
                             }
                             let mut iq = to_complex(fmt, &buf);
@@ -187,7 +176,7 @@ impl SubprocessDriver {
                             match iq_tx.try_send(iq) {
                                 Ok(()) => {}
                                 Err(mpsc::error::TrySendError::Full(iq)) => {
-                                    if iq_send_count <= 5 || iq_send_count % 1000 == 0 {
+                                    if iq_send_count <= 5 || iq_send_count.is_multiple_of(1000) {
                                         warn!("[{}] IQ channel full (cap {}), awaiting send...", sdr_label, iq_tx.capacity());
                                     }
                                     // Fall back to blocking send

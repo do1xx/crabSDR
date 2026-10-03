@@ -1,15 +1,8 @@
-/// Binary WebSocket protocol.
-///
-/// All binary messages start with a 1-byte tag:
-///   0x01 — Spectrum: center_freq(u64 LE) + sample_rate(u32 LE) + n_bins(u16 LE) + i8[] bins
-///   0x02 — Audio: i16 LE samples
-///   0x03 — JSON control message (UTF-8 bytes after tag)
-///   0x81 — Spectrum zstd-compressed (same payload as 0x01, but zstd-wrapped)
+//! Binäres WebSocket-Protokoll. Jede Binärnachricht beginnt mit einem Kennbyte (Liste in docs/ARCHITECTURE.md):
+//! 0x02 PCM-Ton, 0x03 JSON, 0x82 Opus, 0x84 Wasserfall-Zeile, 0x85/0x86 Wasserfall-Verlauf.
 
-pub const TAG_SPECTRUM: u8 = 0x01;
 pub const TAG_AUDIO: u8 = 0x02;
 pub const TAG_JSON: u8 = 0x03;
-pub const TAG_SPECTRUM_ZSTD: u8 = 0x81;
 pub const TAG_AUDIO_OPUS: u8 = 0x82;
 /// Wasserfall-Zeile: tag(1) + zoom(1) + start_bin(2 LE) + flags(1, Bit 0 = Delta zur vorigen Zeile) + zstd(u8-Pixel)
 pub const TAG_WATERFALL: u8 = 0x84;
@@ -18,41 +11,6 @@ pub const WF_FLAG_DELTA: u8 = 0x01;
 pub const TAG_WATERFALL_HIST: u8 = 0x85;
 /// Wasserfall-Verlauf als fertiges Bild: tag(1) + zoom(1) + start_bin(2 LE) + Zeilen(2 LE) + JPEG (neueste Zeile oben)
 pub const TAG_WATERFALL_JPEG: u8 = 0x86;
-
-/// Encode spectrum data into binary frame.
-///
-/// Layout: tag(1) + center_freq(8) + sample_rate(4) + n_bins(2) + bins(n_bins)
-pub fn encode_spectrum(center_freq: u64, sample_rate: u32, bins: &[i8]) -> Vec<u8> {
-    let n_bins = bins.len() as u16;
-    let mut buf = Vec::with_capacity(1 + 8 + 4 + 2 + bins.len());
-    buf.push(TAG_SPECTRUM);
-    buf.extend_from_slice(&center_freq.to_le_bytes());
-    buf.extend_from_slice(&sample_rate.to_le_bytes());
-    buf.extend_from_slice(&n_bins.to_le_bytes());
-    // Safety: i8 and u8 have same layout
-    buf.extend_from_slice(bytemuck_i8_to_u8(bins));
-    buf
-}
-
-/// Encode spectrum with zstd compression.
-pub fn encode_spectrum_zstd(center_freq: u64, sample_rate: u32, bins: &[i8]) -> Vec<u8> {
-    let payload = encode_spectrum_payload(center_freq, sample_rate, bins);
-    let compressed = zstd::encode_all(payload.as_slice(), 1).unwrap_or(payload);
-    let mut buf = Vec::with_capacity(1 + compressed.len());
-    buf.push(TAG_SPECTRUM_ZSTD);
-    buf.extend_from_slice(&compressed);
-    buf
-}
-
-fn encode_spectrum_payload(center_freq: u64, sample_rate: u32, bins: &[i8]) -> Vec<u8> {
-    let n_bins = bins.len() as u16;
-    let mut buf = Vec::with_capacity(8 + 4 + 2 + bins.len());
-    buf.extend_from_slice(&center_freq.to_le_bytes());
-    buf.extend_from_slice(&sample_rate.to_le_bytes());
-    buf.extend_from_slice(&n_bins.to_le_bytes());
-    buf.extend_from_slice(bytemuck_i8_to_u8(bins));
-    buf
-}
 
 /// Encode audio samples into binary frame.
 ///
@@ -134,27 +92,9 @@ pub fn encode_json(json: &str) -> Vec<u8> {
     buf
 }
 
-fn bytemuck_i8_to_u8(slice: &[i8]) -> &[u8] {
-    // Safety: i8 and u8 have identical size/alignment
-    unsafe { std::slice::from_raw_parts(slice.as_ptr() as *const u8, slice.len()) }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_spectrum_encode() {
-        let bins = vec![-120i8, -80, -60, -40];
-        let frame = encode_spectrum(100_000_000, 2_048_000, &bins);
-        assert_eq!(frame[0], TAG_SPECTRUM);
-        let freq = u64::from_le_bytes(frame[1..9].try_into().unwrap());
-        assert_eq!(freq, 100_000_000);
-        let rate = u32::from_le_bytes(frame[9..13].try_into().unwrap());
-        assert_eq!(rate, 2_048_000);
-        let n = u16::from_le_bytes(frame[13..15].try_into().unwrap());
-        assert_eq!(n, 4);
-    }
 
     #[test]
     fn test_waterfall_roundtrip() {

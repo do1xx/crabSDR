@@ -51,7 +51,7 @@ pub fn bearer(headers: &HeaderMap) -> Option<String> {
 /// Absender für die Anmeldebremse: direkte Gegenstelle; steht davor ein Proxy im eigenen Netz, dessen Angabe
 /// (X-Real-IP, sonst erster Eintrag von X-Forwarded-For). Fälschen hilft nichts gegen die Sperre je Name.
 pub fn client_ip(headers: &HeaderMap, peer: Option<SocketAddr>) -> String {
-    let local = peer.map_or(true, |p| match p.ip() {
+    let local = peer.is_none_or(|p| match p.ip() {
         std::net::IpAddr::V4(v) => v.is_loopback() || v.is_private() || (v.octets()[0] == 100 && (64..128).contains(&v.octets()[1])),
         std::net::IpAddr::V6(v) => v.is_loopback() || (v.segments()[0] & 0xfe00) == 0xfc00,
     });

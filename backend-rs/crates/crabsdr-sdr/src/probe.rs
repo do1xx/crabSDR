@@ -250,7 +250,7 @@ fn build_detected_device(props: HashMap<String, String>) -> DetectedDevice {
     let product = props.get("product").cloned()
         .or_else(|| props.get("device").cloned())
         .unwrap_or_default();
-    let available = !props.get("tuner").is_some_and(|v| v == "unavailable");
+    let available = props.get("tuner").is_none_or(|v| v != "unavailable");
 
     DetectedDevice {
         driver,

@@ -95,7 +95,7 @@ impl Channelizer {
         let mut pos = 0usize;
         while pos + n <= self.pending.len() {
             let mut block: Vec<Complex32> = self.pending[pos..pos + n].to_vec();
-            if self.hops_total % self.display_every == 0 {
+            if self.hops_total.is_multiple_of(self.display_every) {
                 let mut win: Vec<Complex32> = block.iter().zip(&self.window).map(|(s, w)| s * w).collect();
                 self.fft_forward.process_with_scratch(&mut win, &mut self.scratch);
                 for (i, v) in win.iter().enumerate() {

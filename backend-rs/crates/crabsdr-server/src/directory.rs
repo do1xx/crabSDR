@@ -49,7 +49,7 @@ pub async fn entry(state: &AppState) -> Option<Value> {
     let mut listeners = 0usize;
     {
         let manager = state.manager.read().await;
-        for (_, p) in manager.all() { listeners += p.clients.lock().await.count_real(); }
+        for p in manager.all().values() { listeners += p.clients.lock().await.count_real(); }
     }
     Some(json!({
         "crabsdr": 1,
@@ -100,7 +100,7 @@ pub async fn run(state: Arc<AppState>) {
                     ok_before = Some(true);
                 }
                 Err(e) => {
-                    if ok_before != Some(false) || last_warn.map_or(true, |t| t.elapsed() >= Duration::from_secs(3600)) {
+                    if ok_before != Some(false) || last_warn.is_none_or(|t| t.elapsed() >= Duration::from_secs(3600)) {
                         warn!("Verzeichnis {}: Meldung nicht angenommen: {} (neuer Versuch alle 5 min, Meldung höchstens stündlich)", server, e);
                         last_warn = Some(Instant::now());
                     }

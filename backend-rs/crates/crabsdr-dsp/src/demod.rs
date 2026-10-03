@@ -6,7 +6,6 @@
 
 use crabsdr_core::{AgcMode, DemodMode};
 use num_complex::Complex32;
-use rustfft::FftPlanner;
 use std::collections::HashMap;
 use std::f32::consts::PI;
 
@@ -476,7 +475,7 @@ impl RdsDecoder {
         if !self.synced {
             // Try to sync: check if current 26 bits match any offset word
             let syn = rds_syndrome(self.block_buf);
-            if syn == RDS_OFFSET_A as u16 {
+            if syn == RDS_OFFSET_A {
                 self.synced = true;
                 self.group_idx = 0;
                 self.bits_in_block = 0;
@@ -550,8 +549,8 @@ impl RdsDecoder {
                 let idx = seg as usize * 2;
                 if idx + 1 < 8 {
                     // Only accept printable ASCII
-                    if c1 >= 0x20 && c1 < 0x7F { self.ps_name[idx] = c1; }
-                    if c2 >= 0x20 && c2 < 0x7F { self.ps_name[idx + 1] = c2; }
+                    if (0x20..0x7F).contains(&c1) { self.ps_name[idx] = c1; }
+                    if (0x20..0x7F).contains(&c2) { self.ps_name[idx + 1] = c2; }
                     self.ps_segments |= 1 << seg;
                     let ps_str = String::from_utf8_lossy(&self.ps_name);
                     tracing::info!("RDS PS seg={} chars='{}{}'  ps_so_far=\"{}\"  segs=0x{:02X}",
@@ -578,7 +577,7 @@ impl RdsDecoder {
                         (d & 0xFF) as u8,
                     ];
                     for (i, &ch) in chars.iter().enumerate() {
-                        if idx + i < 64 && ch >= 0x20 && ch < 0x7F {
+                        if idx + i < 64 && (0x20..0x7F).contains(&ch) {
                             self.radiotext[idx + i] = ch;
                         }
                     }
@@ -590,8 +589,8 @@ impl RdsDecoder {
                     let c1 = (d >> 8) as u8;
                     let c2 = (d & 0xFF) as u8;
                     if idx + 1 < 64 {
-                        if c1 >= 0x20 && c1 < 0x7F { self.radiotext[idx] = c1; }
-                        if c2 >= 0x20 && c2 < 0x7F { self.radiotext[idx + 1] = c2; }
+                        if (0x20..0x7F).contains(&c1) { self.radiotext[idx] = c1; }
+                        if (0x20..0x7F).contains(&c2) { self.radiotext[idx + 1] = c2; }
                     }
                     self.rt_segments |= 1 << seg;
                 }
@@ -795,16 +794,18 @@ impl ClientState {
 
 pub struct Demodulator {
     states: HashMap<u64, ClientState>,
-    /// Cached FFT planner — rustfft caches plans internally, but we avoid
-    /// re-creating the planner object on every demod_ssb call (Pi 4 perf).
-    fft_planner: FftPlanner<f32>,
+}
+
+impl Default for Demodulator {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Demodulator {
     pub fn new() -> Self {
         Self {
             states: HashMap::new(),
-            fft_planner: FftPlanner::new(),
         }
     }
 
@@ -849,7 +850,7 @@ impl Demodulator {
             rds.take_update(stereo)
         } else if stereo {
             // No RDS but stereo detected — still send stereo status
-            Some(format!(r#"{{"type":"rds","ps":"","rt":"","pi":"0x0000","pty":0,"stereo":true}}"#))
+            Some(r#"{"type":"rds","ps":"","rt":"","pi":"0x0000","pty":0,"stereo":true}"#.to_string())
         } else {
             None
         }
@@ -861,6 +862,7 @@ impl Demodulator {
     /// `bandwidth`: RF bandwidth in Hz (used for audio lowpass filter)
     /// `raw_audio`: if true, skip AGC (for machine decoders like multimon-ng)
     /// `residual_hz`: frequency error from FFT bin quantization (from channelizer)
+    #[allow(clippy::too_many_arguments)]
     pub fn demodulate(
         &mut self,
         channel_iq: &[Complex32],
@@ -881,6 +883,8 @@ impl Demodulator {
         let ssb_filter = |m: DemodMode, bw: u32, rate: u32| match m {
             DemodMode::Usb => Some(SsbFilter::new(true, pass_lo as f32, bw as f32, rate as f32)),
             DemodMode::Lsb => Some(SsbFilter::new(false, pass_lo as f32, bw as f32, rate as f32)),
+            // CW: der BFO legt den Träger auf 700 Hz, das Filter lässt 700 ± bw/2 durch (mindestens ±100 Hz)
+            DemodMode::Cw => { let h = (bw as f32 / 2.0).clamp(100.0, 600.0); Some(SsbFilter::new(true, 700.0 - h, 700.0 + h, rate as f32)) }
             _ => None,
         };
 
@@ -981,8 +985,7 @@ impl Demodulator {
         // NFM: ZF-Filter (FIR) vor dem Diskriminator — begrenzt den 24-kHz-Kanal auf die Bandbreite,
         // sonst rauschen und zischen Nachbarkanal und Breitbandrauschen im Diskriminator.
         let filtered_iq;
-        let demod_iq = if mode == DemodMode::Fm && state.iq_fir.is_some() {
-            let (fi, fq) = state.iq_fir.as_mut().unwrap();
+        let demod_iq = if let (DemodMode::Fm, Some((fi, fq))) = (mode, state.iq_fir.as_mut()) {
             filtered_iq = demod_iq
                 .iter()
                 .map(|s| Complex32::new(fi.process(s.re), fq.process(s.im)))
@@ -997,11 +1000,8 @@ impl Demodulator {
             DemodMode::Fm | DemodMode::Wfm => demod_fm(demod_iq, state),
             DemodMode::Am => demod_am(demod_iq, state),
             DemodMode::Sam => demod_sam(demod_iq, channel_rate, state),
-            DemodMode::Usb | DemodMode::Lsb => match state.ssb.as_mut() {
-                Some(f) => f.process(demod_iq),
-                None => demod_ssb(demod_iq, mode == DemodMode::Usb, &mut self.fft_planner),
-            },
-            DemodMode::Cw => demod_cw(demod_iq, channel_rate, state, &mut self.fft_planner),
+            DemodMode::Usb | DemodMode::Lsb => state.ssb.as_mut().map(|f| f.process(demod_iq)).unwrap_or_default(),
+            DemodMode::Cw => demod_cw(demod_iq, channel_rate, state),
         };
 
         if audio.is_empty() {
@@ -1100,31 +1100,32 @@ impl Demodulator {
                 let gain = 0.4 * (state.channel_rate as f32 / 2.0) / dev_ref;
                 for s in &mut audio { *s *= gain; }
             } else {
-                // AM/SSB/CW: Regelung in dB. Angriff sofort (ein Rahmen = 20 ms, sonst übersteuert ein starkes Signal
-                // sekundenlang), Haltezeit 1 s, dann Lösen mit fester Rate in dB je Rahmen – vorher lief das Lösen linear
-                // auf einen riesigen Zielwert zu und riss in Sprechpausen in zwei Rahmen das Rauschen hoch (Pumpen).
-                let rms = (audio.iter().map(|s| s * s).sum::<f32>() / audio.len() as f32).sqrt();
-                if rms > 1e-6 {
-                    let target_gain = (0.15 / rms).min(AGC_MAX_GAIN);
-                    match agc_mode {
-                        AgcMode::Off => {
-                            for s in &mut audio { *s *= 0.5; }
+                // AM/SSB/CW: Regelung in dB, in Blöcken von 2 ms. Angriff sofort je Block (sonst übersteuert ein starkes
+                // Signal), Verstärkung innerhalb des Blocks gleitend (kein Zipper), Haltezeit 1 s, dann Lösen mit fester
+                // Rate in dB – vorher lief das Lösen linear auf einen riesigen Zielwert zu und riss in Sprechpausen das
+                // Rauschen hoch (Pumpen).
+                if agc_mode == AgcMode::Off {
+                    for s in &mut audio { *s *= 0.5; }
+                } else {
+                    let release_db_frame = match agc_mode { AgcMode::Fast => 0.5, AgcMode::Slow => 0.06, _ => 0.2 };   // je 20 ms: 25 / 3 / 10 dB je s
+                    let blk = ((state.channel_rate as usize) / 500).max(8);                  // 2 ms
+                    let blocks_per_frame = (audio.len() / blk).max(1) as f32;
+                    let release = 10f32.powf(release_db_frame / blocks_per_frame / 20.0);
+                    let hang_blocks = AGC_HANG_FRAMES * blocks_per_frame as u32;
+                    let mut i = 0;
+                    while i < audio.len() {
+                        let end = (i + blk).min(audio.len());
+                        let rms = (audio[i..end].iter().map(|s| s * s).sum::<f32>() / (end - i) as f32).sqrt();
+                        let old = state.agc_level;
+                        if rms > 1e-6 {
+                            let target_gain = (0.15 / rms).min(AGC_MAX_GAIN);
+                            if target_gain < state.agc_level { state.agc_level = target_gain; state.agc_hang = hang_blocks; }
+                            else if state.agc_hang > 0 { state.agc_hang -= 1; }
+                            else { state.agc_level = (state.agc_level * release).min(target_gain); }
                         }
-                        _ => {
-                            let release_db = match agc_mode { AgcMode::Fast => 0.5, AgcMode::Slow => 0.06, _ => 0.2 };   // je 20-ms-Rahmen: 25 / 3 / 10 dB je s
-                            let old = state.agc_level;
-                            if target_gain < state.agc_level {
-                                state.agc_level = target_gain;
-                                state.agc_hang = AGC_HANG_FRAMES;
-                            } else if state.agc_hang > 0 {
-                                state.agc_hang -= 1;
-                            } else {
-                                state.agc_level = (state.agc_level * 10f32.powf(release_db / 20.0)).min(target_gain);
-                            }
-                            // Verstärkung über den Rahmen hinweg gleitend von alt nach neu, kein Sprung alle 20 ms (Zipper)
-                            let n = audio.len().max(1) as f32;
-                            for (i, s) in audio.iter_mut().enumerate() { *s *= old + (state.agc_level - old) * (i as f32 + 1.0) / n; }
-                        }
+                        let n = (end - i) as f32;
+                        for (k, s) in audio[i..end].iter_mut().enumerate() { *s *= old + (state.agc_level - old) * (k as f32 + 1.0) / n; }
+                        i = end;
                     }
                 }
             }
@@ -1234,74 +1235,12 @@ fn demod_sam(iq: &[Complex32], channel_rate: f32, state: &mut ClientState) -> Ve
     audio
 }
 
-/// SSB demod with proper sideband selection via Hilbert transform (FFT method).
-///
-/// The channelizer extracts a symmetric band around the carrier. We need to
-/// select only one sideband to avoid noise from the unwanted side folding in.
-///
-/// For USB: zero negative frequencies, keep positive → Re() gives audio.
-/// For LSB: zero positive frequencies, keep negative → Re() gives audio.
-///
-/// `upper`: true for USB, false for LSB.
-fn demod_ssb(iq: &[Complex32], upper: bool, planner: &mut FftPlanner<f32>) -> Vec<f32> {
-    let n = iq.len();
-    if n < 4 {
-        return iq.iter().map(|s| s.re).collect();
-    }
-
-    // FFT the channel IQ
-    let fft = planner.plan_fft_forward(n);
-    let mut freq: Vec<Complex32> = iq.to_vec();
-    let scratch_len = fft.get_inplace_scratch_len();
-    let mut scratch = vec![Complex32::new(0.0, 0.0); scratch_len];
-    fft.process_with_scratch(&mut freq, &mut scratch);
-
-    // Zero out the unwanted sideband.
-    // FFT layout: [DC, +1, +2, ..., +N/2, -N/2+1, ..., -2, -1]
-    // Positive freq bins: 1..N/2
-    // Negative freq bins: N/2+1..N-1
-    let half = n / 2;
-    if upper {
-        // USB: keep positive frequencies (bins 1..half), zero negative (bins half+1..n-1)
-        // DC (bin 0) and Nyquist (bin half) kept at half amplitude
-        freq[0] *= 0.5;
-        if half < n {
-            freq[half] *= 0.5;
-        }
-        for i in (half + 1)..n {
-            freq[i] = Complex32::new(0.0, 0.0);
-        }
-    } else {
-        // LSB: keep negative frequencies (bins half+1..n-1), zero positive (bins 1..half-1)
-        freq[0] *= 0.5;
-        if half < n {
-            freq[half] *= 0.5;
-        }
-        for i in 1..half {
-            freq[i] = Complex32::new(0.0, 0.0);
-        }
-    }
-
-    // iFFT back to time domain
-    let ifft = planner.plan_fft_inverse(n);
-    let iscratch_len = ifft.get_inplace_scratch_len();
-    if scratch.len() < iscratch_len {
-        scratch.resize(iscratch_len, Complex32::new(0.0, 0.0));
-    }
-    ifft.process_with_scratch(&mut freq, &mut scratch);
-
-    // Normalize (rustfft doesn't normalize) and take Re.
-    // Factor 2.0 compensates for zeroing half the spectrum.
-    let inv = 2.0 / n as f32;
-    freq.iter().map(|s| s.re * inv).collect()
-}
-
 /// CW demod: 700 Hz BFO + USB sideband selection.
 ///
 /// The BFO shifts the CW signal from DC to 700 Hz, then USB sideband
 /// selection filters out noise from the lower sideband. This matches
 /// how OpenWebRX and other SDR programs handle CW.
-fn demod_cw(iq: &[Complex32], rate: f32, state: &mut ClientState, planner: &mut FftPlanner<f32>) -> Vec<f32> {
+fn demod_cw(iq: &[Complex32], rate: f32, state: &mut ClientState) -> Vec<f32> {
     let bfo = 700.0f32;
     let phase_inc = 2.0 * PI * bfo / rate;
     let mut phase = state.bfo_phase;
@@ -1321,8 +1260,8 @@ fn demod_cw(iq: &[Complex32], rate: f32, state: &mut ClientState, planner: &mut 
 
     state.bfo_phase = phase;
 
-    // Apply USB sideband selection to reject noise from lower sideband
-    demod_ssb(&mixed, true, planner)
+    // USB-Filter um 700 Hz (durchlaufend, keine Blockartefakte)
+    state.ssb.as_mut().map(|f| f.process(&mixed)).unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -1451,13 +1390,16 @@ mod tests {
         let rate = 8000.0f32; let frame = 160usize;
         let tone = |amp: f32, i0: usize| -> Vec<Complex32> { (0..frame).map(|i| Complex32::new(0.0, 2.0 * PI * 1000.0 * (i0 + i) as f32 / rate).exp() * amp).collect() };
         for k in 0..100 { let c = tone(0.001, k * frame); demod.demodulate(&c, rate, DemodMode::Usb, 9, 144_260_000, 2700, 8000, false, 0.0, AgcMode::Medium, 300); }   // leise: Regelung dreht auf
-        let mut clipped = 0usize;
+        let mut first = 0usize; let mut later = 0usize;
         for k in 100..105 {
             let c = tone(1.0, k * frame);
             let out = demod.demodulate(&c, rate, DemodMode::Usb, 9, 144_260_000, 2700, 8000, false, 0.0, AgcMode::Medium, 300).unwrap();
-            clipped += out.iter().filter(|&&v| v.abs() >= 31000).count();
+            let n = out.iter().filter(|&&v| v.abs() >= 31000).count();
+            if k == 100 { first = n; } else { later += n; }
         }
-        assert_eq!(clipped, 0, "Übersteuerung nach lautem Einsatz");
+        // gleitende Regelung: höchstens 1 ms (8 Samples) am Einsatz, danach nichts mehr
+        assert!(first <= 8, "Übersteuerung am Einsatz: {} Samples", first);
+        assert_eq!(later, 0, "Übersteuerung nach dem Einsatz");
     }
 
     #[test]
@@ -1478,45 +1420,19 @@ mod tests {
         assert!(!audio.is_empty());
     }
 
+    /// Seitenbandwahl des durchlaufenden Filters: USB lässt +1 kHz durch und sperrt −1 kHz, LSB umgekehrt
     #[test]
     fn test_ssb_sideband_selection() {
-        // USB should pass positive frequencies and reject negative
-        let mut planner = FftPlanner::new();
-        let n = 256;
-        let rate = 12000.0f32;
-        // Positive frequency tone at +1 kHz (USB signal)
-        let pos_tone: Vec<Complex32> = (0..n)
-            .map(|i| {
-                let t = i as f32 / rate;
-                Complex32::new(0.0, 2.0 * PI * 1000.0 * t).exp()
-            })
-            .collect();
-        // Negative frequency tone at -1 kHz (LSB signal)
-        let neg_tone: Vec<Complex32> = (0..n)
-            .map(|i| {
-                let t = i as f32 / rate;
-                Complex32::new(0.0, -2.0 * PI * 1000.0 * t).exp()
-            })
-            .collect();
-
-        let usb_from_pos = demod_ssb(&pos_tone, true, &mut planner);
-        let usb_from_neg = demod_ssb(&neg_tone, true, &mut planner);
-        let lsb_from_neg = demod_ssb(&neg_tone, false, &mut planner);
-        let lsb_from_pos = demod_ssb(&pos_tone, false, &mut planner);
-
-        // USB should pass positive tone
-        let usb_pos_energy: f32 = usb_from_pos.iter().map(|s| s * s).sum::<f32>() / n as f32;
-        // USB should reject negative tone
-        let usb_neg_energy: f32 = usb_from_neg.iter().map(|s| s * s).sum::<f32>() / n as f32;
-        // LSB should pass negative tone
-        let lsb_neg_energy: f32 = lsb_from_neg.iter().map(|s| s * s).sum::<f32>() / n as f32;
-        // LSB should reject positive tone
-        let lsb_pos_energy: f32 = lsb_from_pos.iter().map(|s| s * s).sum::<f32>() / n as f32;
-
-        assert!(usb_pos_energy > usb_neg_energy * 100.0,
-            "USB should pass +1kHz but reject -1kHz: pos={:.4} neg={:.4}", usb_pos_energy, usb_neg_energy);
-        assert!(lsb_neg_energy > lsb_pos_energy * 100.0,
-            "LSB should pass -1kHz but reject +1kHz: neg={:.4} pos={:.4}", lsb_neg_energy, lsb_pos_energy);
+        let rate = 8000.0f32; let n = 8000;
+        let tone = |f: f32| -> Vec<Complex32> { (0..n).map(|i| Complex32::new(0.0, 2.0 * PI * f * i as f32 / rate).exp()).collect() };
+        let energy = |v: &[f32]| v[n / 2..].iter().map(|s| s * s).sum::<f32>() / (n / 2) as f32;
+        let (pos, neg) = (tone(1000.0), tone(-1000.0));
+        let mut usb = SsbFilter::new(true, 300.0, 2700.0, rate); let usb_pos = energy(&usb.process(&pos));
+        let mut usb = SsbFilter::new(true, 300.0, 2700.0, rate); let usb_neg = energy(&usb.process(&neg));
+        let mut lsb = SsbFilter::new(false, 300.0, 2700.0, rate); let lsb_neg = energy(&lsb.process(&neg));
+        let mut lsb = SsbFilter::new(false, 300.0, 2700.0, rate); let lsb_pos = energy(&lsb.process(&pos));
+        assert!(usb_pos > usb_neg * 100.0, "USB: +1 kHz {:.4} vs −1 kHz {:.4}", usb_pos, usb_neg);
+        assert!(lsb_neg > lsb_pos * 100.0, "LSB: −1 kHz {:.4} vs +1 kHz {:.4}", lsb_neg, lsb_pos);
     }
 
     #[test]

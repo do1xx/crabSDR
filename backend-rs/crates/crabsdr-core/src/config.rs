@@ -66,20 +66,6 @@ pub struct SdrInstanceConfig {
     pub settings: Option<String>,
 }
 
-/// Directory/tunnel site configuration for connecting to a central directory server.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SiteConfig {
-    /// Human-readable site name (e.g. "Eberswalde")
-    pub name: String,
-    /// Maidenhead grid locator (e.g. "JO62ql")
-    #[serde(default)]
-    pub locator: Option<String>,
-    /// Directory server WebSocket URL (e.g. "wss://verzeichnis.example.org/api/tunnel")
-    pub directory_url: String,
-    /// API token for authentication with directory server
-    pub directory_token: String,
-}
-
 /// Stationsangaben (Name, Untertitel, Adresse, Locator) für die Oberfläche.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StationConfig {
@@ -257,10 +243,6 @@ pub struct ServerConfig {
 
 
 
-    // Directory/tunnel site config (optional)
-    #[serde(default)]
-    pub site: Option<SiteConfig>,
-
     /// Opus-Bitrate je Kanal in bit/s (24 kHz mono; 32 kbit/s reicht für NFM-Sprache, 48 für Rundfunk)
     #[serde(default = "default_opus_bitrate")]
     pub opus_bitrate: u32,
@@ -284,7 +266,7 @@ pub struct ServerConfig {
     pub source: Option<PathBuf>,
 }
 
-fn path_is_empty(p: &PathBuf) -> bool { p.as_os_str().is_empty() }
+fn path_is_empty(p: &std::path::Path) -> bool { p.as_os_str().is_empty() }
 
 fn default_opus_bitrate() -> u32 { 32_000 }
 fn default_opus_complexity() -> u32 { 3 }
@@ -477,7 +459,6 @@ impl Config {
             decoders: vec![],
             mqtt: None,
             directory: DirectoryConfig::default(),
-            site: None,
             opus_bitrate: default_opus_bitrate(),
             opus_complexity: default_opus_complexity(),
             smeter_cal: HashMap::new(),
@@ -524,7 +505,7 @@ impl ServerConfig {
         let cands = config_candidates(explicit);
         let found = cands.iter().find(|p| p.exists()).cloned();
         let Some(path) = found else {
-            if explicit.is_some() || std::env::var("CRABSDR_CONFIG").map_or(false, |v| !v.is_empty()) {
+            if explicit.is_some() || std::env::var("CRABSDR_CONFIG").is_ok_and(|v| !v.is_empty()) {
                 return Err(format!("Konfiguration {} nicht gefunden", cands[0].display()));
             }
             warnings.push("keine Konfiguration gefunden (/etc/crabsdr/config.toml, /data/config.toml, ./config.toml) – Voreinstellungen, ein Band per Umgebungsvariablen".into());
@@ -640,7 +621,7 @@ impl ServerConfig {
                 warn.push(format!("Band „{}“: driver „{}“ unbekannt (rtl_sdr, rtl_tcp, hackrf, rx_sdr)", b.id, b.sdr_driver));
             }
             if let Some(st) = &b.settings {
-                if !st.chars().all(|c| c.is_ascii_alphanumeric() || "=,_.-".contains(c)) || !st.split(',').all(|kv| kv.split_once('=').map_or(false, |(k, v)| !k.is_empty() && !v.is_empty())) {
+                if !st.chars().all(|c| c.is_ascii_alphanumeric() || "=,_.-".contains(c)) || !st.split(',').all(|kv| kv.split_once('=').is_some_and(|(k, v)| !k.is_empty() && !v.is_empty())) {
                     err.push(format!("Band „{}“: settings „{}“ – Form key=wert,key2=wert2 (Buchstaben, Ziffern, _ . -)", b.id, st));
                 } else if !["rx_sdr", "soapy"].contains(&b.sdr_driver.as_str()) { warn.push(format!("Band „{}“: settings gilt nur für driver = \"rx_sdr\" – wird ignoriert", b.id)); }
             }
@@ -682,7 +663,6 @@ impl ServerConfig {
                 warn.push("[directory]: kein öffentliches Band – das Verzeichnis zeigt die Station ohne Bänder".into());
             }
         }
-        if self.site.is_some() { warn.push("[site] (Verzeichnis-Tunnel) ist experimentell".into()); }
         (err, warn)
     }
 
@@ -692,22 +672,6 @@ impl ServerConfig {
         if let Ok(v) = std::env::var("FRONTEND_DIR") { self.frontend_dir = PathBuf::from(v); }
         if let Ok(v) = std::env::var("DATA_DIR") { self.data_dir = PathBuf::from(v); }
 
-        // Directory/tunnel site config from env vars
-        let site_name = std::env::var("CRABSDR_SITE_NAME").ok();
-        let dir_url = std::env::var("CRABSDR_DIRECTORY_URL").ok();
-        let dir_token = std::env::var("CRABSDR_DIRECTORY_TOKEN").ok();
-        if let (Some(name), Some(url), Some(token)) = (site_name, dir_url, dir_token) {
-            if !name.is_empty() && !url.is_empty() && !token.is_empty() {
-                let locator = std::env::var("CRABSDR_SITE_LOCATOR").ok()
-                    .filter(|s| !s.is_empty());
-                self.site = Some(SiteConfig {
-                    name,
-                    locator,
-                    directory_url: url,
-                    directory_token: token,
-                });
-            }
-        }
     }
 
     /// Datei für Änderungen über die Admin-Schnittstelle: die gelesene Konfiguration (Kommentare gehen dabei verloren)

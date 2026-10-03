@@ -125,6 +125,7 @@ impl Channel {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn process(&mut self, chz: &Channelizer, blocks: &[Vec<Complex32>], frame: u64, want_opus: bool, want_pcm: bool, floor_bin: f32, bin_hz: f32, opus_bitrate: i32, opus_complexity: i32) -> ChannelOut {
         self.last_used = frame;
         let iq = chz.extract_with_plan(&mut self.plan, blocks);
@@ -225,11 +226,11 @@ fn build_hist(hist: &std::collections::VecDeque<Vec<u8>>, sub: WaterfallSub, row
         for a in acc.iter_mut() { *a = 0; }
         for k in 0..slow {
             let line = &hist[first + r * slow + k];
-            for px in 0..WF_PX {
+            for (px, a) in acc.iter_mut().enumerate().take(WF_PX) {
                 let b0 = start + px * bpp;
                 if b0 >= nbins { continue; }
                 let b1 = (b0 + bpp).min(nbins);
-                acc[px] += *line[b0..b1].iter().max().unwrap_or(&0) as u32;
+                *a += *line[b0..b1].iter().max().unwrap_or(&0) as u32;
             }
         }
         out.push(acc.iter().map(|&v| (v / slow as u32) as u8).collect());
@@ -246,7 +247,7 @@ fn palette() -> [[u8; 3]; 256] {
         let t = i as f32 / 255.0;
         let mut k = 0; while k < stops.len() - 2 && t > stops[k + 1].0 { k += 1; }
         let (a, b) = (stops[k], stops[k + 1]); let u = (t - a.0) / (b.0 - a.0);
-        for c in 0..3 { px[c] = (a.1[c] + (b.1[c] - a.1[c]) * u) as u8; }
+        for (c, p) in px.iter_mut().enumerate().take(3) { *p = (a.1[c] + (b.1[c] - a.1[c]) * u) as u8; }
     }
     p
 }
@@ -437,7 +438,7 @@ impl DspThread {
                                 let _ = v.tx.try_send(pcm.clone());
                             }
                         }
-                        if frame % level_every == 0 || send != rt_c.was_open {
+                        if frame.is_multiple_of(level_every) || send != rt_c.was_open {
                             let msg = json!({"type": "level", "db": (o.level_db * 10.0).round() / 10.0,
                                              "floor": (o.floor_db * 10.0).round() / 10.0, "sq": send});
                             let _ = v.tx.try_send(protocol::encode_json(&msg.to_string()));
@@ -447,7 +448,7 @@ impl DspThread {
                 }
 
                 // === Wasserfall-Zeilen je Zoom-Ausschnitt (einmal rechnen, an alle Abonnenten) ===
-                if frame % wf_every == 0 {
+                if frame.is_multiple_of(wf_every) {
                     // Verlauf immer mitschreiben (auch ohne Hörer), damit neue Hörer sofort einen vollen Wasserfall bekommen
                     wf_hist.push_back(spec.iter().map(|&db| quantize_db(db)).collect());
                     if wf_hist.len() > WF_HIST_LINES { wf_hist.pop_front(); }
@@ -474,7 +475,7 @@ impl DspThread {
                                 let _ = v.tx.try_send(protocol::encode_waterfall_hist(sub.zoom, sub.start_bin, &lines));
                             }
                         }
-                        let delta = st.prev.is_some() && !newcomer && st.lines % 100 != 0;
+                        let delta = st.prev.is_some() && !newcomer && !st.lines.is_multiple_of(100);
                         // Delta mit Totzone: ±2 dB Flimmern wird nicht gesendet (Client behält den alten Wert);
                         // `prev` ist immer der Stand, den der Client hat → kein Drift.
                         let (payload, sent): (Vec<u8>, Vec<u8>) = if delta {
@@ -493,20 +494,10 @@ impl DspThread {
                         st.lines += 1;
                     }
                 }
-                // Altes Vollspektrum (0x81) nur für Hörer, die es wollen (Svelte), 25 Zeilen/s
-                if frame % 2 == 0 {
-                    let wants: Vec<&ClientView> = views.iter().filter(|v| v.wants_full_spectrum).collect();
-                    if !wants.is_empty() {
-                        let bins: Vec<i8> = spec.iter().map(|&db| db.clamp(-127.0, 0.0) as i8).collect();
-                        let f = protocol::encode_spectrum_zstd(center, rate, &bins);
-                        for v in wants { let _ = v.tx.try_send(f.clone()); }
-                    }
-                }
-
                 // === Alle 2 s Systemwerte; Hörerliste [id, name, freq, mode] sofort bei Änderung (max. 2×/s), sonst alle 5 s ===
                 if spectrum_tx.receiver_count() > 0 {
                     let real: Vec<_> = views.iter().filter(|v| v.id < PLUGIN_CLIENT_BASE).collect();
-                    if frame % (2 * fps as u64) == 0 {
+                    if frame.is_multiple_of(2 * fps as u64) {
                         if let Some(c) = read_proc_cpu_s() {
                             let now = std::time::Instant::now();
                             if let Some((t0, c0)) = cpu_prev { cpu_pct = ((c - c0) / now.duration_since(t0).as_secs_f64() * 100.0) as f32; }
@@ -531,12 +522,12 @@ impl DspThread {
                 }
 
                 // Aufräumen
-                if frame % 50 == 0 {
+                if frame.is_multiple_of(50) {
                     channels.retain(|_, ch| frame - ch.last_used < CHANNEL_IDLE_FRAMES);
                     let ids: HashSet<u64> = views.iter().map(|v| v.id).collect();
                     client_rt.retain(|id, _| ids.contains(id));
                 }
-                if frame <= 2 || frame % 3000 == 0 {
+                if frame <= 2 || frame.is_multiple_of(3000) {
                     info!("[{}] Rahmen {}: {} Hörer, {} Kanäle, {} Wasserfall-Abos", name, frame, views.len(), results.len(), wf.len());
                 }
             }

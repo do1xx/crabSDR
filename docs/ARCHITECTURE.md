@@ -35,7 +35,6 @@ Jeder Hörer bekommt seinen eigenen Kanal (Frequenz, Betriebsart, Bandbreite), D
 | `auth.rs`, `access.rs`, `ratelimit.rs` | Anmeldung, Rechte je Band und Decoder, Anmeldebremse ([SECURITY.md](SECURITY.md)) |
 | `admin.rs`, `confedit.rs` | Admin-Schnittstelle: Überblick, Benutzer, Konfiguration bearbeiten (Kommentare bleiben, Sicherungen) |
 | `directory.rs` | optionaler Eintrag im Verzeichnis crabsdr.de (`[directory]`) |
-| `tunnel.rs` | experimenteller Verzeichnis-Tunnel (`[site]`) |
 
 ## Kosten
 
@@ -52,7 +51,6 @@ Steuerung als JSON (Text), Daten als Binärrahmen mit einem Kennbyte vorn:
 | `0x02` | PCM-Ton (s16le), wenn der Browser kein WebCodecs hat |
 | `0x84` | Wasserfall-Zeile (Zoomstufe, Start-Bin, Differenz- oder Absolutzeile) |
 | `0x85` / `0x86` | Wasserfall-Verlauf beim Anmelden (Zeilenblock bzw. fertiges JPEG) |
-| `0x81` | Vollspektrum (zstd) |
 | `0x03` | JSON vom Server (Konfiguration, Pegel, Hörerliste) |
 
 Befehle vom Browser: `tune` (Frequenz, Modus, Bandbreite), `untune`, `set_squelch`, `set_agc`, `set_codec`,

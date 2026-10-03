@@ -18,7 +18,6 @@ mod directory;
 mod dsp_thread;
 mod sdr_manager;
 mod sdr_pipeline;
-mod tunnel;
 
 use axum::{
     extract::{
@@ -147,16 +146,6 @@ async fn main() {
         config_lock: tokio::sync::Mutex::new(()),
         restart_pending: std::sync::atomic::AtomicBool::new(false),
     });
-
-    // Start tunnel client if site config is present
-    if let Some(site) = &config.site {
-        let site = site.clone();
-        let state = shared.clone();
-        info!("Starting tunnel client for site '{}' → {}", site.name, site.directory_url);
-        tokio::spawn(async move {
-            tunnel::run_tunnel(site, state).await;
-        });
-    }
 
     // Öffentliches Verzeichnis (crabsdr.de): nur wenn [directory] enabled
     if config.directory.enabled {
@@ -332,11 +321,10 @@ async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, is_admin: 
         tokio::select! {
             Ok(frame) = spectrum_rx.recv() => {
                 // Broadcast trägt nur noch JSON (Decoder, Statistik, Hörerliste); Ton und Wasserfall kommen je Hörer
-                if frame.first() == Some(&protocol::TAG_JSON) {
-                    if socket.send(Message::Binary(frame.into())).await.is_err() {
+                if frame.first() == Some(&protocol::TAG_JSON)
+                    && socket.send(Message::Binary(frame.into())).await.is_err() {
                         break;
                     }
-                }
             }
 
             Some(audio_frame) = audio_rx.recv() => {
@@ -476,9 +464,6 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
                 let mode = msg.get("mode").and_then(|v| v.as_u64()).unwrap_or(1).min(3) as u8;
                 clients.set_waterfall_hist(client_id, rows.min(2000) as u16, slow, jpeg, mode);
             }
-            if let Some(full) = msg.get("full").and_then(|v| v.as_bool()) {
-                clients.set_full_spectrum(client_id, full);
-            }
             if msg.get("off").and_then(|v| v.as_bool()).unwrap_or(false) {
                 clients.set_waterfall(client_id, None);
             } else if let Some(zoom) = msg.get("zoom").and_then(|v| v.as_u64()) {
@@ -562,7 +547,7 @@ async fn read_ui_file(state: &AppState, name: &str) -> Option<Vec<u8>> {
 }
 async fn ui_file_exists(state: &AppState, name: &str) -> bool {
     let (site, web) = { let c = state.config.read().await; (c.site_dir.clone(), c.frontend_dir.clone()) };
-    site.map_or(false, |s| s.join(name).exists()) || web.join(name).exists()
+    site.is_some_and(|s| s.join(name).exists()) || web.join(name).exists()
 }
 
 /// `status.json` für die Statuszeile: Datei aus dem Frontend-Verzeichnis (z. B. von einem Wächter geschrieben), sonst
@@ -636,7 +621,7 @@ async fn ui_json(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         "login": ui.login.unwrap_or(has_private) && state.auth.is_some(),
         "info": match ui.info { Some(b) => b, None => ui_file_exists(&state, "info/index.html").await },
         // eigenes Logo im Stationsordner → crabSDR-Marke klein neben dem Titel, sonst ist die Krabbe selbst das Logo
-        "own_logo": state.config.read().await.site_dir.as_ref().map_or(false, |d| d.join("logo.svg").exists()),
+        "own_logo": state.config.read().await.site_dir.as_ref().is_some_and(|d| d.join("logo.svg").exists()),
     });
     if let Some(o) = v.as_object_mut() {
         o.insert("features".into(), features);

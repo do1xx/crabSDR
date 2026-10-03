@@ -41,7 +41,7 @@ pub fn run(path: Option<&Path>) -> i32 {
         let (lo, hi) = (b.center_freq as f64 - b.sample_rate as f64 / 2.0, b.center_freq as f64 + b.sample_rate as f64 / 2.0);
         let src = if b.sdr_driver == "rtl_tcp" {
             let addr = format!("{}:{}", b.sdr_tcp_host, b.sdr_tcp_port);
-            let up = addr.to_socket_addrs().ok().and_then(|mut a| a.next()).map_or(false, |a| TcpStream::connect_timeout(&a, Duration::from_millis(800)).is_ok());
+            let up = addr.to_socket_addrs().ok().and_then(|mut a| a.next()).is_some_and(|a| TcpStream::connect_timeout(&a, Duration::from_millis(800)).is_ok());
             if !up && b.enabled { warns.push(format!("Band „{}“: rtl_tcp {} gerade nicht erreichbar", b.id, addr)); }
             format!("rtl_tcp {} {}", addr, if up { "✓" } else { "(nicht erreichbar)" })
         } else { format!("{} {}", b.sdr_driver, b.sdr_device) };

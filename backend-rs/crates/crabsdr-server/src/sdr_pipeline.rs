@@ -22,6 +22,7 @@ use tracing::info;
 
 /// Health status of a pipeline.
 #[derive(Debug, Clone, Serialize)]
+#[derive(Default)]
 pub struct PipelineStatus {
     pub running: bool,
     pub error: Option<String>,
@@ -29,16 +30,6 @@ pub struct PipelineStatus {
     pub frames_processed: u64,
 }
 
-impl Default for PipelineStatus {
-    fn default() -> Self {
-        Self {
-            running: false,
-            error: None,
-            client_count: 0,
-            frames_processed: 0,
-        }
-    }
-}
 
 /// A complete SDR processing pipeline.
 pub struct SdrPipeline {

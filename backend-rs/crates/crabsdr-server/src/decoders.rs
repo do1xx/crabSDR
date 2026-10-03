@@ -435,7 +435,7 @@ async fn events_since(hub: &DecoderHub, q: &EvQuery, p: &crate::access::Principa
     let g = hub.inner.lock().await;
     let since = q.since.unwrap_or(0);
     let lim = q.limit.unwrap_or(200).min(KEEP_EVENTS);
-    let mut v: Vec<Event> = g.events.iter().filter(|e| p.may_decoder(&e.id, e.public) && e.seq > since && q.id.as_ref().map_or(true, |i| &e.id == i)).cloned().collect();
+    let mut v: Vec<Event> = g.events.iter().filter(|e| p.may_decoder(&e.id, e.public) && e.seq > since && q.id.as_ref().is_none_or(|i| &e.id == i)).cloned().collect();
     if v.len() > lim { v.drain(..v.len() - lim); }
     (g.seq, v)
 }

@@ -62,7 +62,7 @@ Der Server prüft das bei jeder Verbindung und jeder Abfrage; die Oberfläche bl
 - Formulare ändern nur eine feste Liste von Einstellungen (Station, Oberfläche, Bänder, Decoder); die Textansicht
   zeigt die ganze Datei.
 - **Pfade, Port und Schlüsselquellen** (`port`, `frontend_dir`, `plugin_dir`, `data_dir`, `db_path`, `site_dir`,
-  `jwt_secret_env`, `[site]`, `mqtt.password_file`) sind über die Admin-Seite nicht änderbar – nur in der Datei am Rechner.
+  `jwt_secret_env`, `mqtt.password_file`) sind über die Admin-Seite nicht änderbar – nur in der Datei am Rechner.
   So kann auch ein gestohlenes Admin-Passwort keine fremden Programme als Decoder unterschieben. Ebenso gesperrt:
   Decoder-Optionen mit Dateipfaden (`logdir`, `json`, `log`, `out`, `igate_passfile`, alles auf `_file`/`_dir`/`_path`) –
   sonst ließen sich Dateien der Station überschreiben oder geheime Dateien über einen Decoder nach außen schicken.

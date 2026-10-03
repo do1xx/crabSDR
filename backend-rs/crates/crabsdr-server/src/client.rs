@@ -71,8 +71,6 @@ pub struct ClientState {
     pub agc_mode: AgcMode,
     pub squelch: Squelch,
     pub name: String,
-    /// Altes Vollspektrum (0x81, 4096 Bins) gewünscht (Svelte-Oberfläche)
-    pub wants_full_spectrum: bool,
     pub waterfall: Option<WaterfallSub>,
     /// zählt jede Wasserfall-Anmeldung, damit der DSP-Thread danach eine Absolut-Zeile schickt
     pub wf_seq: u32,
@@ -93,7 +91,6 @@ pub struct ClientView {
     pub tuned: Option<ChannelKey>,
     pub use_opus: bool,
     pub squelch: Squelch,
-    pub wants_full_spectrum: bool,
     pub waterfall: Option<WaterfallSub>,
     pub wf_seq: u32,
     pub wf_hist_rows: u16,
@@ -126,7 +123,6 @@ impl ClientManager {
                 agc_mode: AgcMode::Medium,
                 squelch: Squelch::default(),
                 name: String::new(),
-                wants_full_spectrum: false,
                 waterfall: None,
                 wf_seq: 0,
                 wf_hist_rows: 0,
@@ -195,9 +191,6 @@ impl ClientManager {
         }
     }
 
-    pub fn set_full_spectrum(&mut self, id: u64, on: bool) {
-        if let Some(c) = self.clients.get_mut(&id) { c.wants_full_spectrum = on; }
-    }
 
     pub fn set_waterfall_hist(&mut self, id: u64, rows: u16, slow: u8, jpeg: bool, mode: u8) {
         if let Some(c) = self.clients.get_mut(&id) { c.wf_hist_rows = rows; c.wf_slow = slow.max(1); c.wf_jpeg = jpeg; c.wf_mode = mode; }
@@ -226,7 +219,6 @@ impl ClientManager {
                 }),
                 use_opus: c.use_opus,
                 squelch: c.squelch,
-                wants_full_spectrum: c.wants_full_spectrum,
                 waterfall: c.waterfall,
                 wf_seq: c.wf_seq,
                 wf_hist_rows: c.wf_hist_rows,

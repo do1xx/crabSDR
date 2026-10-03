@@ -7,6 +7,15 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 ### Oberfläche
 - Tastatur: FM/AM steppen alle Pfeile einen Rasterkanal; SSB/CW: ← → 100 Hz, ↑ ↓ auf den nächsten vollen kHz (Umschalt 10 kHz); Belegung auf der Info-Seite.
 - Kanalraster rastet nur noch in FM/AM ein; SSB/CW lassen sich frei abstimmen.
+- Notch-Schalter entfernt (hatte keine Funktion).
+
+### Ton
+- CW nutzt dasselbe durchlaufende Seitenbandfilter wie SSB (700 Hz ± halbe Bandbreite), keine Blockartefakte mehr.
+- Regelung in 2-ms-Blöcken: sofortiger Angriff ohne hörbares Übersteuern, gleitend ohne Zipper.
+
+### Aufgeräumt
+- Reste der alten Svelte-Oberfläche (Vollspektrum 0x81) und der experimentelle Verzeichnis-Tunnel (`[site]`) entfernt,
+  blockweiser FFT-SSB-Demodulator weg, Clippy ohne Warnungen.
 
 ## 0.4.2 – 2026-10-03
 

@@ -28,7 +28,7 @@ var keysOn = true, dx = [], uu = [], hideMarks = false, wfModeNames = ['Spektrum
 var _crab = {
   token: null, bands: [], fft: 4096, px: 1024, wsBase: (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + location.pathname.replace(/[^\/]*$/, ''),   // Basis-Pfad, damit /beta/ hinter nginx funktioniert
   audio: { gain: null, node: null, decoder: null, ts: 0, muted: false, volume: 1, pcm: typeof AudioDecoder !== 'function', rec: null },   // ohne WebCodecs (z. B. http:// im LAN) gleich PCM anfordern
-  level: -200, floor: -200, sq: true, squelchOn: false, sqMargin: 6, notch: false, listenersTimer: null, palette: null,
+  level: -200, floor: -200, sq: true, squelchOn: false, sqMargin: 6, listenersTimer: null, palette: null,
   dragRxX: 0, dragEdge: 0, started: false, sel: [0], bandsOff: [], features: {}, banner: '', links: {},
 };
 
@@ -516,7 +516,6 @@ function _crabSqForMode() {
   if (fm) { want = true; try { want = localStorage.getItem('crab_sq_fm') !== '0'; } catch (e) {} }
   _crab.sqUser = false; setSquelch(want); _crab.sqUser = true;
 }
-function setAutoNotch(on) { _crab.notch = !!on; }
 
 /* ===== Aufnahme (WAV aus dem decodierten Ton) ===== */
 function recStart() { _crab.audio.rec = []; recUrl = null; }

@@ -236,9 +236,5 @@ vergleicht die Kennung (Zufallszahl in `data_dir/directory.id`), damit niemand f
 | Schlüssel | Bedeutung |
 |---|---|
 | `jwt_secret_env` | Name der Umgebungsvariable mit dem JWT-Schlüssel (Standard `CRABSDR_JWT_SECRET`, sonst in `data_dir`) |
-| `[[channels]]` | Kanalmarker der alten Svelte-Oberfläche; neu: `markers.json` im Stationsordner |
-| `decoder_access` | Zugriffsstufen der alten Plugin-Schnittstelle |
-| `[site]` | Anmeldung an einem zentralen Verzeichnis (experimentell) |
-| `decoders` im Band | altes Plugin-System; neu: `[[decoders]]` |
 
 Änderungen über die Admin-Schnittstelle schreiben die Konfigurationsdatei neu; Kommentare gehen dabei verloren.
