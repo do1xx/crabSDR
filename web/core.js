@@ -760,7 +760,7 @@ function _crabLoadLook() {
       a.title = 'crabSDR – Sysop-Bereich'; a.setAttribute('aria-label', 'crabSDR – Sysop-Bereich'); a.innerHTML = '<span class="crabemoji" aria-hidden="true">🦀</span>'; foot.appendChild(a); }
   }
   if (!document.getElementById('crab-look-css')) {
-    var l = document.createElement('link'); l.id = 'crab-look-css'; l.rel = 'stylesheet'; l.href = 'look.css?v=8'; document.head.appendChild(l);
+    var l = document.createElement('link'); l.id = 'crab-look-css'; l.rel = 'stylesheet'; l.href = 'look.css?v=9'; document.head.appendChild(l);
   }
 }
 
@@ -901,8 +901,13 @@ function _crabPanelBuild() {
   var q = function (sel) { return strip.querySelector(sel); };
   var el = function (tag, cls, title) { var d = document.createElement(tag); if (cls) d.className = cls; if (title) d.title = title; return d; };
   var bar = el('div', 'x1bar'); bar.id = 'x1bar';
-  var r1 = el('div', 'x1row x1main'), r2 = el('div', 'x1row x1tools');
-  var put = function (row, node, cls, title) { if (!node) return null; var g = el('div', 'x1grp ' + (cls || ''), title); g.appendChild(node); row.appendChild(g); return g; };
+  // drei feste Zeilen: Hauptzeile (Frequenz, Betriebsart, Bandbreite, Signal) · Abstimmen · Ton und Anzeige
+  var r1 = el('div', 'x1row x1main'), r2 = el('div', 'x1row x1tools'), r3 = el('div', 'x1row x1tools');
+  var put = function (row, node, cls, title, label) {
+    if (!node) return null; var g = el('div', 'x1grp ' + (cls || ''), title);
+    if (label) { var l = el('span', 'x1lbl'); l.textContent = label; g.appendChild(l); }
+    g.appendChild(node); row.appendChild(g); return g;
+  };
   var sep = function (row) { row.appendChild(el('span', 'x1sep')); };
   // Zeile 1
   var fg = el('div', 'x1grp x1freq'); fg.appendChild(document.getElementById('freqmhz'));
@@ -915,19 +920,22 @@ function _crabPanelBuild() {
     var seg = el('div', 'x1seg'); seg.appendChild(minus); seg.appendChild(bwp); seg.appendChild(plus); bw.appendChild(seg); if (val) bw.appendChild(val); }
   r1.appendChild(bw);
   put(r1, q('.smeter'), 'x1meter');
-  // Zeile 2
-  var ff = document.querySelector('form[name=freqform]'); put(r2, ff, 'x1khz', 'Frequenz in kHz eintippen, Enter');
-  var pr = q('.presetrow'); if (pr) { pr.classList.add('x1seg'); put(r2, pr, 'x1quick'); }
-  var sn = q('label.snap'); put(r2, sn, 'x1snap', 'Klicks im Wasserfall rasten in diesem Raster ein');
-  if (share) put(r2, share, 'x1share');
-  sep(r2);
-  put(r2, q('.toggles'), 'x1audio');
-  put(r2, document.getElementById('squelchcontrol'), 'x1sq', 'Rauschsperre: dB über dem Rauschen');
-  put(r2, document.getElementById('agccontrol'), 'x1agc', 'Regelung (AM/SSB/CW): wie schnell die Lautstärke nachgeführt wird');
-  put(r2, document.getElementById('volumecontrol'), 'x1vol', 'Lautstärke');
-  put(r2, document.getElementById('recbtn'), 'x1rec');
-  sep(r2);
-  var wb = q('.wfbtns'); if (wb) { wb.classList.add('x1seg'); var g = put(r2, wb, 'x1zoom', 'Wasserfall: Zoom'); var l = el('span', 'x1lbl'); l.textContent = 'Zoom'; g.insertBefore(l, wb); }
+  // Zeile 2: Abstimmen
+  var ff = document.querySelector('form[name=freqform]'); put(r2, ff, 'x1khz', 'Frequenz in kHz eintippen, Enter', 'Frequenz');
+  var segsel = document.getElementById('segsel');
+  var pr = q('.presetrow'); if (pr) { pr.classList.add('x1seg'); put(r2, pr, 'x1quick', 'Schnellwahl und Liste der Relais und Frequenzen', 'Schnellwahl'); }
+  put(r2, segsel, 'x1range', 'Bereich des Bandplans: Frequenz, Betriebsart und Ausschnitt', 'Bereich');
+  var sn = q('label.snap'); if (sn) { var snSel = sn.querySelector('select'); put(r2, snSel || sn, 'x1snap', 'Klicks im Wasserfall rasten in diesem Raster ein', 'Raster'); if (snSel) sn.remove(); }
+  if (share) put(r2, share, 'x1share', 'Link zu dieser Frequenz kopieren');
+  // Zeile 3: Ton und Anzeige
+  var tg = q('.toggles');
+  put(r3, tg, 'x1audio', null, 'Ton');
+  if (tg) { var sc = document.getElementById('squelchcontrol'); var sqlabel = tg.querySelector('#squelchcheckbox'); if (sc && sqlabel) tg.insertBefore(sc, sqlabel.parentNode.nextSibling); }
+  put(r3, document.getElementById('agccontrol'), 'x1agc', 'Regelung (AM/SSB/CW): wie schnell die Lautstärke nachgeführt wird');
+  put(r3, document.getElementById('volumecontrol'), 'x1vol', 'Lautstärke', 'Lautstärke');
+  put(r3, document.getElementById('recbtn'), 'x1rec', 'Ton als WAV aufnehmen (Taste R)');
+  sep(r3);
+  var wb = q('.wfbtns'); if (wb) { wb.classList.add('x1seg'); put(r3, wb, 'x1zoom', 'Wasserfall: Zoom (Tasten + und −)', 'Zoom'); }
   // Decoder: live aus /api/decoders (Zustand, letzte Treffer, abstimmen); mit Verweis auf die Digital-Seite
   var dec = el('div', 'x1grp x1dec'), db = el('button', 'btn x1decbtn', 'Decoder'); db.type = 'button'; db.innerHTML = 'Decoder <span class="x1caret">▾</span>';
   var pop = el('div', 'x1pop'); pop.id = 'x1decpop'; pop.innerHTML = '<div class="x1pophead">Decoder</div><div class="x1popempty">lädt …</div>';
@@ -937,9 +945,9 @@ function _crabPanelBuild() {
     var b = ev.target.closest ? ev.target.closest('[data-tune]') : null; if (!b) return;
     ev.preventDefault(); _crabTuneTo(Number(b.dataset.tune), b.dataset.mode); dec.classList.remove('open');
   });
-  dec.appendChild(db); dec.appendChild(pop); if (_crab.features.decoders !== false) r2.appendChild(dec);
+  dec.appendChild(db); dec.appendChild(pop); if (_crab.features.decoders !== false) { dec.classList.add('x1right'); r3.appendChild(dec); }
   setInterval(function () { if (dec.classList.contains('open')) _crabDecLoad(); }, 5000);
-  bar.appendChild(r1); bar.appendChild(r2);
+  bar.appendChild(r1); bar.appendChild(r2); bar.appendChild(r3);
   strip.parentNode.insertBefore(bar, strip);
   strip.classList.add('x1old');
   document.body.classList.add('x1panel');

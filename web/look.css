@@ -105,9 +105,13 @@ body.look-crab .foot .status { flex: 1; }
 /* ===== Bedienfeld neu (core.js _crabPanelBuild): zwei Zeilen, umbrechen statt überlappen ===== */
 body.x1panel .panel .strip.x1old { display: none; }
 body.x1panel .panel { padding: 8px 16px 6px; }
-.x1bar { display: flex; flex-direction: column; gap: 8px; }
+.x1bar { display: flex; flex-direction: column; gap: 6px; }
 .x1row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; min-width: 0; }
-.x1tools { gap: 6px 12px; }
+.x1tools { gap: 6px 16px; padding-top: 6px; border-top: 1px solid var(--line2); }
+.x1right { margin-left: auto; }
+.x1grp .agcrow .x1lbl { margin-right: 2px; }
+.x1bar .toggles { display: inline-flex; align-items: center; gap: 6px; }
+.x1bar .toggles .sqrow { margin-right: 4px; }
 .x1grp { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
 .x1sep { width: 1px; height: 18px; background: var(--line); flex: none; }
 .x1lbl { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
@@ -150,7 +154,9 @@ body.look-crab .x1bar .bwpresets .btn.active { border-color: var(--accent); }
 .x1bar .freqform { display: inline-flex; align-items: center; gap: 4px; margin: 0; }
 .x1bar .freqform input[name=frequency] { width: 104px; font-variant-numeric: tabular-nums; }
 .x1bar .freqform .unit { font-size: 10px; color: var(--faint); }
-.x1bar .presetsel { min-width: 0; width: 200px; max-width: 240px; border-radius: 4px 0 0 4px; }
+.x1bar .presetsel { min-width: 0; width: 180px; max-width: 220px; border-radius: 4px 0 0 4px; }
+.x1bar .presetrow .segsel { display: none; }   /* Bereich steht in der Leiste als eigene Gruppe */
+.x1range .segsel { width: 190px; }
 .x1bar .presetrow { gap: 0; }
 .x1bar .presetrow .btn { border-radius: 0 4px 4px 0; margin-left: -1px; }
 .x1bar label.snap { margin: 0; gap: 6px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
