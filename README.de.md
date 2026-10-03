@@ -35,7 +35,7 @@ Downloads: [Releases](https://github.com/do1xx/crabSDR/releases).
 Pi 2, `amd64`: PC):
 
 ```bash
-sudo apt install ./crabsdr_0.4.3_arm64.deb
+sudo apt install ./crabsdr_0.4.4_arm64.deb
 ```
 
 Danach `http://<rechner>:8080` öffnen. Die Admin-Seite liegt hinter der Krabbe unten rechts; das erste Passwort für
@@ -45,7 +45,7 @@ werden. Konfiguration: `/etc/crabsdr/config.toml` (oder auf der Admin-Seite). Up
 **Andere Linux-Systeme** – Release-Archiv:
 
 ```bash
-tar xzf crabsdr-0.4.3.tar.gz && cd crabsdr-0.4.3 && sudo ./install.sh
+tar xzf crabsdr-0.4.4.tar.gz && cd crabsdr-0.4.4 && sudo ./install.sh
 ```
 
 **Docker** – im Archiv liegt eine `docker-compose.yml`: `docker compose up -d`.

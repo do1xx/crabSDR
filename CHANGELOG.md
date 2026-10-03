@@ -2,7 +2,9 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## Unveröffentlicht
+## 0.4.4 – 2026-10-03
+
+Zoom mit echter Auflösung, Bereiche, Verbund-Chat, neue Bedienleiste.
 
 ### Oberfläche
 - Hörer ohne Namen heißen je Browser „Hörer-47“ statt alle „Hörer“ (Chat und Hörerliste); beim ersten Chatbeitrag steht
