@@ -459,11 +459,11 @@ impl DspThread {
                     for v in &views { if let Some(s) = v.waterfall { if s.zoom as u32 > srv_max { wanted.insert(s); } } }
                     zooms.retain(|s, _| wanted.contains(s));
                     for s in wanted {
-                        if !zooms.contains_key(&s) {
+                        if let std::collections::hash_map::Entry::Vacant(e) = zooms.entry(s) {
                             let w = nb >> s.zoom;                                   // Breite des Ausschnitts in Bins
                             let mid_bin = s.start_bin as i64 + (w / 2) as i64;
                             let f_mid = (center as i64 + ((mid_bin - (nb / 2) as i64) as f64 * bin_hz as f64).round() as i64).max(0) as u64;
-                            if let Some(z) = ZoomSpectrum::new(&channelizer, center, f_mid, w as f32 * bin_hz) { zooms.insert(s, z); }
+                            if let Some(z) = ZoomSpectrum::new(&channelizer, center, f_mid, w as f32 * bin_hz) { e.insert(z); }
                         }
                         if let Some(z) = zooms.get_mut(&s) { z.push(&channelizer, &out.fft_blocks); }
                     }
