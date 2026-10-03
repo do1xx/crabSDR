@@ -62,8 +62,9 @@ body.look-crab .recbox { margin-top: 2px; }
 body.look-crab .recbtn { border-color: transparent; color: var(--faint); }
 body.look-crab .recbtn:hover, body.look-crab .recbtn.on { color: var(--bad); border-color: var(--bad); }
 body.look-crab .wfbtns .btn { min-width: 30px; }
-.segsel { font-size: 12px; max-width: 220px; }
+.segsel { font-size: 12px; max-width: 200px; }
 .x1bar .segsel { height: 26px; }
+.presetrow .segsel { margin-left: 4px; }
 body.look-crab .viewsel .toggle span { border-color: transparent; padding-left: 0; }
 body.look-crab .viewsel .toggle input:checked + span { border-color: transparent; }
 body.look-crab .viewsel .toggle span::before { content: "○ "; color: var(--faint); }

@@ -103,7 +103,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
         <button class="btn adv" type="button" onclick="freqStep(3)" title="großer Schritt hoch">+++</button>
         <button class="btn btn-ghost sharebtn" id="linkbtn" type="button" title="Link zu dieser Frequenz teilen">🔗 <span data-de="Teilen" data-en="Share">Teilen</span></button>
       </div>
-      <div class="presetrow"><select id="presets" class="presetsel" aria-label="Schnellwahl"></select><button class="btn" type="button" id="flistbtn" title="Relais und Frequenzen, die hier zu hören sind" data-de="Liste" data-en="List">Liste</button></div>
+      <div class="presetrow"><select id="presets" class="presetsel" aria-label="Schnellwahl"></select><button class="btn" type="button" id="flistbtn" title="Relais und Frequenzen, die hier zu hören sind" data-de="Liste" data-en="List">Liste</button><select id="segsel" class="segsel" title="Bereich des Bandplans: Frequenz, Betriebsart und Ausschnitt einstellen"></select></div>
       <div class="vfo adv">
         <button class="btn" type="button" id="vfoab" title="VFO A/B tauschen">A/B</button>
         <button class="btn" type="button" id="vfoaeqb" title="B = aktuelle Einstellung">A=B</button>
@@ -183,7 +183,6 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
         <button class="btn" type="button" onclick="setZoom(0)" title="Zoom rein">+</button>
         <button class="btn" type="button" onclick="setZoom(4)" data-de="ganzes Band" data-en="whole band">ganzes Band</button>
         <button class="btn adv" type="button" onclick="setZoom(2)" data-de="max. Zoom" data-en="max zoom">max. Zoom</button>
-        <select id="segsel" class="segsel" title="Bereich des Bandplans: Wasserfall auf diesen Ausschnitt zoomen"></select>
       </div>
       <div class="viewsel">
         <label class="toggle"><input id="allbandschk" type="checkbox"><span data-de="Alle Bänder zeigen" data-en="Show all bands">Alle Bänder zeigen</span></label>
@@ -293,7 +292,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </div>
 </div>
 
-<script src="ui.js?v=67"></script>
+<script src="ui.js?v=68"></script>
 <script src="account.js?v=1"></script>
 </body>
 </html>

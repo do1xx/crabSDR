@@ -8,7 +8,7 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 - Wasserfall-Zoom mit echter Auflösung: jenseits von 1 Bin je Pixel rechnet der Server für den Ausschnitt ein eigenes
   Zoom-Spektrum (2048er-FFT auf dem ausgeschnittenen Bereich). Bei 64 kHz Breite sind das 62 Hz je Bin statt 500 Hz,
   ein SSB-Signal ist als Band erkennbar statt als fünf Blöcke.
-- Auswahl „Bereich“ bei den Zoom-Knöpfen: Wasserfall auf einen Abschnitt des IARU-Bandplans zoomen (CW, SSB, Baken,
+- Auswahl „Bereich“ neben der Schnellwahl: Wasserfall auf einen Abschnitt des IARU-Bandplans zoomen (CW, SSB, Baken,
   FM-Simplex, Relaisausgaben …), passende Betriebsart wird gesetzt. Eigene Liste je Station über `segments.json`.
 
 ## 0.4.3 – 2026-10-03
