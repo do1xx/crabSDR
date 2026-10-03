@@ -136,7 +136,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
         <label class="toggle"><input id="squelchcheckbox" type="checkbox" onclick="setSquelch(this.checked)"><span>Squelch</span></label>
         <span id="squelchcontrol" class="volrow sqrow" title="Rauschsperre: öffnet, wenn das Signal so viele dB über dem Rauschen liegt"><input type="range" id="squelchlevel" min="0" max="30" step="1" value="6"
           oninput="setSquelchLevel(this.value)" onchange="setSquelchLevel(this.value)"><span id="squelchdb">6 dB</span></span>
-        <span id="agccontrol" class="volrow agcrow" title="Regelung: wie schnell die Lautstärke bei AM/SSB/CW nachgeführt wird"><span class="x1lbl">AGC</span><select id="agcsel" onchange="setAgc(this.value)"><option value="fast" data-de="schnell" data-en="fast">schnell</option><option value="medium" selected data-de="mittel" data-en="medium">mittel</option><option value="slow" data-de="langsam" data-en="slow">langsam</option></select></span>
+        <span id="agccontrol" class="volrow agcrow" title="Regelung: wie schnell die Lautstärke bei AM/SSB/CW nachgeführt wird"><span class="x1lbl">AGC</span><select id="agcsel" onchange="setAgc(this.value); this.blur()"><option value="fast" data-de="schnell" data-en="fast">schnell</option><option value="medium" selected data-de="mittel" data-en="medium">mittel</option><option value="slow" data-de="langsam" data-en="slow">langsam</option></select></span>
         <label class="toggle"><input id="mutecheckbox" type="checkbox" onclick="setMute(this.checked)"><span data-de="Stumm" data-en="Mute">Stumm</span></label>
       </div>
     </div>
@@ -292,7 +292,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </div>
 </div>
 
-<script src="ui.js?v=68"></script>
+<script src="ui.js?v=69"></script>
 <script src="account.js?v=1"></script>
 </body>
 </html>

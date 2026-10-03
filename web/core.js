@@ -486,6 +486,7 @@ var crabAudio = {
 };
 function setMute(on) { var A = _crab.audio; A.muted = (on === undefined) ? !A.muted : !!on; if (A.gain) A.gain.gain.value = A.muted ? 0 : A.volume; var c = document.getElementById('mutecheckbox'); if (c) c.checked = A.muted; }
 /* Regelung AM/SSB/CW: schnell/mittel/langsam (Server set_agc); bleibt im Browser gespeichert; bei FM ohne Wirkung */
+/* Auswahlfelder geben nach der Wahl den Fokus frei (sonst schlucken sie die Pfeiltasten) */
 function setAgc(v) {
   v = (v === 'fast' || v === 'slow') ? v : 'medium'; _crab.agcMode = v;
   try { localStorage.setItem('crab_agc', v); } catch (e) {}

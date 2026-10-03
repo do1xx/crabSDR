@@ -523,6 +523,7 @@
       g.appendChild(o);
     }
     box.onchange = function () {
+      this.blur();   // Fokus freigeben, sonst schluckt das Auswahlfeld die Pfeiltasten
       var o = this.options[this.selectedIndex];
       if (o && o.value !== '') tunePreset(presets[Number(o.value)], Number(o.dataset.idx));
       this.selectedIndex = 0;
@@ -925,14 +926,14 @@
     // Raster
     var sel = $('snapsel'); sel.value = String(snap);
     if (sel.value !== String(snap)) { sel.value = '12.5'; snap = 12.5; }
-    sel.onchange = function () { snap = Number(this.value); snapUser = snap; try { localStorage.setItem('crab_snap', String(snap)); } catch (e) {} if (snap > 0) setFreq(freq); };
+    sel.onchange = function () { snap = Number(this.value); snapUser = snap; try { localStorage.setItem('crab_snap', String(snap)); } catch (e) {} if (snap > 0) setFreq(freq); this.blur(); };
     loadUi(); initName(); initAdvanced(); loadMarkers(); initPwa(); initChat();
     $('linkbtn').onclick = copyLink;
     // Bereiche: eigene segments.json der Station, sonst der eingebaute Bandplan
     (function () { var sx = new XMLHttpRequest(); sx.open('GET', 'segments.json?' + Date.now());
       sx.onload = function () { if (sx.status === 200) { try { var j = JSON.parse(sx.responseText); if (Array.isArray(j) && j.length) segments = j; } catch (e) {} } buildSegments(); };
       sx.onerror = function () { buildSegments(); }; sx.send(); })();
-    $('segsel').onchange = function () { var list = bandSegments(band), s = list[Number(this.value)]; this.value = ''; if (s) zoomSegment(s); };
+    $('segsel').onchange = function () { var list = bandSegments(band), s = list[Number(this.value)]; this.value = ''; this.blur(); if (s) zoomSegment(s); };
     // Startwerte: FM-Bandbreite 12 kHz statt 16 kHz; auf dem Handy höherer Wasserfall (wird auf Bildschirmbreite skaliert)
     setTimeout(function () {
       try { if (typeof mode !== 'undefined' && mode === 'FM' && Math.abs((hi - lo) - 16) < 0.01) setMode('fm', -6, 6); } catch (e) {}
