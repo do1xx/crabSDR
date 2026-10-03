@@ -71,6 +71,8 @@ pub struct ClientState {
     pub agc_mode: AgcMode,
     pub squelch: Squelch,
     pub name: String,
+    /// Sitzungskennung des Browsers (alle Band-Verbindungen einer Person tragen dieselbe)
+    pub session: String,
     pub waterfall: Option<WaterfallSub>,
     /// zählt jede Wasserfall-Anmeldung, damit der DSP-Thread danach eine Absolut-Zeile schickt
     pub wf_seq: u32,
@@ -123,6 +125,7 @@ impl ClientManager {
                 agc_mode: AgcMode::Medium,
                 squelch: Squelch::default(),
                 name: String::new(),
+                session: String::new(),
                 waterfall: None,
                 wf_seq: 0,
                 wf_hist_rows: 0,
@@ -185,6 +188,9 @@ impl ClientManager {
         if let Some(c) = self.clients.get_mut(&id) { c.squelch = squelch; }
     }
 
+    pub fn set_session(&mut self, id: u64, sid: &str) {
+        if let Some(c) = self.clients.get_mut(&id) { c.session = sid.chars().filter(|ch| ch.is_ascii_alphanumeric()).take(32).collect(); }
+    }
     pub fn set_name(&mut self, id: u64, name: &str) {
         if let Some(c) = self.clients.get_mut(&id) {
             c.name = name.chars().filter(|ch| !ch.is_control()).take(32).collect();
@@ -235,7 +241,7 @@ impl ClientManager {
             .clients
             .iter()
             .filter(|(&id, _)| id < PLUGIN_CLIENT_BASE)
-            .map(|(&id, c)| json!({"id": id, "name": c.name, "band": band, "freq": c.tune_freq, "mode": c.mode.as_str()}))
+            .map(|(&id, c)| json!({"id": id, "name": c.name, "band": band, "freq": c.tune_freq, "mode": c.mode.as_str(), "session": c.session}))
             .collect();
         v.sort_by_key(|e| e["id"].as_u64().unwrap_or(0));
         v

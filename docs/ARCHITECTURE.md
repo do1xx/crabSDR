@@ -65,7 +65,7 @@ Befehle vom Browser: `tune` (Frequenz, Modus, Bandbreite), `untune`, `set_squelc
 | `/`, `/digi/`, `/logbuch/`, `/info/` | Oberfläche (`web/`, Stationsordner hat Vorrang) |
 | `/bandinfo.js`, `/ui.json` | Bänder und Einstellungen für die Oberfläche |
 | `/api/health` | Zustand, Version, Laufzeit |
-| `/api/bands`, `/api/listeners` | Bänder, Hörer |
+| `/api/bands`, `/api/listeners` | Bänder, Hörer (`n` Personen, `n_audio` hören gerade, `connections` Verbindungen) |
 | `/api/decoders`, `/api/decoders/events?since=&wait=1` | Decoder-Zustand, Meldungen (Langabfrage) |
 | `/digi/aprs.json`, `ft8.json`, `sstv.json`, `relais.json` | Übersichten der Decoder |
 | `/logbuch/api/chat`, `/logbuch/api/log`, `/logbuch/api/online` | Chat, Logbuch, Hörer online |

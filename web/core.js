@@ -40,6 +40,12 @@ function createCookie(name, value, days) {
 }
 /* Platzhalter je Browser, wenn kein Name gesetzt ist: „Hörer-47“ statt überall nur „Hörer“ – so bleiben Hörer in
    Chat und Hörerliste unterscheidbar; die Nummer merkt sich der Browser (localStorage) */
+/* Sitzungskennung je Browser (zufällig, nur lokal gespeichert): der Server zählt damit Personen statt Verbindungen */
+function _crabSessionId() {
+  var s = null; try { s = localStorage.getItem('crab_sid'); } catch (e) {}
+  if (!s) { s = ''; for (var i = 0; i < 16; i++) s += 'abcdefghijklmnopqrstuvwxyz0123456789'[Math.floor(Math.random() * 36)]; try { localStorage.setItem('crab_sid', s); } catch (e) {} }
+  return s;
+}
 function _crabGuestName() {
   var g = null; try { g = localStorage.getItem('crab_guest'); } catch (e) {}
   if (!g) { g = 'Hörer-' + (10 + Math.floor(Math.random() * 90)); try { localStorage.setItem('crab_guest', g); } catch (e) {} }
@@ -713,6 +719,7 @@ function _crabConnect(b) {
     var ws = new WebSocket(_crab.wsBase + 'ws/' + encodeURIComponent(bi[b].name) + '?token=' + encodeURIComponent(tok));
     ws.binaryType = 'arraybuffer'; B.ws = ws;
     ws.onopen = function () {
+    ws.send(JSON.stringify({ type: 'session', id: _crabSessionId() }));   // eine Person = eine Kennung über alle Bänder
       B.retry = 0;
       ws.send(JSON.stringify({ type: 'set_codec', audio: _crab.audio.pcm ? 'raw' : 'opus' }));
       var nm = (document.usernameform && document.usernameform.username.value || '').trim() || _crabGuestName(); ws.send(JSON.stringify({ type: 'set_name', name: nm }));

@@ -456,6 +456,12 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
             let mut clients = pipeline.clients.lock().await;
             clients.set_name(client_id, name);
         }
+        "session" => {
+            // Sitzungskennung des Browsers: mehrere Band-Verbindungen derselben Person zählen als ein Hörer
+            let sid = msg.get("id").and_then(|v| v.as_str()).unwrap_or("");
+            let mut clients = pipeline.clients.lock().await;
+            clients.set_session(client_id, sid);
+        }
         "set_waterfall" => {
             // {"type":"set_waterfall","full":true}  (altes Vollspektrum)  oder
             // {"type":"set_waterfall","zoom":0,"start_bin":0}  (1024-px-Zeile, Zoomstufe 0..2)  oder {"off":true}
@@ -655,14 +661,31 @@ async fn ui_json(State(state): State<Arc<AppState>>) -> impl IntoResponse {
 }
 
 /// Hörerliste über alle Bänder (Ersatz für ~~othersjj der alten Oberfläche).
+/// Hörer = Personen: Verbindungen mit derselben Sitzungskennung (eine Person, mehrere Bänder offen) werden zu einem
+/// Eintrag zusammengefasst; steht eine davon auf einer Frequenz, zählt diese. `n` = Personen, `n_audio` = Personen,
+/// die gerade hören (Frequenz eingestellt), `connections` = rohe Verbindungen.
 async fn api_listeners(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
     let manager = state.manager.read().await;
-    let mut list = Vec::new();
+    let mut raw = Vec::new();
     for (id, pipeline) in manager.all() {
         let clients = pipeline.clients.lock().await;
-        list.extend(clients.listeners_json(id));
+        raw.extend(clients.listeners_json(id));
     }
-    Json(json!({"listeners": list, "n": list.len()}))
+    let connections = raw.len();
+    let mut order: Vec<String> = Vec::new();
+    let mut by: std::collections::HashMap<String, serde_json::Value> = std::collections::HashMap::new();
+    for e in raw {
+        let sid = e["session"].as_str().unwrap_or("").to_string();
+        let key = if sid.is_empty() { format!("c{}", e["id"]) } else { sid };
+        match by.get(&key) {
+            Some(cur) if cur["freq"].is_null() || e["freq"].is_null() => { if cur["freq"].is_null() && !e["freq"].is_null() { by.insert(key, e); } }
+            Some(_) => {}   // schon ein hörender Eintrag dieser Person
+            None => { order.push(key.clone()); by.insert(key, e); }
+        }
+    }
+    let list: Vec<serde_json::Value> = order.iter().filter_map(|k| by.get(k).cloned()).map(|mut e| { if let Some(o) = e.as_object_mut() { o.remove("session"); } e }).collect();
+    let n_audio = list.iter().filter(|e| !e["freq"].is_null()).count();
+    Json(json!({"listeners": list, "n": list.len(), "n_audio": n_audio, "connections": connections}))
 }
 
 async fn api_health(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {

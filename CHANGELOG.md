@@ -6,6 +6,8 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 
 ### Oberfläche
 - Bereich: Eintrag „ganzes Band“ führt zurück zur vollen Breite.
+- Hörerzahl zählt Personen statt Verbindungen: öffnet jemand mehrere Bänder, ist das ein Hörer. `/api/listeners` fasst
+  je Sitzung zusammen und liefert zusätzlich `n_audio` (hören gerade) und `connections`.
 
 ## 0.4.4 – 2026-10-03
 
