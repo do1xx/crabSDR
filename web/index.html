@@ -28,7 +28,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </script>
 <script>(function(){var t=null;try{t=localStorage.getItem('crab_token')}catch(e){}document.write('<script src="bandinfo.js?_=' + Date.now() + (t ? '&token=' + encodeURIComponent(t) : '') + '"><\/script>');})();</script>
 <script>window.STATION_NAME = '{{STATION_NAME_JS}}';</script>
-<script src="core.js?v=74"></script>
+<script src="core.js?v=75"></script>
 </head>
 <body class="hoeren">
 
@@ -255,7 +255,8 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
   <div class="keyhelp-box" role="dialog" aria-label="Tastatur">
     <b data-de="Tastatur" data-en="Keyboard">Tastatur</b>
     <dl>
-      <dt>← →</dt><dd data-de="abstimmen (mit Umschalt: größere Schritte)" data-en="tune (shift: bigger steps)">abstimmen (mit Umschalt: größere Schritte)</dd>
+      <dt>← →</dt><dd data-de="fein abstimmen: SSB/CW 100 Hz, FM/AM 1 kHz (Umschalt ×5, Strg ×25)" data-en="fine tune: SSB/CW 100 Hz, FM/AM 1 kHz (shift ×5, ctrl ×25)">fein abstimmen: SSB/CW 100 Hz, FM/AM 1 kHz (Umschalt ×5, Strg ×25)</dd>
+      <dt>↑ ↓</dt><dd data-de="auf den nächsten vollen kHz (mit Umschalt: 10 kHz)" data-en="to the next full kHz (shift: 10 kHz)">auf den nächsten vollen kHz (mit Umschalt: 10 kHz)</dd>
       <dt>1 … 5</dt><dd data-de="Band wählen" data-en="select band">Band wählen</dd>
       <dt>B</dt><dd data-de="nächstes Band" data-en="next band">nächstes Band</dd>
       <dt>F A U L C</dt><dd data-de="FM · AM · USB · LSB · CW" data-en="FM · AM · USB · LSB · CW">FM · AM · USB · LSB · CW</dd>
@@ -292,7 +293,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </div>
 </div>
 
-<script src="ui.js?v=63"></script>
+<script src="ui.js?v=64"></script>
 <script src="account.js?v=1"></script>
 </body>
 </html>

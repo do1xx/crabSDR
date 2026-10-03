@@ -98,9 +98,16 @@ function setFreqMark(b, f, m) {   // Marker-Klick: Band, Betriebsart, Frequenz
   var md = String(m || 'fm').toLowerCase(), ff = _crabMODEFILTER[md] || _crabMODEFILTER.fm;
   setMode(md, ff[0], ff[1]); setFreq(Number(f) - (isCw() ? (hi + lo) / 2 : 0));
 }
+/* ← →: feiner Schritt – SSB/CW 100 Hz, FM/AM 1 kHz; Umschalt ×5, Strg/Alt ×25 */
 function freqStep(st) {
-  var n = Math.abs(st) === 1 ? 1 : Math.abs(st) === 2 ? 5 : 25;
-  setFreq(freq + (st > 0 ? n : -n));
+  var fine = (mode === 'USB' || mode === 'LSB' || mode === 'CW') ? 0.1 : 1;
+  var n = fine * (Math.abs(st) === 1 ? 1 : Math.abs(st) === 2 ? 5 : 25);
+  setFreq(Math.round((freq + (st > 0 ? n : -n)) * 1000) / 1000);
+}
+/* ↑ ↓: auf den nächsten vollen Schritt springen (1 kHz; mit Umschalt 10 kHz), z. B. 144 802,0 → 144 803,0 bzw. 144 810,0 */
+function freqSnap(dir, stepKhz) {
+  var k = stepKhz || 1, cur = freq / k, next = dir > 0 ? Math.floor(cur + 1e-6) + 1 : Math.ceil(cur - 1e-6) - 1;
+  setFreq(Math.round(next * k * 1000) / 1000);
 }
 function setMode(m, l, h) {
   mode = String(m).toUpperCase(); lo = Number(l); hi = Number(h);

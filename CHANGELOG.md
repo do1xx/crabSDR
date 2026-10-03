@@ -2,6 +2,11 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Oberfläche
+- Tastatur: ← → fein (SSB/CW 100 Hz, FM/AM 1 kHz), ↑ ↓ auf den nächsten vollen kHz, mit Umschalt 10 kHz; Belegung auf der Info-Seite.
+
 ## 0.4.2 – 2026-10-03
 
 SSB klingt wieder natürlich; Aufnahme, AGC-Wahl, Teilen-Link.
