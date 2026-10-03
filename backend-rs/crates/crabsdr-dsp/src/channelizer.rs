@@ -229,6 +229,66 @@ impl Channelizer {
     pub fn bin_hz(&self) -> f32 { self.bin_hz }
 }
 
+/// Zoom-Spektrum für einen gezoomten Wasserfall-Ausschnitt: Der Ausschnitt wird wie ein Kanal ausgeschnitten und darauf
+/// eine eigene 2048er-FFT gerechnet. Die Auflösung steigt so mit jeder Zoomstufe (statt Bins nur zu strecken).
+pub struct ZoomSpectrum {
+    plan: ChannelPlan,
+    ring: std::collections::VecDeque<Complex32>,
+    fft: Arc<dyn Fft<f32>>,
+    window: Vec<f32>,
+    window_norm: f32,
+    scratch: Vec<Complex32>,
+    n: usize,
+    /// Breite des Ausschnitts in Hz (liegt im flachen Teil des Kanalfilters, Kanal ist 1,3× breiter)
+    span_hz: f32,
+    /// feinere Bins → weniger Rauschleistung je Bin; Ausgleich, damit der Rauschboden zum Gesamtspektrum passt
+    offset_db: f32,
+    ema: Option<Vec<f32>>,
+}
+
+impl ZoomSpectrum {
+    pub const N: usize = 2048;
+    /// `span_center_hz`: Mitte des Ausschnitts (absolut), `span_hz`: Breite
+    pub fn new(chz: &Channelizer, center_freq: u64, span_center_hz: u64, span_hz: f32) -> Option<Self> {
+        let plan = chz.plan_channel(center_freq, span_center_hz, (span_hz * 1.3).ceil() as u32)?;
+        let n = Self::N;
+        let mut planner = FftPlanner::new();
+        let fft = planner.plan_fft_forward(n);
+        let window: Vec<f32> = (0..n).map(|i| { let x = std::f32::consts::PI * 2.0 * i as f32 / (n - 1) as f32; 0.42 - 0.5 * x.cos() + 0.08 * (2.0 * x).cos() }).collect();
+        let window_norm = 1.0 / window.iter().sum::<f32>();
+        let scratch = vec![Complex32::new(0.0, 0.0); fft.get_inplace_scratch_len()];
+        let offset_db = 10.0 * (chz.bin_hz / (plan.channel_rate / n as f32)).log10();
+        Some(Self { plan, ring: std::collections::VecDeque::with_capacity(2 * n), fft, window, window_norm, scratch, n, span_hz, offset_db, ema: None })
+    }
+    /// Kanal-Samples des Rahmens übernehmen (jeden Rahmen aufrufen, sonst reißt die Phase des Ausschnitts)
+    pub fn push(&mut self, chz: &Channelizer, fft_blocks: &[Vec<Complex32>]) {
+        let iq = chz.extract_with_plan(&mut self.plan, fft_blocks);
+        self.ring.extend(iq);
+        while self.ring.len() > self.n { self.ring.pop_front(); }
+    }
+    /// Spektrum des Ausschnitts in dB, `px` Werte von links nach rechts über `span_hz`; None, solange der Puffer füllt
+    pub fn line(&mut self, px: usize) -> Option<Vec<f32>> {
+        if self.ring.len() < self.n { return None; }
+        let n = self.n;
+        let mut buf: Vec<Complex32> = self.ring.iter().zip(&self.window).map(|(s, w)| s * w).collect();
+        self.fft.process_with_scratch(&mut buf, &mut self.scratch);
+        let pw: Vec<f32> = (0..n).map(|i| { let v = buf[(i + n / 2) % n].norm() * self.window_norm; 10.0 * (v * v + 1e-20).log10() + self.offset_db }).collect();
+        match &mut self.ema {
+            Some(e) => for (a, &d) in e.iter_mut().zip(&pw) { *a = 0.25 * d + 0.75 * *a; },
+            None => self.ema = Some(pw),
+        }
+        let e = self.ema.as_ref()?;
+        let bin = self.plan.channel_rate / n as f32;
+        Some((0..px).map(|p| {
+            let f0 = -self.span_hz / 2.0 + self.span_hz * p as f32 / px as f32;
+            let f1 = f0 + self.span_hz / px as f32;
+            let b0 = ((f0 / bin + n as f32 / 2.0).floor().max(0.0) as usize).min(n - 1);
+            let b1 = ((f1 / bin + n as f32 / 2.0).ceil() as usize).clamp(b0 + 1, n);
+            e[b0..b1].iter().cloned().fold(f32::MIN, f32::max)
+        }).collect())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -357,4 +417,25 @@ mod tests {
         }
     }
 
+    /// Zoom-Spektrum: ein Träger bei +40 kHz liegt in einem 128-kHz-Ausschnitt um +32 kHz bei Pixel (40−32+64)/128·1024 = 576
+    #[test]
+    fn zoom_spektrum_findet_traeger() {
+        let (fft_size, rate) = (4096usize, 2_048_000u32);
+        let mut chz = Channelizer::new(fft_size, rate);
+        let center = 145_000_000u64;
+        let mut z = ZoomSpectrum::new(&chz, center, center + 32_000, 128_000.0).unwrap();
+        let frame = (rate / 50) as usize;
+        let mut t = 0usize;
+        for _ in 0..40 {
+            let data: Vec<Complex32> = (0..frame).map(|i| { let ph = 2.0 * std::f32::consts::PI * 40_000.0 * (t + i) as f32 / rate as f32; Complex32::new(ph.cos(), ph.sin()) * 0.3 }).collect();
+            t += frame;
+            let out = chz.process(&data);
+            z.push(&chz, &out.fft_blocks);
+        }
+        let line = z.line(1024).expect("Puffer voll");
+        let (imax, _) = line.iter().enumerate().fold((0, f32::MIN), |m, (i, &v)| if v > m.1 { (i, v) } else { m });
+        assert!((imax as i32 - 576).abs() <= 2, "Träger bei Pixel {} statt 576", imax);
+        let floor = { let mut v = line.clone(); v.sort_by(|a, b| a.partial_cmp(b).unwrap()); v[v.len() / 2] };
+        assert!(line[imax] - floor > 40.0, "zu wenig Abstand zum Boden: {} dB", line[imax] - floor);
+    }
 }

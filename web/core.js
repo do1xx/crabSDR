@@ -128,11 +128,12 @@ function id2band(i) { return Number(view) === Views.allbands ? _crab.sel[i] : ba
 function band2id(b) { return Number(view) === Views.allbands ? _crab.sel.indexOf(b) : (b === band ? 0 : -1); }
 function freq2x(fabs, b) { var e = bi[b]; return (fabs - (e.effcenterfreq - e.effsamplerate / 2)) / (e.effsamplerate / 1024); }
 /* Zoom je Band: die FFT-Größe hängt von der Abtastrate ab (4096 bei 2 MS/s, 16384 bei 8 MS/s). Der Server liefert
-   1024 Pixel und zoomt, bis ein Pixel ein Bin ist; danach streckt der Browser noch fünf Stufen (bis ×32). */
-function _crabSrvMax(e) { return Math.max(0, Math.round(Math.log2((e.fft || _crab.fft) / _crab.px))); }
-function _crabMaxZoom(e) { return _crabSrvMax(e) + 5; }
-function _crabBpp(zoom, e) { return Math.max(1, ((e.fft || _crab.fft) / _crab.px) >> Math.min(zoom, _crabSrvMax(e))); }
-function _crabScale(zoom, e) { return 1 << Math.max(0, zoom - _crabSrvMax(e)); }   // Pixel-Streckung über die Server-Stufen hinaus
+   immer 1024 Pixel: bis ein Pixel ein Bin ist aus dem Gesamtspektrum, darüber (fünf weitere Stufen) aus einem eigenen
+   Zoom-Spektrum des Ausschnitts – die Auflösung steigt mit jeder Stufe, der Browser streckt nichts mehr. */
+function _crabSrvMax(e) { return _crabMaxZoom(e); }
+function _crabMaxZoom(e) { return Math.max(0, Math.round(Math.log2((e.fft || _crab.fft) / _crab.px))) + 5; }
+function _crabBpp(zoom, e) { return ((e.fft || _crab.fft) / _crab.px) / Math.pow(2, zoom); }   // Bins je Pixel, < 1 im Zoom-Spektrum
+function _crabScale() { return 1; }
 function _crabGeom(b) {
   var e = bi[b], bpp = _crabBpp(e.zoom, e), sc = _crabScale(e.zoom, e), binkhz = e.samplerate / e.fft;
   e.effsamplerate = 1024 * bpp * binkhz / sc;

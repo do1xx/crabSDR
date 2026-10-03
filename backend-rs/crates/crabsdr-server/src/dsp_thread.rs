@@ -6,7 +6,7 @@
 
 use crate::client::{ChannelKey, ClientManager, ClientView, SquelchMode, WaterfallSub, PLUGIN_CLIENT_BASE};
 use crabsdr_core::{protocol, DemodMode, IqBuffer};
-use crabsdr_dsp::channelizer::{ChannelPlan, Channelizer};
+use crabsdr_dsp::channelizer::{ChannelPlan, Channelizer, ZoomSpectrum};
 use crabsdr_dsp::demod::Demodulator;
 use crabsdr_dsp::resample::Resampler;
 use num_complex::Complex32;
@@ -218,8 +218,6 @@ fn build_hist(hist: &std::collections::VecDeque<Vec<u8>>, sub: WaterfallSub, row
     if n == 0 { return Vec::new(); }
     let first = hist.len() - n * slow;
     let nbins = hist[0].len();
-    let bpp = ((nbins / WF_PX) >> sub.zoom).max(1);
-    let start = sub.start_bin as usize;
     let mut out = Vec::with_capacity(n);
     let mut acc = vec![0u32; WF_PX];
     for r in 0..n {
@@ -227,9 +225,7 @@ fn build_hist(hist: &std::collections::VecDeque<Vec<u8>>, sub: WaterfallSub, row
         for k in 0..slow {
             let line = &hist[first + r * slow + k];
             for (px, a) in acc.iter_mut().enumerate().take(WF_PX) {
-                let b0 = start + px * bpp;
-                if b0 >= nbins { continue; }
-                let b1 = (b0 + bpp).min(nbins);
+                let Some((b0, b1)) = px_bins(nbins, sub, px) else { continue };
                 *a += *line[b0..b1].iter().max().unwrap_or(&0) as u32;
             }
         }
@@ -275,19 +271,26 @@ fn render_hist_jpeg(lines: &[Vec<u8>], mode: u8) -> Option<Vec<u8>> {
 }
 
 /// Eine Wasserfall-Zeile aus dem (fftshift-)Spektrum: je Pixel das Maximum seiner Bins.
+/// Bins eines Pixels im Gesamtspektrum: bis Stufe srv_max mehrere Bins je Pixel, darüber mehrere Pixel je Bin
+fn px_bins(n: usize, sub: WaterfallSub, px: usize) -> Option<(usize, usize)> {
+    let srv_max = (n / WF_PX).max(1).ilog2();
+    let start = sub.start_bin as usize;
+    let (b0, b1) = if sub.zoom as u32 <= srv_max {
+        let bpp = (n / WF_PX) >> sub.zoom;
+        (start + px * bpp, start + px * bpp + bpp)
+    } else {
+        let ppb = 1usize << (sub.zoom as u32 - srv_max);
+        (start + px / ppb, start + px / ppb + 1)
+    };
+    if b0 >= n { None } else { Some((b0, b1.min(n))) }
+}
+
 fn build_line(spec: &[f32], sub: WaterfallSub) -> Vec<u8> {
     let n = spec.len();
-    let bpp = ((n / WF_PX) >> sub.zoom).max(1);
-    let start = sub.start_bin as usize;
     (0..WF_PX)
-        .map(|px| {
-            let b0 = start + px * bpp;
-            if b0 >= n {
-                0
-            } else {
-                let b1 = (b0 + bpp).min(n);
-                quantize_db(spec[b0..b1].iter().cloned().fold(f32::MIN, f32::max))
-            }
+        .map(|px| match px_bins(n, sub, px) {
+            Some((b0, b1)) => quantize_db(spec[b0..b1].iter().cloned().fold(f32::MIN, f32::max)),
+            None => 0,
         })
         .collect()
 }
@@ -319,6 +322,7 @@ impl DspThread {
         let mut channels: HashMap<ChannelKey, Channel> = HashMap::new();
         let mut client_rt: HashMap<u64, ClientRt> = HashMap::new();
         let mut wf: HashMap<WaterfallSub, WfState> = HashMap::new();
+        let mut zooms: HashMap<WaterfallSub, ZoomSpectrum> = HashMap::new();   // Zoom-Spektren je Ausschnitt jenseits der Bin-Grenze
         let mut wf_hist: std::collections::VecDeque<Vec<u8>> = std::collections::VecDeque::with_capacity(WF_HIST_LINES + 1);
         let mut spec_ema: Option<Vec<f32>> = None;
         let mut cpu_prev: Option<(std::time::Instant, f64)> = None;
@@ -447,6 +451,24 @@ impl DspThread {
                     }
                 }
 
+                // === Zoom-Spektren: Ausschnitte jenseits der Bin-Grenze (1 Pixel = 1 Bin) bekommen eine eigene FFT ===
+                {
+                    let nb = spec.len();
+                    let srv_max = (nb / WF_PX).max(1).ilog2();
+                    let mut wanted: HashSet<WaterfallSub> = HashSet::new();
+                    for v in &views { if let Some(s) = v.waterfall { if s.zoom as u32 > srv_max { wanted.insert(s); } } }
+                    zooms.retain(|s, _| wanted.contains(s));
+                    for s in wanted {
+                        if !zooms.contains_key(&s) {
+                            let w = nb >> s.zoom;                                   // Breite des Ausschnitts in Bins
+                            let mid_bin = s.start_bin as i64 + (w / 2) as i64;
+                            let f_mid = (center as i64 + ((mid_bin - (nb / 2) as i64) as f64 * bin_hz as f64).round() as i64).max(0) as u64;
+                            if let Some(z) = ZoomSpectrum::new(&channelizer, center, f_mid, w as f32 * bin_hz) { zooms.insert(s, z); }
+                        }
+                        if let Some(z) = zooms.get_mut(&s) { z.push(&channelizer, &out.fft_blocks); }
+                    }
+                }
+
                 // === Wasserfall-Zeilen je Zoom-Ausschnitt (einmal rechnen, an alle Abonnenten) ===
                 if frame.is_multiple_of(wf_every) {
                     // Verlauf immer mitschreiben (auch ohne Hörer), damit neue Hörer sofort einen vollen Wasserfall bekommen
@@ -457,7 +479,8 @@ impl DspThread {
                     wf.retain(|s, _| by_sub.contains_key(s));
                     for (sub, vs) in &by_sub {
                         let st = wf.entry(*sub).or_insert(WfState { prev: None, subs: HashSet::new(), lines: 0 });
-                        let line = build_line(spec, *sub);
+                        // Zoom-Spektrum, sobald sein Puffer voll ist; davor (und im Verlauf) das gestreckte Gesamtspektrum
+                        let line = zooms.get_mut(sub).and_then(|z| z.line(WF_PX)).map(|v| v.iter().map(|&d| quantize_db(d)).collect::<Vec<u8>>()).unwrap_or_else(|| build_line(spec, *sub));
                         let newcomer = vs.iter().any(|v| !st.subs.contains(&(v.id, v.wf_seq)));
                         // Neuankömmlinge (neu, Zoom- oder Bandwechsel) bekommen zuerst den Verlauf ihres Ausschnitts
                         for v in vs.iter().filter(|v| !st.subs.contains(&(v.id, v.wf_seq)) && v.wf_hist_rows > 0) {

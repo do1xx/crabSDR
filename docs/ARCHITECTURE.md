@@ -2,6 +2,8 @@
 
 Ein Programm (`crabsdr-server`, Rust) liest die Empfänger, rechnet alles selbst und liefert die Weboberfläche aus.
 Jeder Hörer bekommt seinen eigenen Kanal (Frequenz, Betriebsart, Bandbreite), Decoder hören als unsichtbare Hörer mit.
+Gezoomte Wasserfall-Ausschnitte jenseits von 1 Bin je Pixel bekommen ein eigenes Zoom-Spektrum (`ZoomSpectrum`: Ausschnitt
+wie ein Kanal ausgeschnitten, 2048er-FFT), damit die Auflösung mit dem Zoom steigt.
 
 ```
  Stick / rtl_tcp ──IQ──►  Band-Pipeline ──►  DSP-Thread ──┬─► Wasserfall-Zeilen ─────────┐
