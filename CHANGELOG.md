@@ -2,7 +2,9 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## Unveröffentlicht
+## 0.4.6 – 2026-10-04
+
+Frequenzkorrektur je Band in Software.
 
 ### Empfänger
 - `freq_correction_ppm` je Band: Frequenzkorrektur in Software mit Nachkommastellen, unabhängig vom Treiber (RSP1 ohne TCXO).
