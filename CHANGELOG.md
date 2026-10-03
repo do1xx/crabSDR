@@ -2,6 +2,11 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Oberfläche
+- Bereich: Eintrag „ganzes Band“ führt zurück zur vollen Breite.
+
 ## 0.4.4 – 2026-10-03
 
 Zoom mit echter Auflösung, Bereiche, Verbund-Chat, neue Bedienleiste.

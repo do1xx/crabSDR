@@ -493,6 +493,7 @@
     var sel = $('segsel'); if (!sel) return;
     var list = bandSegments(band); segBand = band;
     sel.innerHTML = ''; var o0 = document.createElement('option'); o0.value = ''; o0.textContent = lang === 'en' ? 'Range…' : 'Bereich…'; sel.appendChild(o0);
+    var oa = document.createElement('option'); oa.value = 'all'; oa.textContent = lang === 'en' ? 'whole band' : 'ganzes Band'; sel.appendChild(oa);
     list.forEach(function (s, i) { var o = document.createElement('option'); o.value = String(i); o.textContent = s.label + '  ' + (s.lo / 1000).toFixed(3) + '–' + (s.hi / 1000).toFixed(3); sel.appendChild(o); });
     sel.hidden = !list.length;
   }
@@ -937,7 +938,7 @@
     (function () { var sx = new XMLHttpRequest(); sx.open('GET', 'segments.json?' + Date.now());
       sx.onload = function () { if (sx.status === 200) { try { var j = JSON.parse(sx.responseText); if (Array.isArray(j) && j.length) segments = j; } catch (e) {} } buildSegments(); };
       sx.onerror = function () { buildSegments(); }; sx.send(); })();
-    $('segsel').onchange = function () { var list = bandSegments(band), s = list[Number(this.value)]; this.value = ''; this.blur(); if (s) zoomSegment(s); };
+    $('segsel').onchange = function () { var v = this.value, list = bandSegments(band), s = list[Number(v)]; this.value = ''; this.blur(); if (v === 'all') setZoom(4); else if (s) zoomSegment(s); };
     // Startwerte: FM-Bandbreite 12 kHz statt 16 kHz; auf dem Handy höherer Wasserfall (wird auf Bildschirmbreite skaliert)
     setTimeout(function () {
       try { if (typeof mode !== 'undefined' && mode === 'FM' && Math.abs((hi - lo) - 16) < 0.01) setMode('fm', -6, 6); } catch (e) {}
