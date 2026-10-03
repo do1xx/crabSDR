@@ -377,6 +377,7 @@ impl SubprocessDriver {
                     "-F".into(), fmt.rx_sdr_name().into(),
                 ];
                 if let Some(st) = c.settings.as_deref().filter(|s| !s.is_empty()) { v.push("-t".into()); v.push(st.to_string()); }
+    if c.ppm != 0 { v.push("-p".into()); v.push(c.ppm.to_string()); }   // Frequenzkorrektur (SoapySDR setFrequencyCorrection)
                 v.push("-".into());
                 v
             }
