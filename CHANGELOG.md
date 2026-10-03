@@ -2,7 +2,9 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## Unveröffentlicht
+## 0.4.2 – 2026-10-03
+
+SSB klingt wieder natürlich; Aufnahme, AGC-Wahl, Teilen-Link.
 
 ### Oberfläche
 - Aufnahme: die Datei wird beim Stopp direkt heruntergeladen (der Link lag im ausgeblendeten Bedienfeld).
