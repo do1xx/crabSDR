@@ -638,8 +638,10 @@
       var st = e.shiftKey ? 2 : 1, k = e.key, hit = true;
       if (k === 'ArrowLeft' || k === 'j' || k === 'J') freqStep(-st);
       else if (k === 'ArrowRight' || k === 'k' || k === 'K') freqStep(st);
-      else if (k === 'ArrowUp') freqSnap(1, e.shiftKey ? 10 : 1);
-      else if (k === 'ArrowDown') freqSnap(-1, e.shiftKey ? 10 : 1);
+      else if (k === 'ArrowUp' || k === 'ArrowDown') {   // FM/AM mit Raster: ein Kanal wie ← →; SSB/CW: nächster voller kHz (Umschalt 10 kHz)
+        var up = k === 'ArrowUp';
+        if (snap > 0 && (mode === 'FM' || mode === 'AM')) freqStep(up ? st : -st); else freqSnap(up ? 1 : -1, e.shiftKey ? 10 : 1);
+      }
       else if (/^[1-9]$/.test(k)) { var n = Number(k) - 1; if (n < nbands && !bandOff(bandinfo[n].name)) gotoBand(n); }
       else if (k === 'b' || k === 'B') { for (var i = 1; i <= nbands; i++) { var nb = (band + (e.shiftKey ? -i : i) + nbands * 2) % nbands; if (!bandOff(bandinfo[nb].name)) { gotoBand(nb); break; } } }
       else if ('fFaAuUlLcC'.indexOf(k) >= 0) { var md = { f: 'fm', a: 'am', u: 'usb', l: 'lsb', c: 'cw' }[k.toLowerCase()], ff = MODEFILTER[md]; setMode(md, ff[0], ff[1]); }

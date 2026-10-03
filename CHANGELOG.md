@@ -5,7 +5,7 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 ## Unveröffentlicht
 
 ### Oberfläche
-- Tastatur: ← → SSB/CW 100 Hz, FM/AM ein Rasterkanal; ↑ ↓ auf den nächsten vollen kHz (Umschalt 10 kHz), am Raster vorbei; Belegung auf der Info-Seite.
+- Tastatur: FM/AM steppen alle Pfeile einen Rasterkanal; SSB/CW: ← → 100 Hz, ↑ ↓ auf den nächsten vollen kHz (Umschalt 10 kHz); Belegung auf der Info-Seite.
 - Kanalraster rastet nur noch in FM/AM ein; SSB/CW lassen sich frei abstimmen.
 
 ## 0.4.2 – 2026-10-03
