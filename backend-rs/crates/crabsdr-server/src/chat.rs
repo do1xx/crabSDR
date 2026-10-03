@@ -44,6 +44,9 @@ impl Chat {
                     "create table if not exists log (id integer primary key, t integer, name text, call text, freq real, comment text);
                      create table if not exists chat (id integer primary key, t integer, name text, msg text);",
                 ).is_ok();
+                // Verbund-Chat: Herkunft fremder Zeilen (Stationskürzel), NULL = eigene Station
+                let ccols: Vec<String> = c.prepare("pragma table_info(chat)").and_then(|mut s| s.query_map([], |r| r.get::<_, String>(1)).map(|m| m.flatten().collect())).unwrap_or_default();
+                if !ccols.iter().any(|x| x == "station") { let _ = c.execute("alter table chat add column station text", []); }
                 // Spalten wie pinnwand.py nachrüsten
                 let cols: Vec<String> = c.prepare("pragma table_info(log)").and_then(|mut s| s.query_map([], |r| r.get::<_, String>(1)).map(|m| m.flatten().collect())).unwrap_or_default();
                 for (col, typ) in [("loc", "text"), ("km", "integer"), ("deg", "integer")] {
@@ -123,11 +126,11 @@ pub struct SinceQuery { since: Option<i64>, wait: Option<u8> }
 fn chat_rows(chat: &Chat, since: i64) -> (i64, Vec<serde_json::Value>) {
     let g = chat.db.lock().unwrap();
     let Some(c) = g.as_ref() else { return (since, vec![]) };
-    let map = |r: &rusqlite::Row| Ok(json!({"id": r.get::<_, i64>(0)?, "t": r.get::<_, i64>(1)?, "name": r.get::<_, String>(2)?, "msg": r.get::<_, String>(3)?}));
+    let map = |r: &rusqlite::Row| Ok(json!({"id": r.get::<_, i64>(0)?, "t": r.get::<_, i64>(1)?, "name": r.get::<_, String>(2)?, "msg": r.get::<_, String>(3)?, "station": r.get::<_, Option<String>>(4)?}));
     let rows: Vec<serde_json::Value> = if since == 0 {
-        c.prepare("select id,t,name,msg from (select * from chat order by id desc limit 100) order by id").and_then(|mut s| s.query_map([], map).map(|m| m.flatten().collect())).unwrap_or_default()
+        c.prepare("select id,t,name,msg,station from (select * from chat order by id desc limit 100) order by id").and_then(|mut s| s.query_map([], map).map(|m| m.flatten().collect())).unwrap_or_default()
     } else {
-        c.prepare("select id,t,name,msg from chat where id>? order by id limit 200").and_then(|mut s| s.query_map([since], map).map(|m| m.flatten().collect())).unwrap_or_default()
+        c.prepare("select id,t,name,msg,station from chat where id>? order by id limit 200").and_then(|mut s| s.query_map([since], map).map(|m| m.flatten().collect())).unwrap_or_default()
     };
     let last = rows.last().and_then(|r| r["id"].as_i64()).unwrap_or(since);
     (last, rows)
@@ -160,7 +163,56 @@ pub async fn post_chat(State(state): State<Arc<AppState>>, headers: HeaderMap, J
         match g.as_ref() { Some(c) => c.execute("insert into chat (t,name,msg) values (?,?,?)", params![now_s(), name, msg]).map(|_| c.last_insert_rowid()).ok(), None => None }
     };
     chat.notify.notify_waiters();
+    // Verbund-Chat: Zeile an crabsdr.de weiterreichen (ohne Hörer-IP), Fehler nur leise
+    if id.is_some() {
+        let cfg = state.config.read().await;
+        if cfg.chat_verbund && cfg.directory.enabled && !cfg.station.url.is_empty() {
+            let url = format!("{}/api/verbund/chat", cfg.directory.server.trim_end_matches('/'));
+            let body = json!({"id": crate::directory::station_id(&cfg.data_dir), "url": cfg.station.url, "name": name, "msg": msg});
+            drop(cfg);
+            tokio::task::spawn_blocking(move || { if let Err(e) = crate::directory::post(&url, &body) { tracing::debug!("Verbund-Chat: {}", e); } });
+        }
+    }
     match id { Some(i) => Json(json!({"ok": true, "id": i})).into_response(), None => (StatusCode::SERVICE_UNAVAILABLE, Json(json!({"error": "Datenbank fehlt"}))).into_response() }
+}
+
+/// Verbund-Chat: fremde Zeilen von crabsdr.de holen (Langabfrage) und in den eigenen Chat einsortieren. Die letzte
+/// gesehene Nummer steht in `data_dir/verbund.id`, damit nach einem Neustart nichts doppelt kommt.
+pub async fn run_verbund(state: Arc<AppState>) {
+    let (server, own, idfile) = { let c = state.config.read().await;
+        (c.directory.server.trim_end_matches('/').to_string(), crate::directory::station_id(&c.data_dir), c.data_dir.join("verbund.id")) };
+    let mut since: i64 = std::fs::read_to_string(&idfile).ok().and_then(|s| s.trim().parse().ok()).unwrap_or(0);
+    let mut warned: Option<Instant> = None;
+    info!("Verbund-Chat: an ({})", server);
+    loop {
+        let url = format!("{}/api/verbund/chat?since={}&wait=1", server, since);
+        let res = tokio::task::spawn_blocking(move || {
+            let agent = ureq::AgentBuilder::new().timeout(Duration::from_secs(40)).redirects(0).user_agent(&format!("crabSDR/{}", env!("CARGO_PKG_VERSION"))).build();
+            agent.get(&url).call().map_err(|e| e.to_string()).and_then(|r| r.into_json::<serde_json::Value>().map_err(|e| e.to_string()))
+        }).await.unwrap_or_else(|e| Err(e.to_string()));
+        match res {
+            Ok(v) => {
+                let lines = v["lines"].as_array().cloned().unwrap_or_default();
+                let mut added = false;
+                for l in &lines {
+                    let id = l["id"].as_i64().unwrap_or(0);
+                    if id > since { since = id; }
+                    if l["station"].as_str() == Some(own.as_str()) { continue; }   // eigene Zeilen stehen schon lokal
+                    let (t, name, msg, label) = (l["t"].as_i64().unwrap_or_else(now_s), l["name"].as_str().unwrap_or("Hörer"), l["msg"].as_str().unwrap_or(""), l["label"].as_str().unwrap_or("?"));
+                    if msg.is_empty() { continue; }
+                    let g = state.chat.db.lock().unwrap();
+                    if let Some(c) = g.as_ref() { let _ = c.execute("insert into chat (t,name,msg,station) values (?,?,?,?)", params![t, name, msg, label]); added = true; }
+                }
+                if added { state.chat.notify.notify_waiters(); }
+                if !lines.is_empty() { let _ = std::fs::write(&idfile, since.to_string()); }
+                warned = None;
+            }
+            Err(e) => {
+                if warned.is_none_or(|t| t.elapsed() >= Duration::from_secs(3600)) { warn!("Verbund-Chat: {} nicht erreichbar: {} (weiter alle 30 s)", server, e); warned = Some(Instant::now()); }
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+        }
+    }
 }
 
 #[derive(Deserialize)]

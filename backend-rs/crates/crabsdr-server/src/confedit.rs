@@ -28,7 +28,7 @@ const STATION_KEYS: &[&str] = &["name", "subtitle", "locator", "lat", "lon", "ur
 /// Verzeichnis: nur Ein/Aus über die Admin-Seite; der Server steht in der Datei
 const DIRECTORY_KEYS: &[&str] = &["enabled"];
 const UI_KEYS: &[&str] = &["login", "chat", "logbook", "digital", "info", "recording", "status", "decoders", "banner", "impressum", "datenschutz", "admin"];
-const TOP_KEYS: &[&str] = &["builtin_chat"];
+const TOP_KEYS: &[&str] = &["builtin_chat", "chat_keep_hours", "chat_verbund"];
 const BAND_KEYS: &[&str] = &["id", "label", "note", "driver", "device", "host", "port", "center_freq", "sample_rate", "gain", "ppm", "mode",
     "enabled", "guest", "admin_only", "bias_tee", "smeter_cal", "fft_size", "fft_fps", "format", "settings"];
 const DECODER_KEYS: &[&str] = &["plugin", "freq", "id", "band", "label", "enabled", "public", "options"];

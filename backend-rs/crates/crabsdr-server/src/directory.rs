@@ -20,7 +20,7 @@ const INTERVAL: Duration = Duration::from_secs(300);
 const FIRST: Duration = Duration::from_secs(30);
 
 /// Kennung der Station (einmal erzeugt, bleibt über Neustarts)
-fn station_id(data_dir: &std::path::Path) -> String {
+pub fn station_id(data_dir: &std::path::Path) -> String {
     let p = data_dir.join("directory.id");
     if let Ok(s) = std::fs::read_to_string(&p) {
         let s = s.trim().to_string();
@@ -71,7 +71,7 @@ pub async fn api_entry(State(state): State<Arc<AppState>>) -> Response {
 }
 
 /// Meldung verschicken (blockierend, läuft im eigenen Thread). Ok(Antwort des Verzeichnisses) oder Fehlertext.
-fn post(url: &str, body: &Value) -> Result<Value, String> {
+pub fn post(url: &str, body: &Value) -> Result<Value, String> {
     let agent = ureq::AgentBuilder::new().timeout(Duration::from_secs(15)).redirects(0)
         .user_agent(&format!("crabSDR/{}", env!("CARGO_PKG_VERSION"))).build();
     match agent.post(url).send_json(body.clone()) {

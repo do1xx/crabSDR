@@ -820,7 +820,9 @@
     function setBadge() { badge.textContent = unread > 99 ? '99+' : String(unread); badge.hidden = !unread || open; }
     function add(r) {
       var d = document.createElement('div');
-      d.innerHTML = '<span class="t">' + fmtT(r.t) + '</span> <b>' + escapeHtml(dispName(r.name)) + ':</b> ' + linkFreqs(r.msg);
+      // Verbund-Chat: fremde Zeilen tragen das Kürzel ihrer Station
+      var from = r.station ? '<span class="from">' + escapeHtml(r.station) + ' · </span>' : '';
+      d.innerHTML = '<span class="t">' + fmtT(r.t) + '</span> ' + from + '<b>' + escapeHtml(dispName(r.name)) + ':</b> ' + linkFreqs(r.msg);
       list.appendChild(d); list.scrollTop = list.scrollHeight;
     }
     function poll() {

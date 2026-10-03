@@ -252,6 +252,10 @@ pub struct ServerConfig {
     /// Chat-Zeilen nach so vielen Stunden löschen (0 = behalten); das Logbuch bleibt
     #[serde(default = "default_chat_keep_hours")]
     pub chat_keep_hours: u32,
+    /// Verbund-Chat: Chatzeilen über crabsdr.de mit allen teilnehmenden Stationen teilen (braucht `[directory] enabled`).
+    /// Die Station reicht weiter, Hörer-IPs verlassen sie nicht. Voreinstellung aus.
+    #[serde(default)]
+    pub chat_verbund: bool,
     /// Stationsangaben für die neutrale Oberfläche (Platzhalter in index.html)
     #[serde(default)]
     pub station: StationConfig,
@@ -464,6 +468,7 @@ impl Config {
             smeter_cal: HashMap::new(),
             builtin_chat: true,
             chat_keep_hours: 24,
+            chat_verbund: false,
             station: StationConfig::default(),
             source: None,
         }

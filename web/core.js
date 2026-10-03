@@ -748,6 +748,8 @@ function _crabLoadLook() {
     var x = new XMLHttpRequest(); x.open('GET', 'ui.json?' + Date.now(), false); x.send();
     var u = JSON.parse(x.responseText);
     _crab.features = u.features || {}; _crab.banner = u.banner || ''; _crab.links = u.links || {};
+    // Verbund-Chat: Hinweis im Chat-Kopf, dass Zeilen auch auf den anderen Stationen erscheinen
+    if (_crab.features.chat_verbund) { var ch = document.querySelector('.chathead small'); if (ch) { ch.textContent = 'Verbund: alle crabSDR-Stationen'; ch.title = 'Nachrichten gehen über crabsdr.de an alle Stationen mit Verbund-Chat'; } }
     _crab.bandsOff = Array.isArray(u.bands_off) ? u.bands_off.map(String) : [];
     _crab.parkMarkers = u.park_markers === true;
   } catch (e) {}

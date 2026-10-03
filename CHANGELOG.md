@@ -5,6 +5,8 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 ## Unveröffentlicht
 
 ### Oberfläche
+- Verbund-Chat (`chat_verbund`, aus): Chat mit allen teilnehmenden crabSDR-Stationen über crabsdr.de. Fremde Zeilen
+  tragen das Stationskürzel; die Station reicht weiter, Hörer-IPs verlassen sie nicht; dort 24 h. Schalter auf der Admin-Seite.
 - Wasserfall-Zoom mit echter Auflösung: jenseits von 1 Bin je Pixel rechnet der Server für den Ausschnitt ein eigenes
   Zoom-Spektrum (2048er-FFT auf dem ausgeschnittenen Bereich). Bei 64 kHz Breite sind das 62 Hz je Bin statt 500 Hz,
   ein SSB-Signal ist als Band erkennbar statt als fünf Blöcke.

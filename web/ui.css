@@ -378,6 +378,7 @@ body.sticky.allbands .rx-host { position: sticky; top: 0; z-index: 40; backgroun
 .chatform input[name=chat] { min-width: 0; }
 .chatform .chatname[hidden] { display: none; }
 .chatlist a.tune { text-decoration: none; border-bottom: 1px dotted currentColor; }
+.chatlist .from { color: var(--accent); font-size: 11px; letter-spacing: .04em; }
 
 /* Tastatur-Hilfe */
 .keyhelp { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); }

@@ -147,6 +147,8 @@ async fn main() {
         restart_pending: std::sync::atomic::AtomicBool::new(false),
     });
 
+    // Verbund-Chat über crabsdr.de (nur mit eingebautem Chat und Verzeichnis-Eintrag)
+    if config.chat_verbund && config.builtin_chat && config.directory.enabled { tokio::spawn(chat::run_verbund(shared.clone())); }
     // Öffentliches Verzeichnis (crabsdr.de): nur wenn [directory] enabled
     if config.directory.enabled {
         info!("Verzeichnis: Station wird bei {} gelistet (öffentliche Adresse {})", config.directory.server, config.station.url);
@@ -612,6 +614,7 @@ async fn ui_json(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         Some(v) => v, None => json!({}),
     };
     // Schalter der Oberfläche: ausdrücklich aus [ui], sonst Voreinstellung (Zusatzseiten nur, wenn es sie gibt)
+    let verbund_on = { let c = state.config.read().await; c.chat_verbund && c.builtin_chat && c.directory.enabled };
     let features = json!({
         "chat": ui.chat.unwrap_or(chat_on), "status": ui.status.unwrap_or(true), "recording": ui.recording.unwrap_or(true),
         "decoders": ui.decoders.unwrap_or(has_decoders),
@@ -622,6 +625,7 @@ async fn ui_json(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         "info": match ui.info { Some(b) => b, None => ui_file_exists(&state, "info/index.html").await },
         // eigenes Logo im Stationsordner → crabSDR-Marke klein neben dem Titel, sonst ist die Krabbe selbst das Logo
         "own_logo": state.config.read().await.site_dir.as_ref().is_some_and(|d| d.join("logo.svg").exists()),
+        "chat_verbund": verbund_on,
     });
     if let Some(o) = v.as_object_mut() {
         o.insert("features".into(), features);
