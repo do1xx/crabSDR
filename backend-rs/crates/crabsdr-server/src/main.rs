@@ -470,7 +470,7 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
                 // bis Stufe srv_max ist ein Pixel ein Bin des Gesamtspektrums, darüber (5 Stufen) rechnet der Server ein Zoom-Spektrum
                 let srv_max = ((pipeline.fft_size as u64 / 1024).max(1)).ilog2() as u64;
                 let zoom = zoom.min(srv_max + 5) as u8;
-                let max_start = (pipeline.fft_size as u64).saturating_sub(1024u64 * ((pipeline.fft_size as u64 / 1024) >> zoom).max(1));
+                let max_start = (pipeline.fft_size as u64).saturating_sub((pipeline.fft_size as u64 >> zoom).max(1));   // Ausschnitt = fft/2^zoom Bins
                 let start_bin = msg.get("start_bin").and_then(|v| v.as_u64()).unwrap_or(0).min(max_start) as u16;
                 clients.set_waterfall(client_id, Some(WaterfallSub { zoom, start_bin }));
             }
