@@ -340,6 +340,8 @@ impl DecoderHub {
             self.set_state(idx, &format!("fehlt: {}", miss)).await;
             return;
         }
+        // Ton-Fähigkeit sofort eintragen, damit ein Hörer gleich nach dem Start abonnieren kann (DV)
+        { let mut g = self.inner.lock().await; if let Some(s) = g.status.get_mut(idx) { s.audio = m.output.is_some(); } }
         let data = self.data_dir.join("decoders").join(&st.id);
         let _ = std::fs::create_dir_all(&data);
         // absolut: die Plugins laufen in ihrem eigenen Ordner, ein relativer data_dir zeigte sonst dorthin
