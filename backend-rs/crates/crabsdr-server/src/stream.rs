@@ -128,7 +128,14 @@ async fn attach(state: &AppState, headers: &HeaderMap, peer: SocketAddr, q: &Str
         return Err(err(StatusCode::NOT_FOUND, "Kein Band dieser Station deckt die Frequenz ab"));
     };
     let tok = access::bearer(headers).or_else(|| q.token.clone());
-    let Ok(p) = access::resolve(state, tok.as_deref()).await else { return Err(err(StatusCode::UNAUTHORIZED, "Sitzung abgelaufen")) };
+    // Fester Stream-Schlüssel aus der Konfiguration: zählt wie der Sysop, aber nur hier (nie für die Admin-Seite)
+    let key = state.config.read().await.stream_key.clone();
+    let p = if !key.is_empty() && key.len() >= 16 && tok.as_deref() == Some(key.as_str()) {
+        access::Principal { id: "stream-key".into(), username: "Sysop".into(), role: "admin".into(), scope: "listen".into(), bands: vec![], decoders: vec![], must_change: false }
+    } else {
+        let Ok(p) = access::resolve(state, tok.as_deref()).await else { return Err(err(StatusCode::UNAUTHORIZED, "Sitzung abgelaufen")) };
+        p
+    };
     let (public, admin_only) = (pipeline.guest.load(Ordering::Relaxed), pipeline.admin_only.load(Ordering::Relaxed));
     if !p.may_band(&pipeline.id, public, admin_only) {
         return Err(err(StatusCode::FORBIDDEN, "Band nur für angemeldete Hörer (?token=…)"));

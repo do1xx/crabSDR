@@ -59,6 +59,7 @@ Station unangetastet.
 | `max_streams` | `6` | gleichzeitige Streams (`/stream/…`) je Band |
 | `iq_stream` | `admin` | I/Q-Stream (`iq.wav`/`iq.ogg`, komplexes Basisband für externe Decoder): `off`, `admin` (nur Sysop), `users` (angemeldete Hörer), `all` |
 | `max_iq` | `1` | gleichzeitige I/Q-Streams je Band (ab 0,5 Mbit/s je Hörer) |
+| `stream_key` | leer | fester Schlüssel für Streams: `?token=<stream_key>` zählt wie der Sysop, nur für `/stream/…`, läuft nicht ab. Lang und zufällig, bei Verlust ändern |
 | `chat_keep_hours` | `3` | Zusätzlich Chat-Zeilen nach so vielen Stunden löschen, `0` = aus |
 | `chat_verbund` | `false` | Verbund-Chat: Chatzeilen (Name, Text, Uhrzeit, Stationskürzel) über crabsdr.de mit allen teilnehmenden Stationen teilen. Die Station reicht weiter, Hörer-IPs verlassen sie nicht; dort 24 h. Braucht `[directory] enabled` |
 | `opus_bitrate` | `32000` | bit/s je belegter Frequenz (Opus, 24 kHz mono); 32 k reicht für Sprache, 48 k für Rundfunk |

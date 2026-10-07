@@ -41,7 +41,7 @@ auch für 4FSK (DMR) – Opus rundet die Flanken ab, PCM nicht.
 | `name` | Anzeigename in der Hörerliste | `Stream` |
 | `band` | Band-ID, nur wenn zwei Bänder die Frequenz abdecken | – |
 | `rate`, `bits` | nur `iq.wav`: 32000/48000 Hz, 8/16 bit | 48000, 16 |
-| `token` | Zugang (Gast-Token oder Anmeldung), falls das Band nicht für Gäste frei ist | – |
+| `token` | Zugang: Gast-Token, Anmeldung oder der feste **Stream-Schlüssel** der Station (`stream_key`, Admin-Seite → Station; zählt wie der Sysop, nur für Streams, läuft nicht ab) | – |
 
 Bei `pair.wav` gelten `bw`, `sq` und `agc` für beide Kanäle. Bei geschlossener Rauschsperre wird Stille gesendet,
 nicht nichts, sonst beendet der Spieler die Verbindung.

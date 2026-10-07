@@ -288,6 +288,10 @@ pub struct ServerConfig {
     pub iq_stream: String,
     #[serde(default = "default_max_iq")]
     pub max_iq: u32,
+    /// Fester Schlüssel für Streams (`?token=<stream_key>`): gilt wie eine Sysop-Anmeldung, aber nur für /stream/…, läuft nicht
+    /// ab, wird auf der Admin-Seite gesetzt. Leer = aus. Lang und zufällig wählen; bei Verlust einfach ändern.
+    #[serde(default)]
+    pub stream_key: String,
     /// Stationsangaben für die neutrale Oberfläche (Platzhalter in index.html)
     #[serde(default)]
     pub station: StationConfig,
@@ -509,6 +513,7 @@ impl Config {
             max_streams: 6,
             iq_stream: "admin".into(),
             max_iq: 1,
+            stream_key: String::new(),
             station: StationConfig::default(),
             source: None,
         }

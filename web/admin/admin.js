@@ -221,6 +221,8 @@
       var inp = {};
       function t(k, label, val, hint) { inp[k] = h('input', { type: 'text', value: val == null ? '' : String(val), maxlength: '200' }); return field(label, inp[k], hint); }
       var sw = {}, listed = h('input', { type: 'checkbox', checked: !!dir.enabled }), verbund = h('input', { type: 'checkbox', checked: !!p.chat_verbund });
+      var skey = h('input', { type: 'text', value: p.stream_key || '', maxlength: '200', placeholder: 'leer = aus' });
+      var skeyBtn = h('button', { type: 'button', cls: 'btn', text: 'Erzeugen', onclick: function () { var b = new Uint8Array(24); crypto.getRandomValues(b); skey.value = btoa(String.fromCharCode.apply(null, b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); } });
       v.appendChild(h('form', { cls: 'adm-card', onsubmit: function (e) {
         e.preventDefault();
         var ops = [];
@@ -238,6 +240,8 @@
         if (listed.checked !== !!dir.enabled) ops.push({ op: 'set', path: ['directory', 'enabled'], value: listed.checked });
         if (verbund.checked && !listed.checked) return toast('Der Verbund-Chat braucht den Verzeichnis-Eintrag', true);
         if (verbund.checked !== !!p.chat_verbund) ops.push({ op: 'set', path: ['chat_verbund'], value: verbund.checked || null });
+        var sk = skey.value.trim(); if (sk && sk.length < 16) return toast('Stream-Schlüssel: mindestens 16 Zeichen', true);
+        if (sk !== (p.stream_key || '')) ops.push({ op: 'set', path: ['stream_key'], value: sk || null });
         saveOps(ops, function () { show('station'); });
       } },
         h('h3', { text: 'Station' }),
@@ -251,6 +255,7 @@
         h('label', { cls: 'adm-check' }, listed, ' Im Verzeichnis auf ' + (dir.server || 'https://crabsdr.de').replace(/^https?:\/\//, '') + ' listen'),
         h('p', { cls: 'muted small', text: 'Die Station meldet alle 5 Minuten Name, Untertitel, Standort, die öffentlichen Bänder und Decoder und die Hörerzahl. Mitglieder- und Admin-Bänder bleiben unsichtbar. Das Verzeichnis prüft die Angaben über die öffentliche Adresse. Wirkt nach dem Neustart.' }),
         h('label', { cls: 'adm-check' }, verbund, ' Verbund-Chat: Chat mit allen crabSDR-Stationen teilen'),
+        field('Stream-Schlüssel', h('div', { cls: 'adm-cols' }, skey, skeyBtn), 'für /stream/…?token=…: zählt wie der Sysop, nur für Streams (I/Q, gesperrte Bänder in VLC), läuft nicht ab; bei Verlust neu erzeugen'),
         h('p', { cls: 'muted small', text: 'Chatzeilen (Name, Text, Uhrzeit, Station) gehen über crabsdr.de an alle Stationen mit Verbund-Chat und kommen von dort zurück. Hörer-IPs verlassen die Station nicht. Aufbewahrung dort 24 h. Braucht den Verzeichnis-Eintrag. Wirkt nach dem Neustart.' }),
         h('h3', { text: 'Oberfläche' }),
         h('div', { cls: 'adm-switches' }, UI_SWITCHES.map(function (x) {

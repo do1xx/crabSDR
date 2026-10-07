@@ -2,6 +2,11 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Stream
+- Fester Stream-Schlüssel (`stream_key`, Admin-Seite → Station → „Erzeugen“): `?token=<Schlüssel>` zählt wie der Sysop, gilt nur für `/stream/…`, läuft nicht ab. Für I/Q-Streams und gesperrte Bänder in VLC, ohne Anmelde-Token aus dem Browser.
+
 ## 1.2.0 – 2026-10-07
 
 ### Stream
