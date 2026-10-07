@@ -101,13 +101,13 @@ crabReady(function (UI) {
     TABS = [];
     ['aprs', 'ft8'].forEach(function (k) { if (DECS[k].length) { TABS.push(k); h.push('<button class="band" data-dec="' + k + '"><b>' + T[k][0] + ' <small>' + freqs(DECS[k]) + ' MHz</small></b><small>' + T[k][1] + (bandOf(DECS[k]) ? ' · ' + esc(bandOf(DECS[k])) : '') + '</small></button>'); } });
     if (DECS.aprs.length || DECS.ft8.length) { TABS.push('reichweite'); h.push('<button class="band" data-dec="reichweite"><b>Reichweite <small>so weit hört die Station</small></b><small>direkt empfangen · ' + (DECS.aprs.length ? 'APRS · ' : '') + (DECS.ft8.length ? 'FT8 · ' : '') + (UI.features && UI.features.logbook ? 'Logbuch · ' : '') + '90 Tage</small></button>'); }
-    ['pocsag', 'freedv'].forEach(function (k) { if (DECS[k].length) { TABS.push(k); h.push('<button class="band" data-dec="' + k + '"><b>' + T[k][0] + ' <small>' + freqs(DECS[k]) + ' MHz</small></b><small>' + T[k][1] + '</small></button>'); } });
+    ['pocsag'].forEach(function (k) { if (DECS[k].length) { TABS.push(k); h.push('<button class="band" data-dec="' + k + '"><b>' + T[k][0] + ' <small>' + freqs(DECS[k]) + ' MHz</small></b><small>' + T[k][1] + '</small></button>'); } });
     if (DECS.sstv.length) { TABS.push('sstv'); h.push('<button class="band" data-dec="sstv"><b>SSTV <small>' + freqs(DECS.sstv) + ' MHz</small></b><small>' + T.sstv[1] + '</small></button>'); }
     $('dectabs').innerHTML = h.join('');
   }
   var dec = 'aprs';
   try { dec = localStorage.getItem('crab_dec') || 'aprs'; } catch (e) {}
-  (function () { var m = /[?&]tab=(aprs|ft8|reichweite|sstv|pocsag|freedv)\b/.exec(location.search); if (m) dec = m[1]; })();   // Deep-Link, z. B. digi/?tab=reichweite
+  (function () { var m = /[?&]tab=(aprs|ft8|reichweite|sstv|pocsag)\b/.exec(location.search); if (m) dec = m[1]; })();   // Deep-Link, z. B. digi/?tab=reichweite
   function startTabs() {
     buildTabs();
     if (!TABS.length) { $('stations').innerHTML = $('packets').innerHTML = '<span class="muted">Auf dieser Station laufen keine öffentlichen Decoder.</span>'; $('status').textContent = ''; return false; }
@@ -129,18 +129,6 @@ crabReady(function (UI) {
     $('packets').innerHTML = top.length ? '<div class="muted">häufigste RICs</div>' + top.map(function (r) { return '<div class="pk"><b>' + r + '</b> <small>' + byRic[r] + '×</small></div>'; }).join('') : '';
     $('status').innerHTML = '<span>Pager ' + freqs(DECS.pocsag) + ' · multimon-ng</span><span class="' + (Date.now() / 1000 - d.ts < 300 ? 'ok' : 'warn') + '">Stand ' + ago(d.ts) + '</span>';
   }
-  // FreeDV: Sync je Mode, Textkanal, Knopf zum Hören des dekodierten Tons
-  function renderFreedv(d) {
-    var ms = d.modes || [], act = d.active, decs = DECS.freedv;
-    $('sttitle').textContent = 'Modes'; $('pktitle').textContent = 'Hören'; $('stcount').textContent = ''; $('pkcount').textContent = '';
-    $('stations').innerHTML = ms.map(function (m) { return '<div class="pk"><b>' + esc(m.mode) + '</b> ' + (m.sync ? '<span class="ok">Sync · ' + m.snr + ' dB</span>' : '<span class="muted">kein Signal</span>') + (act === m.mode ? ' <small>· aktiv</small>' : '') + '</div>'; }).join('') || '<span class="muted">Decoder läuft an</span>';
-    $('packets').innerHTML = decs.map(function (x) {
-      var base = location.origin + location.pathname.replace(/digi\/?(index\.html)?$/, '');
-      return '<div class="pk"><a class="btn" href="' + base + '?dec=' + encodeURIComponent(x.id) + '">🔊 ' + esc(x.label) + ' dekodiert hören</a><br><small class="muted">VLC: ' + base + 'stream/decoder/' + encodeURIComponent(x.id) + '.ogg</small></div>';
-    }).join('') + '<div class="muted">FreeDV ist digitale Sprache über SSB (Codec 2). Mit Sync hörst du die dekodierte Stimme statt des Modem-Rauschens; das Rufzeichen kommt über den Textkanal und erscheint in den Treffern.</div>';
-    $('status').innerHTML = '<span>FreeDV ' + freqs(decs) + ' · libcodec2</span><span class="' + (Date.now() / 1000 - d.ts < 30 ? 'ok' : 'warn') + '">Stand ' + ago(d.ts) + '</span>';
-  }
-
   function renderFt8(d) {
     var st = d.stations || [], dx = d.decodes || [];
     $('sttitle').textContent = 'Stationen'; $('pktitle').textContent = 'Decodes';
@@ -407,7 +395,7 @@ crabReady(function (UI) {
     }
     get(dec + '.json', function (v) {
       if (!v) { $('status').textContent = 'noch keine Daten'; return; }
-      try { (dec === 'ft8' ? renderFt8 : dec === 'sstv' ? renderSstv : dec === 'pocsag' ? renderPocsag : dec === 'freedv' ? renderFreedv : render)(v); } catch (e) { console.error(e); $('status').textContent = 'noch keine Daten'; }
+      try { (dec === 'ft8' ? renderFt8 : dec === 'sstv' ? renderSstv : dec === 'pocsag' ? renderPocsag : render)(v); } catch (e) { console.error(e); $('status').textContent = 'noch keine Daten'; }
     });
   }
   function refreshDecs(cb) {

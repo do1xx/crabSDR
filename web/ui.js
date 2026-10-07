@@ -560,7 +560,7 @@
     $('mfreq').textContent = txt;
     renderListeners(); buildBwPresets(); markBwPreset();
     var mb = document.querySelectorAll('#modes .btn');
-    for (var i = 0; i < mb.length; i++) mb[i].classList.toggle('active', mb[i].dataset.mode === mode);
+    for (var i = 0; i < mb.length; i++) mb[i].classList.toggle('active', mb[i].dataset.dec ? mb[i].dataset.dec === _crab.decAudio : (mb[i].dataset.mode === mode && !_crab.decAudio));
     var bb = document.querySelectorAll('#bandbar .band[data-band]');
     for (var j = 0; j < bb.length; j++) bb[j].classList.toggle('active', Number(bb[j].dataset.band) === band);
     var ms = $('mmode'); if (ms.value !== mode.toLowerCase()) ms.value = mode.toLowerCase();

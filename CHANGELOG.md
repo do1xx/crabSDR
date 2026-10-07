@@ -2,6 +2,11 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Oberfläche
+- FreeDV als Betriebsart: Knopf „FreeDV“ neben FM/AM/USB, wenn die Station im Band einen FreeDV-Decoder hat; er springt auf dessen Frequenz, zeigt USB und spielt die dekodierte Sprache. Abstimmen oder eine andere Betriebsart holt den normalen Kanal zurück. FreeDV steht nicht mehr auf der Digital-Seite.
+
 ## 1.3.0 – 2026-10-07
 
 Zwei neue Decoder: FreeDV und Pager.

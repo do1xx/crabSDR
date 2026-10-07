@@ -79,7 +79,7 @@ function _crabTuneMsg() {
 }
 function _crabRetune() {
   var B = _crab.bands[band];
-  if (_crab.decAudio) { _crab.decAudio = null; _crabStatus(''); }   // Nutzer stimmt ab: zurück vom Decoder-Ton zum Kanal
+  if (_crab.decAudio) { _crab.decAudio = null; _crabStatus(''); _crabMarkDec(); }   // Nutzer stimmt ab: zurück vom Decoder-Ton zum Kanal
   if (B && B.ws && B.ws.readyState === 1) B.ws.send(JSON.stringify(_crabTuneMsg()));
   drawPassband();
 }
@@ -208,6 +208,7 @@ function setBand(n) {
   _crabRetune();
   showMarks(n);
   if (typeof showListeners === 'function') showListeners();
+  _crabDecButtons();
 }
 /* Betriebsart eines Bandes (config.toml: mode im Band), wenn sie von der aktuellen abweicht */
 function _crabBandMode(n) {
@@ -1037,7 +1038,7 @@ function _crabDecLoad() {
         return '<div class="x1decitem"><div class="x1dechead"><b>' + _crabEsc(d.label) + '</b><span class="x1decst ' + (run ? 'ok' : 'warn') + '">' + _crabEsc(d.state) + '</span></div>' +
           '<div class="x1decmeta">' + (d.freq / 1e6).toFixed(3).replace('.', ',') + ' MHz · ' + d.events + ' Treffer' + (d.last_event ? ' · zuletzt ' + _crabAgo(d.last_event) : '') + '</div>' +
           (mine.length ? '<div class="x1declast">' + mine.map(function (e) { return '<div><span>' + new Date(e.t * 1000).toTimeString().slice(0, 5) + '</span>' + _crabEsc(_crabDecText(e)) + '</div>'; }).join('') + '</div>' : '') +
-          '<div class="x1decbtns"><button class="btn" type="button" data-tune="' + d.freq + '" data-mode="' + mode + '">' + (d.audio ? 'Frequenz' : 'Hören') + '</button>' + (d.audio ? '<button class="btn btn-accent" type="button" data-decaudio="' + _crabEsc(d.id) + '" data-band="' + _crabEsc(d.band) + '" data-freq="' + d.freq + '">🔊 Dekodiert hören</button>' : '') + digi + '</div></div>';
+          '<div class="x1decbtns"><button class="btn" type="button" data-tune="' + d.freq + '" data-mode="' + mode + '">Hören</button>' + (d.audio ? '<button class="btn btn-accent" type="button" data-decaudio="' + _crabEsc(d.id) + '" data-band="' + _crabEsc(d.band) + '" data-freq="' + d.freq + '">🔊 ' + _crabEsc(d.plugin === 'freedv' ? 'FreeDV' : d.label) + ' dekodiert</button>' : '') + digi + '</div></div>';
       }).join('');
       pop.innerHTML = h;
     });
@@ -1047,10 +1048,35 @@ function _crabDecLoad() {
    Kanals den Decoder-Ton bestellen. Jede eigene Abstimmung (Klick, Taste, Schnellwahl) holt den normalen Kanal zurück. */
 function _crabListenDecoder(id, bandName, hz) {
   var b = -1; for (var i = 0; i < bi.length; i++) if (bi[i].name === bandName) b = i;
-  if (b >= 0) { if (b !== band) setBand(b); if (hz) setFreqText(String(hz / 1000)); }
+  if (b >= 0) { if (b !== band) setBand(b); setMode('usb', 0.3, 2.7); if (hz) setFreqText(String(hz / 1000)); }   // Anzeige: USB auf der Decoder-Frequenz
   _crab.decAudio = id; _crabAudioInit(); _crabAudioFlush();
   var B = _crab.bands[band]; if (B && B.ws && B.ws.readyState === 1) B.ws.send(JSON.stringify({ type: 'listen_decoder', id: id }));
-  _crabStatus('🔊 Dekodiert: ' + id + ' – zum Zurückschalten einfach abstimmen');
+  _crabMarkDec();
+  _crabStatus('🔊 FreeDV dekodiert – zum Zurückschalten einfach abstimmen oder USB wählen');
+}
+/* Betriebsarten-Knöpfe für Decoder mit Ton (FreeDV) im aktuellen Band: neben FM/AM/USB, springen auf die Decoder-Frequenz */
+function _crabDecButtons() {
+  var row = document.getElementById('modes'); if (!row) return;
+  Array.prototype.forEach.call(row.querySelectorAll('.btn[data-dec]'), function (b) { b.remove(); });
+  var name = bi[band] && bi[band].name;
+  (_crab.audioDecs || []).forEach(function (d) {
+    if (d.band !== name) return;
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.dataset.mode = 'FREEDV'; b.dataset.dec = d.id;
+    b.textContent = d.plugin === 'freedv' ? 'FreeDV' : d.label; b.title = d.label + ' · ' + (d.freq / 1e6).toFixed(3).replace('.', ',') + ' MHz · dekodierte Sprache';
+    b.onclick = function () { _crabListenDecoder(d.id, d.band, d.freq); };
+    row.appendChild(b);
+  });
+  _crabMarkDec();
+}
+function _crabMarkDec() {
+  Array.prototype.forEach.call(document.querySelectorAll('#modes .btn'), function (b) {
+    if (b.dataset.dec) b.classList.toggle('active', b.dataset.dec === _crab.decAudio); else if (_crab.decAudio) b.classList.remove('active');
+  });
+}
+function _crabLoadAudioDecs() {
+  var x = new XMLHttpRequest(); x.open('GET', 'api/decoders'); if (window.crabAccount) crabAccount.header(x);
+  x.onload = function () { try { _crab.audioDecs = JSON.parse(x.responseText).decoders.filter(function (d) { return d.audio; }); } catch (e) { _crab.audioDecs = []; } _crabDecButtons(); };
+  x.send();
 }
 function _crabListenDecoderById(id) {
   var x = new XMLHttpRequest(); x.open('GET', 'api/decoders'); if (window.crabAccount) crabAccount.header(x);
@@ -1130,6 +1156,7 @@ function crabStart() {
     var mn = /[?&]name=([^&]+)/.exec(qs);
     if (mn && document.usernameform) { try { document.usernameform.username.value = decodeURIComponent(mn[1].replace(/\+/g, ' ')).slice(0, 32); } catch (e) {} }
     if (/[?&]ui=min\b/.test(qs)) document.body.classList.add('min');   // nur Frequenz, Betriebsart, Pegel, Ton – für viele Tabs
+    _crabLoadAudioDecs();   // FreeDV & Co. als Betriebsarten-Knopf
     var mdc = /[?&]dec=([^&]+)/.exec(qs); if (mdc) setTimeout(function () { _crabListenDecoderById(decodeURIComponent(mdc[1])); }, 1200);   // ?dec=<id>: Decoder-Ton (z. B. FreeDV)
   })();
   _crabTextFreq();

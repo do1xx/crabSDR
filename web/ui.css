@@ -461,3 +461,6 @@ body.min .top .users, body.min #users, body.min #x1banner { display: none !impor
 body.min .main { min-height: 0; }
 body.min.hoeren .main { flex: 0 0 auto; }
 body.min.hoeren .panel { box-shadow: none; }
+
+/* Decoder-Betriebsarten (FreeDV): wie die anderen Knöpfe, mit Akzentrand */
+.modes .btn[data-dec] { border-color: var(--accent); }
