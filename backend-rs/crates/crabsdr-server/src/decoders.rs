@@ -379,6 +379,13 @@ impl DecoderHub {
             }
             None => {}
         }
+        // Verwaiste dynamische Decoder (niemand hört mehr, z. B. nach dem Weiterdrehen) sofort beenden, nicht erst nach 90 s
+        let orphans: Vec<usize> = self.inner.lock().await.status.iter().enumerate()
+            .filter(|(_, s)| s.dynamic && s.state != "beendet" && s.id != id).map(|(i, _)| i).collect();
+        for idx in orphans {
+            let oid = self.inner.lock().await.status.get(idx).map(|s| s.id.clone()).unwrap_or_default();
+            if self.audio_listeners(&oid) == 0 { self.stop_instance(idx).await; }
+        }
         let running = self.inner.lock().await.status.iter().filter(|s| s.dynamic && s.state != "beendet").count();
         if running >= max as usize { return Err(format!("Schon {} DV-Decoder in Betrieb (dv_max), bitte später", max)); }
         let (_, m) = self.manifest_of(plugin);

@@ -57,7 +57,7 @@ class Rx:
         c = ch.decode("latin-1", "replace") if isinstance(ch, bytes) else chr(ch)
         if c in "\r\n":
             t = self.text.strip()[:80]
-            if t and (t != self.last_text[0] or self.t_audio - self.last_text[1] >= 60):
+            if t and self.on and (t != self.last_text[0] or self.t_audio - self.last_text[1] >= 60):   # nur mit stabilem Sync, sonst Rauschen-Buchstaben
                 say({"kind": "text", "mode": self.name, "text": t}); self.last_text = (t, self.t_audio)
             self.text = ""
         elif c.isprintable(): self.text = (self.text + c)[-80:]

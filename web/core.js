@@ -82,7 +82,8 @@ function _crabRetune() {
   if (_crab.decAudio && /^dv/.test(_crab.decAudio)) {
     // DV klebt wie eine Betriebsart: neue Frequenz → die Station dekodiert FreeDV dort (nur ein anderer Betriebsarten-Knopf beendet DV)
     _crab.dvFreq = Math.round(dialFreq() * 1000);
-    if (B && B.ws && B.ws.readyState === 1) B.ws.send(JSON.stringify({ type: 'dv', freq: _crab.dvFreq }));
+    clearTimeout(_crab.dvTimer);   // beim Drehen erst senden, wenn die Frequenz 400 ms steht – sonst ein Decoder je Zwischenschritt
+    _crab.dvTimer = setTimeout(function () { var W = _crab.bands[band]; if (_crab.decAudio && W && W.ws && W.ws.readyState === 1) W.ws.send(JSON.stringify({ type: 'dv', freq: _crab.dvFreq })); }, 400);
     drawPassband(); return;
   }
   if (_crab.decAudio) { _crab.decAudio = null; _crabStatus(''); _crabMarkDec(); }   // fester Decoder: Abstimmen holt den Kanal zurück
@@ -1042,7 +1043,7 @@ function _crabDecLoad() {
   var get = function (u, cb) { var x = new XMLHttpRequest(); x.open('GET', u); if (window.crabAccount) crabAccount.header(x); x.onload = function () { try { cb(JSON.parse(x.responseText)); } catch (e) { cb(null); } }; x.onerror = function () { cb(null); }; x.send(); };
   get('api/decoders', function (st) {
     get('api/decoders/events?limit=300', function (ev) {
-      var list = (st && st.decoders) || [], evs = (ev && ev.events) || [];
+      var list = ((st && st.decoders) || []).filter(function (d) { return !d.dynamic; }), evs = (ev && ev.events) || [];   // DV-Decoder der Hörer sind flüchtig, nicht hier
       var h = '<div class="x1pophead">Decoder</div>';
       if (!list.length) { pop.innerHTML = h + '<div class="x1popempty">Noch keine Decoder eingerichtet.</div>'; return; }
       h += list.map(function (d) {
