@@ -296,7 +296,7 @@ async fn ws_handler(
         else if max_ip > 0 && clients.count_ip(&ip) >= max_ip as usize { Some(format!("Zu viele Verbindungen von deiner Adresse (höchstens {})", max_ip)) }
         else { None }
     };
-    ws.on_upgrade(move |socket| handle_ws(socket, pipeline, is_admin, role, ip, max_ch, refuse)).into_response()
+    ws.max_message_size(16 * 1024).on_upgrade(move |socket| handle_ws(socket, pipeline, is_admin, role, ip, max_ch, refuse)).into_response()
 }
 
 async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, is_admin: bool, role: String, ip: String, max_channels: u32, refuse: Option<String>) {
@@ -402,11 +402,18 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
                 .unwrap_or("wfm");
             let mode = DemodMode::from_str(mode_str).unwrap_or(DemodMode::Wfm);
             if mode == DemodMode::Iq { return Some("I/Q gibt es nur als Stream (/stream/<kHz>/iq.wav)".into()); }
+            // Bandbreite begrenzen: ein Kanal mit Megahertz-Breite würde den DSP mit voller Abtastrate demodulieren lassen
             let bandwidth = msg
                 .get("bandwidth")
                 .and_then(|v| v.as_u64())
-                .map(|v| v as u32)
+                .map(|v| (v as u32).clamp(100, 250_000))
                 .unwrap_or_else(|| mode.default_bandwidth());
+            // Frequenz muss im Ausschnitt des Bandes liegen (Mitte ± halbe Abtastrate), sonst Hinweis statt stillem Nichts
+            let center = crate::sdr_pipeline::corrected_center(pipeline.center_freq.load(std::sync::atomic::Ordering::Relaxed), pipeline.corr_ppm) as i64;
+            let half = pipeline.sample_rate.load(std::sync::atomic::Ordering::Relaxed) as i64 / 2;
+            if (freq as i64 - center).abs() > half {
+                return Some(format!("Frequenz {} kHz liegt außerhalb dieses Bandes ({}–{} kHz)", freq / 1000, (center - half) / 1000, (center + half) / 1000));
+            }
 
             // SSB: untere Kante des Durchlassbereichs (Browser schickt lo in Hz, Voreinstellung 300)
             let pass_lo = msg.get("lo").and_then(|v| v.as_u64()).map(|v| v.min(5000) as u32).unwrap_or(300);
