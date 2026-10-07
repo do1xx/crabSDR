@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Logbuch · crabSDR</title>
+<meta name="description" content="Logbuch des WebSDR: wer hat wen wo gehört, mit Entfernung ab der Station. Dazu die Hörer, die gerade online sind.">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f6f7f8" media="(prefers-color-scheme: light)">
+<link rel="icon" href="../icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../ui.css?v=35">
+<link rel="stylesheet" href="../pages.css?v=1">
+<link rel="stylesheet" href="logbuch.css?v=2">
+<link rel="stylesheet" href="../account.css?v=1">
+<script>
+// Einstellungen der Vorversion übernehmen (Schlüssel gartow_… und 1xx_… werden zu crab_…)
+(function(){try{var L=localStorage,k=['theme','view','wf','lang','snap','sticky','chat','chatw','chath','dec','grid','aprs_mode'],m={'1xx_band':'crab_band','1xx_bands':'crab_bands','1xx_sq_fm':'crab_sq_fm'};k.forEach(function(x){m['gartow_'+x]='crab_'+x});for(var o in m)if(L.getItem(m[o])===null&&L.getItem(o)!==null)L.setItem(m[o],L.getItem(o))}catch(e){}})();
+(function(){var t=null;try{t=localStorage.getItem('crab_theme')}catch(e){}
+var h=document.documentElement;if(t==='dark'||t==='light')h.setAttribute('data-theme',t);
+function sys(){if(!h.getAttribute('data-theme'))h.classList.toggle('sysdark',window.matchMedia('(prefers-color-scheme: dark)').matches)}
+sys();window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',sys);})();
+</script>
+</head>
+<body class="pinnwand logbuch" data-page="Logbuch">
+
+<header class="top">
+  <div class="brand">
+    <img class="logo" src="../logo.svg" alt="">
+    <div>
+      <h1><span data-station="name">WebSDR</span> <span>Logbuch</span></h1>
+      <p class="sub"><span data-station="sub"></span></p>
+    </div>
+  </div>
+  <div class="topright">
+    <input id="myname" class="myname" type="text" maxlength="20" autocomplete="off" placeholder="Dein Name / Call">
+    <span class="users" title="Hörer gerade online"><span id="numusers">–</span> Hörer</span>
+    <nav class="tabs"><a href="../" class="btn">Hören</a><a href="../digi/" class="btn" data-feature="digital">Digital</a><a href="./" class="btn active" data-feature="logbook">Logbuch</a><a href="../info/" class="btn" data-feature="info">Info</a></nav>
+    <button id="themebtn" class="btn btn-ghost btn-icon" type="button" title="Hell / Dunkel">◐</button>
+  </div>
+</header>
+
+<section class="pw-main">
+  <div class="card card-log">
+    <h3>Gehört <span class="muted">trag ein, wen du über <span data-station="name">dieses WebSDR</span> gehört hast</span></h3>
+    <form id="logform" class="pw-logform" action="#">
+      <input type="text" name="call" maxlength="20" autocomplete="off" placeholder="Rufzeichen" required>
+      <input type="text" name="freq" inputmode="decimal" autocomplete="off" placeholder="Frequenz in kHz (z. B. 145500)" required>
+      <input type="text" name="loc" maxlength="8" autocomplete="off" placeholder="Locator (z. B. JO53RB)" title="Maidenhead-Locator der gehörten Station, 4 bis 8 Zeichen">
+      <input type="text" name="comment" maxlength="80" autocomplete="off" placeholder="Bemerkung (Rapport, QTH, Betriebsart …)">
+      <button class="btn btn-accent" type="submit">Eintragen</button>
+    </form>
+    <div class="pw-tools">
+      <span id="logstats" class="muted"></span>
+      <label class="toggle"><input id="sortkm" type="checkbox"><span>weiteste zuerst</span></label>
+    </div>
+    <div id="logbook" class="pw-logbook"><span class="muted">lädt…</span></div>
+  </div>
+
+  <div class="card card-online">
+    <h3>Gerade online <span class="muted" id="oncount"></span></h3>
+    <div id="online" class="pw-online"><span class="muted">–</span></div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="about"><p>Nur Empfang. Einträge erscheinen für alle Hörer. Entfernung und Richtung ab dem Standort der Station (<span data-station="locator">Locator</span>), berechnet aus dem Locator der gehörten Station.</p></div>
+</footer>
+<div class="toast" id="toast"></div>
+
+<script src="../common.js?v=2"></script>
+<script src="logbuch.js?v=5"></script>
+<script src="../account.js?v=1"></script>
+</body>
+</html>

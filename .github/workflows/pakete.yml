@@ -1,0 +1,77 @@
+# Pakete bauen: statische musl-Binaries (amd64, arm64, armv7), Debian-Pakete (amd64, arm64, armhf = Raspberry Pi OS
+# 32 Bit ab Pi 2), Release-Archiv und Prüfsummen.
+#   Push auf main  → Vorabversion „Entwicklungsstand“ (Tag entwicklung) mit den neuesten Dateien
+#   Tag v*         → Release-Entwurf mit denselben Dateien (wird von Hand veröffentlicht) + Docker-Images (nur gebaut)
+name: pakete
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    tags: ["v*"]
+permissions:
+  contents: write
+concurrency:
+  group: pakete-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Version
+        run: |
+          BASE=$(sed -n 's/^version = "\(.*\)"/\1/p' backend-rs/Cargo.toml | head -1)
+          case "$GITHUB_REF" in
+            refs/tags/v*) V=${GITHUB_REF_NAME#v} ;;
+            *) V="$BASE+git$(date -u +%Y%m%d).$(git rev-parse --short HEAD)" ;;
+          esac
+          echo "V=$V" >> "$GITHUB_ENV"; echo "Version $V"
+      - name: Statische Binaries (musl, drei Architekturen)
+        run: CRABSDR_GIT=$(git describe --tags --always) sh packaging/build-binaries.sh amd64 arm64 armv7
+      - name: Release-Archiv und Debian-Pakete
+        run: |
+          sh packaging/make-release.sh "$V"
+          sh packaging/make-deb.sh "$V" amd64 arm64 armhf
+          cd dist && sha256sum *.deb *.tar.gz > SHA256SUMS && cat SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with: { name: crabsdr-pakete, path: "dist/*.deb\ndist/*.tar.gz\ndist/SHA256SUMS", retention-days: 14 }
+      - uses: actions/upload-artifact@v4
+        with: { name: crabsdr-bin, path: dist/bin, retention-days: 3 }
+      - name: Entwicklungsstand aktualisieren (main)
+        if: github.ref == 'refs/heads/main'
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          git tag -f entwicklung && git push -f origin entwicklung
+          NOTES="Automatisch gebaut aus dem aktuellen Stand von main ($(git rev-parse --short HEAD), $(date -u '+%Y-%m-%d %H:%M') UTC). Nicht getestet wie ein Release – für Stationen lieber das neueste Release nehmen."
+          gh release view entwicklung >/dev/null 2>&1 || gh release create entwicklung --prerelease --title "Entwicklungsstand" --notes "$NOTES"
+          for a in $(gh release view entwicklung --json assets -q '.assets[].name'); do gh release delete-asset entwicklung "$a" -y; done
+          gh release upload entwicklung dist/*.deb dist/*.tar.gz dist/SHA256SUMS
+          gh release edit entwicklung --prerelease --notes "$NOTES"
+      - name: Release-Entwurf (Tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          awk -v v="## $V" 'index($0, v) == 1 {on=1; next} on && /^## / {exit} on' CHANGELOG.md > /tmp/notes.md
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --draft --title "crabSDR $V" --notes-file /tmp/notes.md
+          gh release upload "$GITHUB_REF_NAME" dist/*.deb dist/*.tar.gz dist/SHA256SUMS --clobber
+  images:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        variant: [{ name: full, file: packaging/Dockerfile }, { name: lite, file: packaging/Dockerfile.lite }]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { name: crabsdr-bin, path: dist/bin }
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.variant.file }}
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: false
+          tags: crabsdr:${{ matrix.variant.name }}

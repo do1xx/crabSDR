@@ -1,0 +1,32 @@
+// FM startet mit Rauschsperre, AM/SSB/CW ohne; eigene Wahl bei FM bleibt gespeichert.
+// Aufruf: node tools/e2e/squelch.spec.mjs [http://127.0.0.1:8082]
+import { chromium } from 'playwright';
+const base = process.argv[2] || 'http://127.0.0.1:8082';
+const browser = await chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
+const page = await (await browser.newContext({ viewport: { width: 1400, height: 1000 } })).newPage();
+const errors = [];
+page.on('pageerror', e => errors.push('pageerror: ' + e.message));
+const check = (name, ok, info) => { console.log((ok ? 'OK  ' : 'FEHL') + ' ' + name + (info !== undefined ? ' → ' + JSON.stringify(info) : '')); if (!ok) errors.push(name); };
+const st = () => page.evaluate(() => ({ mode, on: _crab.squelchOn, cb: document.getElementById('squelchcheckbox').checked, sq: _crab.sq }));
+const ready = () => page.waitForFunction(() => window._crab && _crab.started && _crab.bands[band] && _crab.bands[band].started, null, { timeout: 15000 });
+await page.goto(base + '/'); await ready(); await page.waitForTimeout(800);
+let s = await st(); check('Erster Besuch FM: Sperre an, Knopf an', s.mode === 'FM' && s.on && s.cb, s);
+await page.click('#modes [data-mode="USB"]'); await page.waitForTimeout(400); s = await st();
+check('USB: Sperre aus', s.mode === 'USB' && !s.on && !s.cb, s);
+await page.click('#modes [data-mode="AM"]'); await page.waitForTimeout(300); s = await st();
+check('AM: Sperre aus', !s.on && !s.cb, s);
+await page.click('#modes [data-mode="FM"]'); await page.waitForTimeout(400); s = await st();
+check('Zurück zu FM: Sperre wieder an', s.on && s.cb, s);
+await page.click('label:has(#squelchcheckbox)'); await page.waitForTimeout(400); s = await st();
+check('Hörer schaltet bei FM aus', !s.on && !s.cb, s);
+await page.reload(); await ready(); await page.waitForTimeout(800); s = await st();
+check('Nach Neuladen: bleibt aus', s.mode === 'FM' && !s.on && !s.cb, s);
+await page.click('#modes [data-mode="USB"]'); await page.waitForTimeout(300); await page.click('#modes [data-mode="FM"]'); await page.waitForTimeout(300); s = await st();
+check('USB→FM: eigene Wahl (aus) bleibt', !s.on && !s.cb, s);
+await page.click('label:has(#squelchcheckbox)'); await page.waitForTimeout(300);
+await page.reload(); await ready(); await page.waitForTimeout(800); s = await st();
+check('Wieder eingeschaltet → nach Neuladen an', s.on && s.cb, s);
+await page.goto(base + '/?tune=144300usb'); await ready(); await page.waitForTimeout(800); s = await st();
+check('Deep-Link USB: Sperre aus', s.mode === 'USB' && !s.on && !s.cb, s);
+check('keine JS-Fehler', errors.length === 0, errors.slice(0, 3));
+await browser.close(); process.exit(errors.length ? 1 : 0);

@@ -1,0 +1,8 @@
+{
+  "name": "aprs",
+  "label": "APRS",
+  "description": "APRS 1200 Bd (AFSK) mit direwolf: Pakete, Positionen, Baken",
+  "input": { "kind": "audio", "mode": "fm", "rate": 48000, "bandwidth": 12500, "level": "raw", "gain": 10 },
+  "command": ["python3", "aprs.py"],
+  "requires": ["direwolf", "python3"]
+}

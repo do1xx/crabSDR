@@ -1,0 +1,34 @@
+[package]
+name = "crabsdr-server"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "crabsdr-server"
+path = "src/main.rs"
+
+[dependencies]
+crabsdr-core = { workspace = true }
+crabsdr-dsp = { workspace = true }
+crabsdr-sdr = { workspace = true }
+crabsdr-auth = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+tower-http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+bytes = { workspace = true }
+num-complex = { workspace = true }
+opus = { workspace = true }
+rayon = { workspace = true }
+jpeg-encoder = "0.6"
+rumqttc = { version = "0.25", default-features = false }
+rusqlite = { version = "0.32", features = ["bundled"] }
+toml_edit = "0.22"
+sha2 = "0.10"
+toml = { workspace = true }
+tokio-tungstenite = { workspace = true }
+ureq = { workspace = true }
+futures-util = { workspace = true }

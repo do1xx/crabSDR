@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Info · crabSDR</title>
+<meta name="description" content="Technik des WebSDR: Standort, Bänder, Decoder und Bedienung.">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f6f7f8" media="(prefers-color-scheme: light)">
+<link rel="icon" href="../icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../ui.css?v=35">
+<link rel="stylesheet" href="../pages.css?v=1">
+<link rel="stylesheet" href="../account.css?v=1">
+<script>
+// Einstellungen der Vorversion übernehmen (Schlüssel gartow_… und 1xx_… werden zu crab_…)
+(function(){try{var L=localStorage,k=['theme','view','wf','lang','snap','sticky','chat','chatw','chath','dec','grid','aprs_mode'],m={'1xx_band':'crab_band','1xx_bands':'crab_bands','1xx_sq_fm':'crab_sq_fm'};k.forEach(function(x){m['gartow_'+x]='crab_'+x});for(var o in m)if(L.getItem(m[o])===null&&L.getItem(o)!==null)L.setItem(m[o],L.getItem(o))}catch(e){}})();
+(function(){var t=null;try{t=localStorage.getItem('crab_theme')}catch(e){}
+var h=document.documentElement;if(t==='dark'||t==='light')h.setAttribute('data-theme',t);
+function sys(){if(!h.getAttribute('data-theme'))h.classList.toggle('sysdark',window.matchMedia('(prefers-color-scheme: dark)').matches)}
+sys();window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',sys);})();
+</script>
+</head>
+<body class="info" data-page="Info">
+<!-- Eigene Info-Seite der Station: info/index.html in den Stationsordner (site_dir) legen, sie ersetzt diese. -->
+
+<header class="top">
+  <div class="brand">
+    <img class="logo" src="../logo.svg" alt="">
+    <div>
+      <h1><span data-station="name">WebSDR</span> <span>Info</span></h1>
+      <p class="sub"><span data-station="sub"></span></p>
+    </div>
+  </div>
+  <div class="topright">
+    <nav class="tabs"><a href="../" class="btn">Hören</a><a href="../digi/" class="btn" data-feature="digital">Digital</a><a href="../logbuch/" class="btn" data-feature="logbook">Logbuch</a><a href="./" class="btn active" data-feature="info">Info</a></nav>
+    <button id="themebtn" class="btn btn-ghost btn-icon" type="button" title="Hell / Dunkel">◐</button>
+  </div>
+</header>
+
+<main class="info-main">
+  <h2>Standort</h2>
+  <dl class="facts" id="site"><dt>Station</dt><dd data-station="name">–</dd></dl>
+
+  <h2>Bänder</h2>
+  <dl class="facts" id="bands"><dt>–</dt><dd class="muted">lädt…</dd></dl>
+
+  <div id="decwrap" hidden>
+    <h2>Decoder</h2>
+    <p>Diese Decoder hören ständig mit, auch wenn niemand zuhört. Ergebnisse unter <a href="../digi/">Digital</a>.</p>
+    <dl class="facts" id="decs"></dl>
+  </div>
+
+  <h2>Bedienung</h2>
+  <dl class="facts">
+    <dt>Abstimmen</dt><dd>in den Wasserfall oder auf die Skala klicken, ziehen; Pfeiltasten ← → (mit Umschalt größere Schritte)</dd>
+    <dt>Bänder</dt><dd>oben ein- und ausschalten; mehrere Bänder teilen sich den Bildschirm</dd>
+    <dt>Rauschsperre</dt><dd>Knopf „Squelch“; in FM ist sie beim Start an</dd>
+    <dt data-feature="recording">Aufnahme</dt><dd data-feature="recording">Knopf „Aufnahme“ (Taste R): speichert den Ton als WAV-Datei, Name mit Frequenz, Modulation und Uhrzeit</dd>
+    <dt>Teilen</dt><dd>Kettensymbol neben der Frequenz kopiert einen Link, der genau diese Frequenz öffnet</dd>
+    <dt data-feature="chat">Chat</dt><dd data-feature="chat">Knopf „Chat“ oben (Taste T); Frequenzen im Chat wie „145,500 FM“ sind anklickbar</dd>
+    <dt>Tastatur</dt><dd>Taste ? zeigt die Kürzel auch auf der Hören-Seite</dd>
+  </dl>
+
+  <h2>Tastatur</h2>
+  <dl class="facts keys">
+    <dt>← →</dt><dd>abstimmen: SSB/CW 100 Hz · FM/AM ein Kanal im eingestellten Raster (ohne Raster 1 kHz) · Umschalt ×5 · Strg ×25</dd>
+    <dt>↑ ↓</dt><dd>SSB/CW: auf den nächsten vollen kHz springen (144,8020 → 144,8030) · Umschalt: 10 kHz (→ 144,8100) · FM/AM: ein Kanal im Raster</dd>
+    <dt>1 … 9</dt><dd>Band wählen</dd>
+    <dt>B</dt><dd>nächstes Band (Umschalt: voriges)</dd>
+    <dt>F A U L C</dt><dd>FM · AM · USB · LSB · CW</dd>
+    <dt>+ −</dt><dd>Wasserfall zoomen · Z ganzes Band · Umschalt+Z maximal</dd>
+    <dt>M</dt><dd>stumm an/aus</dd>
+    <dt>G</dt><dd>Frequenz eintippen (Enter übernimmt)</dd>
+    <dt>R</dt><dd>Aufnahme starten/stoppen</dd>
+    <dt>T</dt><dd>Chat öffnen und schreiben</dd>
+    <dt>P</dt><dd>Relais- und Frequenzliste</dd>
+    <dt>?</dt><dd>Tastenhilfe ein/aus · Esc schließt</dd>
+  </dl>
+
+  <h2>Stream</h2>
+  <p>Jeden Kanal gibt es auch als Ton-Stream für VLC, mpv oder Home Assistant, ohne Oberfläche:
+    <code>…/stream/145700/fm.ogg</code> (Frequenz in kHz, Betriebsart fm, am, usb, lsb, cw oder data für Decoder).
+    Die Schnellwahl als Senderliste: <a href="../stream/presets.m3u">presets.m3u</a>. Parameter und Beispiele in
+    <a href="https://github.com/do1xx/crabSDR/blob/main/docs/STREAM.md">docs/STREAM.md</a>.</p>
+
+  <h2>Software</h2>
+  <p>crabSDR – freie WebSDR-Software: ein Empfänger für viele Hörer gleichzeitig, jeder mit eigener Frequenz und
+     Modulation, dazu Decoder als Plugins. Quelltext und Anleitung (GNU AGPL 3.0):
+     <a href="https://github.com/do1xx/crabSDR" rel="noopener">github.com/do1xx/crabSDR</a>.
+     <span id="ver" class="muted"></span></p>
+  <p class="muted">Sysop: Verwaltung der Station unter <a href="../admin/">Admin</a> (Anmeldung nötig).</p>
+
+  <div id="impwrap" hidden>
+    <h2 id="impressum">Betreiber</h2>
+    <dl class="facts" id="imp"></dl>
+  </div>
+
+  <h2 id="datenschutz">Datenschutz</h2>
+  <p>Diese Station ist ein Hobbyprojekt im Amateurfunk. Beim Hören werden so wenige Daten wie möglich verarbeitet:</p>
+  <dl class="facts">
+    <dt>Verbindungsdaten</dt><dd>Der Server sieht die IP-Adresse deines Browsers, solange du verbunden bist. Sie steht kurzzeitig
+      im Systemprotokoll des Rechners (Fehlersuche, Schutz vor Missbrauch) und wird sonst nicht ausgewertet oder weitergegeben.</dd>
+    <dt>Name</dt><dd>Der Name, den du oben einträgst, wird anderen Hörern und im Chat gezeigt. Er bleibt in deinem Browser gespeichert
+      (Cookie) – lass ihn leer, wenn du nicht genannt werden willst.</dd>
+    <dt data-feature="chat">Chat und Logbuch</dt><dd data-feature="chat">Einträge werden mit dem gewählten Namen und der Uhrzeit auf der Station
+      gespeichert und allen Besuchern gezeigt. Zum Löschen eines Eintrags an den Betreiber wenden.
+      <span data-feature="chat_verbund">Diese Station nimmt am Verbund-Chat teil: Chatzeilen gehen mit Name, Text, Uhrzeit und Stationskürzel
+      über crabsdr.de an alle teilnehmenden Stationen und dort bleiben höchstens die letzten 50 Zeilen und nichts älter als 3 Stunden.</span></dd>
+    <dt>Einstellungen</dt><dd>Frequenz, Lautstärke, Rauschsperre, Ansicht und Sprache merkt sich dein Browser selbst (localStorage).
+      Nichts davon geht an den Server.</dd>
+    <dt>Ton</dt><dd>Der Ton wird nur zu dir gestreamt. Aufnahmen entstehen ausschließlich in deinem Browser.</dd>
+    <dt data-feature="digital">Decoder</dt><dd data-feature="digital">APRS, FT8 und ähnliche Aussendungen sind Amateurfunk und öffentlich; die Station
+      zeigt sie an und gibt sie an APRS-Netz und Karten weiter. Das betrifft Funkamateure, nicht Hörer.</dd>
+    <dt>Karten</dt><dd>Die Karte auf der Digital-Seite lädt Kacheln von OpenFreeMap (openfreemap.org); dabei sieht dieser Dienst deine
+      IP-Adresse.</dd>
+    <dt>Verzeichnis</dt><dd>Ist die Station auf crabsdr.de gelistet, meldet sie nur ihre eigenen Daten (Name, Standort, Bänder,
+      Hörerzahl) – keine Daten über Hörer.</dd>
+    <dt>Keine Auswertung</dt><dd>Keine Analyse-Werkzeuge, keine Werbung, keine Weitergabe an Dritte.</dd>
+  </dl>
+</main>
+
+<footer class="foot">
+  <div class="about"><p>Nur Empfang.</p></div>
+</footer>
+
+<script>(function(){var t=null;try{t=localStorage.getItem('crab_token')}catch(e){}document.write('<script src="../bandinfo.js?_=' + Date.now() + (t ? '&token=' + encodeURIComponent(t) : '') + '"><\/script>');})();</script>
+<script src="../common.js?v=2"></script>
+<script src="info.js?v=2"></script>
+<script src="../account.js?v=1"></script>
+</body>
+</html>

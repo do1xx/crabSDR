@@ -1,0 +1,16 @@
+{
+ "smeter": {
+  "offset": 0,
+  "bands": {},
+  "cal": {}
+ },
+ "waterfall": {
+  "mode": 1,
+  "brightness": 1,
+  "contrast": 1,
+  "bands": {},
+  "look": "1xx"
+ },
+ "snap": 12.5,
+ "bands_off": []
+}

@@ -1,0 +1,38 @@
+# Testkonfiguration der Unterseiten Digital/Logbuch/Info: Decoder aus, ihre Daten liegen in testdata/data-digi
+# (nicht im Repo; eigene Decoder-Ausgaben dort ablegen: decoders/aprs-144800/aprs.json, ft8-144174/ft8.json, sstv-145800/).
+port = 8084
+plugin_dir = "plugins"
+frontend_dir = "web"
+data_dir = "testdata/data-digi"
+
+[station]
+name = "crabSDR Demo"
+subtitle = "Test der Unterseiten · JO53RB"
+locator = "JO53RB"
+lat = 53.06547
+lon = 11.44281
+
+[[bands]]
+id = "2m"
+label = "2 m"
+note = "144–146 MHz"
+driver = "rtl_tcp"
+port = 7901
+center_freq = 145025000
+gain = 12.0
+mode = "fm"
+
+[[decoders]]
+plugin = "aprs"
+freq = 144800000
+enabled = false   # nur Anzeige testen: Daten liegen schon im Datenordner
+
+[[decoders]]
+plugin = "ft8"
+freq = 144174000
+enabled = false
+
+[[decoders]]
+plugin = "sstv"
+freq = 145800000
+enabled = false

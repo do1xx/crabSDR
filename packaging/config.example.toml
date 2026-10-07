@@ -1,0 +1,64 @@
+# crabSDR – Konfiguration
+# Nur das Nötigste steht hier; alles andere hat sinnvolle Voreinstellungen. Jede Einstellung ist in docs/CONFIG.md
+# erklärt. Nach Änderungen prüfen und neu starten:
+#   crabsdr-server --check /etc/crabsdr/config.toml && systemctl restart crabsdr
+# (Docker: docker compose exec crabsdr crabsdr-server --check, dann docker compose restart)
+
+port = 8080
+
+# ---- Station: erscheint oben auf der Seite; der Standort dient für Entfernungen (Logbuch, Digital, Reichweite) ----
+[station]
+name = "Mein WebSDR"
+subtitle = "Ort · Antenne · Höhe"
+locator = "JO53RB"            # Maidenhead-Locator; genauer: zusätzlich lat = 53.0655 und lon = 11.4428
+
+# ---- Bänder: jedes [[bands]] ist ein Empfänger (ein Stick) ----
+[[bands]]
+id = "2m"                     # kurzer Name ohne Leerzeichen (Adresse, Einstellungen im Browser)
+label = "2 m"                 # Anzeige in der Bandleiste
+note = "FM-Relais, APRS, SSB" # Kurzbeschreibung (optional)
+driver = "rtl_sdr"            # rtl_sdr (Stick am Rechner) · rtl_tcp (Stick über das Netz) · hackrf · rx_sdr (SoapySDR)
+device = "0"                  # Index oder Seriennummer des Sticks
+center_freq = 145000000       # Hz, Mitte des Wasserfalls
+sample_rate = 2048000         # 2,048 MS/s = gut 2 MHz sichtbar
+gain = 30.0                   # dB; übersteuert es (Geisterträger, Rauschteppich springt), kleiner stellen
+mode = "fm"                   # Betriebsart beim Start: fm, am, usb, lsb, cw
+
+# Zweiter Stick, hier mit Seriennummer „70cm“ (Seriennummer setzen: rtl_eeprom -s 70cm):
+# [[bands]]
+# id = "70cm"
+# label = "70 cm"
+# driver = "rtl_sdr"
+# device = "70cm"
+# center_freq = 438500000
+# gain = 35.0
+
+# Stick an einem anderen Rechner (dort läuft: rtl_tcp -a 0.0.0.0 -p 1234):
+# [[bands]]
+# id = "remote"
+# driver = "rtl_tcp"
+# host = "192.168.1.50"
+# port = 1234
+# center_freq = 433500000
+
+# ---- Decoder (optional): Plugin + Frequenz, das Band ergibt sich aus der Frequenz ----
+# Brauchen Programme: APRS direwolf, FT8 jt9 (Paket wsjtx), SSTV python3-numpy + python3-pil (im vollen Docker-Image
+# enthalten). Ergebnisse erscheinen auf der Seite „Digital“.
+# [[decoders]]
+# plugin = "aprs"
+# freq = 144800000
+#
+# [[decoders]]
+# plugin = "ft8"
+# freq = 144174000
+#
+# [[decoders]]
+# plugin = "sstv"
+# freq = 145800000
+
+# ---- Oberfläche (optional): alles ist an, solange es etwas zu zeigen gibt ----
+# [ui]
+# chat = false                          # Chat der Hörer aus
+# banner = "Wartung heute ab 20 Uhr"    # Hinweis oben
+# impressum = "https://example.org/impressum"
+# datenschutz = "https://example.org/datenschutz"

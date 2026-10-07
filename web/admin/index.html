@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Admin · crabSDR</title>
+<link rel="icon" href="../icons/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../ui.css?v=38">
+<link rel="stylesheet" href="../pages.css?v=1">
+<link rel="stylesheet" href="admin.css?v=1">
+<!-- Keine eingebetteten Skripte oder Stile: die Admin-Seite läuft mit strenger Content-Security-Policy (docs/SECURITY.md) -->
+<script src="theme.js?v=1"></script>
+</head>
+<body class="admin">
+
+<header class="top">
+  <div class="brand">
+    <img class="logo" src="../logo.svg" alt="">
+    <div>
+      <h1><span id="stname">crabSDR</span> <span>Admin</span></h1>
+      <p class="sub" id="whoami"></p>
+    </div>
+  </div>
+  <div class="topright">
+    <a class="btn btn-ghost" href="../">Zur Station</a>
+    <button id="ownpw" class="btn btn-ghost" type="button" hidden>Passwort ändern</button>
+    <button id="logout" class="btn btn-ghost" type="button" hidden>Abmelden</button>
+    <button id="themebtn" class="btn btn-ghost btn-icon" type="button" title="Hell / Dunkel">◐</button>
+  </div>
+</header>
+
+<div id="restartbar" class="adm-restart" hidden>
+  <span>Änderungen gespeichert – wirksam nach einem Neustart von crabSDR.</span>
+  <button id="restartbtn" class="btn btn-accent" type="button">Jetzt neu starten</button>
+</div>
+
+<nav id="tabs" class="adm-tabs" hidden>
+  <button type="button" data-tab="overview" class="active">Überblick</button>
+  <button type="button" data-tab="station">Station</button>
+  <button type="button" data-tab="bands">Bänder</button>
+  <button type="button" data-tab="decoders">Decoder</button>
+  <button type="button" data-tab="users">Benutzer</button>
+  <button type="button" data-tab="chat">Chat &amp; Logbuch</button>
+  <button type="button" data-tab="config">Konfiguration</button>
+  <button type="button" data-tab="devices">Sticks</button>
+</nav>
+
+<main id="view" class="adm-main"><p class="muted">lädt…</p></main>
+
+<div id="toast" class="adm-toast" hidden></div>
+
+<script src="admin.js?v=2"></script>
+</body>
+</html>

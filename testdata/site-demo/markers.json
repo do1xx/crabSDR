@@ -1,0 +1,7 @@
+[
+  {"freq": 144174, "mode": "usb", "text": "FT8"},
+  {"freq": 144300, "mode": "usb", "text": "SSB-Anruf"},
+  {"freq": 144800, "mode": "fm", "text": "APRS"},
+  {"freq": 145500, "mode": "fm", "text": "FM-Anruf"},
+  {"freq": 438700, "mode": "fm", "text": "Relais"}
+]

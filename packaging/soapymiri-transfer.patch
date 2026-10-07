@@ -1,0 +1,20 @@
+SoapyMiri (github.com/ericek111/SoapyMiri, getestet mit 1e0a125): USB-Übertragung als Geräte-Einstellung, damit
+crabSDR sie per Band-Einstellung settings = "transfer=BULK" setzen kann. Anwenden im SoapyMiri-Quellordner:
+  git apply soapymiri-transfer.patch   (danach neu bauen und installieren)
+
+
+diff --git a/Settings.cpp b/Settings.cpp
+index 651daa8..7d0de3e 100644
+--- a/Settings.cpp
++++ b/Settings.cpp
+@@ -452,6 +452,10 @@ void SoapyMiri::writeSetting(const std::string &key, const std::string &value) {
+         }
+     } else if (key == "format") {
+         mirisdr_set_sample_format(dev, value.c_str());
++    } else if (key == "transfer") {
++        // USB transfer mode as device setting too (rx_sdr -t transfer=BULK), not only as stream argument
++        if (mirisdr_set_transfer(dev, value.c_str()) != 0)
++            SoapySDR_logf(SOAPY_SDR_ERROR, "SoapyMiri: transfer mode %s not set", value.c_str());
+     }
+ 
+ }

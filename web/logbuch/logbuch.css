@@ -1,0 +1,38 @@
+/* Seite „Logbuch" — Ergänzungen zu ui.css */
+.pw-main { display: grid; grid-template-columns: 1fr 300px; gap: 8px; padding: 6px 16px 12px; align-items: start; }
+.pw-logform { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-bottom: 8px; }
+.pw-logform input[name=comment] { grid-column: 1 / 3; }
+.pw-tools { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 11px; }
+.pw-tools .toggle span { min-height: 28px; padding: 5px 8px; font-size: 11px; }
+.pw-logbook { max-height: 70vh; overflow-y: auto; font-size: 12px; line-height: 1.6; }
+.pw-logbook .row { display: grid; grid-template-columns: 90px 80px 110px 70px 90px 1fr auto; gap: 8px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--line2); }
+.pw-logbook .head { color: var(--faint); font-size: 10px; letter-spacing: .08em; text-transform: uppercase; }
+.pw-logbook .loc { color: var(--muted); font-variant-numeric: tabular-nums; }
+.pw-logbook .km { font-variant-numeric: tabular-nums; color: var(--text); white-space: nowrap; }
+.pw-logbook .km small { color: var(--faint); margin-left: 4px; }
+.pw-logbook .row.dx .km { color: var(--accent); font-weight: 700; }
+.pw-logbook .row:last-child { border-bottom: 0; }
+.pw-logbook .t { color: var(--faint); white-space: nowrap; font-size: 11px; }
+.pw-logbook .f { font-variant-numeric: tabular-nums; color: var(--accent); white-space: nowrap; }
+.pw-logbook .c { font-weight: 700; color: var(--strong); }
+.pw-logbook .by { color: var(--faint); font-size: 11px; white-space: nowrap; }
+.pw-logbook .raw { white-space: pre-wrap; color: var(--muted); font-size: 11px; }
+.pw-chatbox { height: 46vh; min-height: 220px; overflow-y: auto; background: var(--bg2); border: 1px solid var(--line2); border-radius: var(--radius); padding: 6px 10px; font-size: 12px; line-height: 1.7; word-break: break-word; }
+.pw-chatbox .t { color: var(--faint); font-size: 10px; }
+.pw-chatbox b { color: var(--accent); font-weight: 600; }
+.pw-chatbox a { color: var(--accent); }
+.pw-chatform { display: flex; gap: 4px; margin-top: 8px; }
+.pw-chatform input { flex: 1; min-width: 0; }
+.pw-online { display: flex; flex-wrap: wrap; gap: 6px; }
+.pw-online span { display: inline-flex; gap: 6px; align-items: baseline; padding: 4px 8px; border: 1px solid var(--line2); border-radius: var(--radius); background: var(--bg2); font-size: 11px; }
+.pw-online span b { color: var(--accent); font-weight: 600; }
+.pw-online span a { color: var(--text); }
+.card h3 .muted { text-transform: none; letter-spacing: 0; font-weight: 400; }
+@media (max-width: 900px) {
+  .pw-main { grid-template-columns: 1fr; padding: 6px 10px 12px; }
+  .card-log { grid-row: auto; }
+  .pw-logform { grid-template-columns: 1fr; } .pw-logform input[name=comment], .pw-logform .btn { grid-column: auto; }
+  .pw-logbook .head { display: none; }
+  .pw-logbook .row { grid-template-columns: 1fr 1fr 1fr; }
+  .pw-logbook .row span:nth-child(6) { grid-column: 1 / -1; }
+}

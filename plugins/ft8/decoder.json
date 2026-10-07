@@ -1,0 +1,8 @@
+{
+  "name": "ft8",
+  "label": "FT8",
+  "description": "FT8 mit jt9 (WSJT-X): 15-s-Zyklen, Rufzeichen, Locator, Übersicht als ft8.json",
+  "input": { "kind": "audio", "mode": "usb", "rate": 12000, "bandwidth": 3000, "level": "norm" },
+  "command": ["python3", "ft8.py"],
+  "requires": ["jt9", "python3"]
+}

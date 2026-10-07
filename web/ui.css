@@ -1,0 +1,456 @@
+/* crabSDR – Oberfläche (Schwarz, weiße Abstufungen, Smaragd, JetBrains Mono).
+   Der Empfängerblock (.rx) ist fest 1024 px breit und wird per transform:scale() auf die
+   verfügbare Breite gebracht (ui.js). Die Klick-Umrechnung ist in ui.js überlagert.
+   Farben: helles Schema in :root, dunkles per Browser-Einstellung oder Schalter (html[data-theme]). */
+@import url('fonts/fonts.css');
+:root {
+  --bg: #f6f7f8; --bg2: rgba(0,0,0,.04); --card: #ffffff; --line: rgba(0,0,0,.12); --line2: rgba(0,0,0,.06);
+  --text: #111418; --strong: #000000; --muted: rgba(0,0,0,.5); --faint: rgba(0,0,0,.35);
+  --accent: #059669; --accent2: #047857; --accent-fg: #ffffff; --accent-dim: rgba(5,150,105,.12);
+  --ok: #059669; --warn: #b45309; --bad: #dc2626;
+  --scalebg: rgba(246,247,248,.94); --barbg: rgba(246,247,248,.96);
+  --radius: 4px; --sab: env(safe-area-inset-bottom, 0px);
+  color-scheme: light;
+}
+html[data-theme="dark"], html:not([data-theme="light"]).sysdark {
+  --bg: #000000; --bg2: rgba(255,255,255,.05); --card: rgba(255,255,255,.03); --line: rgba(255,255,255,.12); --line2: rgba(255,255,255,.06);
+  --text: #ffffff; --strong: #ffffff; --muted: rgba(255,255,255,.45); --faint: rgba(255,255,255,.3);
+  --accent: #34d399; --accent2: #10b981; --accent-fg: #06110c; --accent-dim: rgba(52,211,153,.15);
+  --ok: #34d399; --warn: #fbbf24; --bad: #f87171;
+  --scalebg: rgba(0,0,0,.9); --barbg: rgba(0,0,0,.94);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 13px/1.5 "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h3 { margin: 0 0 6px; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.offscreen { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.hidden-fields { display: none; }
+.audio-ready .audio-btn { display: none; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+
+/* Kopf */
+.top {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 6px 16px; border-bottom: 1px solid var(--line); background: var(--bg);
+}
+.brand { display: flex; align-items: center; gap: 10px; }
+.logo { width: 34px; height: 34px; flex: none; }
+img.logo { width: auto; height: 38px; }   /* crabSDR-Krabbe (logo.svg) in natürlicher Breite */
+.logo .l-bg { fill: var(--card); stroke: var(--line); }
+.logo .l-ac { fill: var(--accent); }
+.logo .l-st { stroke: var(--accent); }
+.logo .l-mu { fill: var(--muted); }
+.brand h1 { margin: 0; font-size: 16px; letter-spacing: .12em; font-weight: 700; color: var(--strong); text-transform: uppercase; }
+.brand h1 span { color: var(--accent); }
+.sub { margin: 0; color: var(--faint); font-size: 10px; letter-spacing: .04em; }
+.topright { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.users { color: var(--muted); font-size: 11px; padding: 0 6px; }
+.users #numusers { color: var(--accent); font-weight: 700; }
+
+.tabs { display: flex; gap: 4px; }
+.tabs .btn { text-decoration: none; display: inline-flex; align-items: center; }
+/* Knöpfe & Felder */
+.btn {
+  background: var(--bg2); color: var(--muted); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 6px 10px; font: inherit; font-size: 12px; cursor: pointer; min-width: 40px; min-height: 34px;
+  touch-action: manipulation; transition: background .12s, color .12s, border-color .12s;
+}
+.btn:hover { background: var(--line2); color: var(--text); }
+.btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.btn-accent { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); font-weight: 700; }
+.btn-accent:hover { background: var(--accent2); color: var(--accent-fg); }
+.btn-ghost { background: transparent; }
+.btn-icon { min-width: 34px; padding: 6px; }
+select, input[type=text] { background: var(--bg2); color: var(--text); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 8px; font: inherit; font-size: 12px; min-height: 34px; }
+select:focus, input:focus { outline: 1px solid var(--accent); outline-offset: 0; }
+
+/* Bandleiste */
+.bands { display: flex; gap: 6px; padding: 6px 16px; flex-wrap: wrap; border-bottom: 1px solid var(--line2); }
+.band {
+  flex: 1 1 160px; text-align: left; padding: 6px 10px; border-radius: var(--radius);
+  background: var(--bg2); border: 1px solid var(--line); cursor: pointer; color: var(--muted); font: inherit; touch-action: manipulation;
+}
+.band:hover { color: var(--text); background: var(--line2); }
+.band.active { border-color: var(--accent); background: var(--accent-dim); color: var(--text); }
+.band.active b { color: var(--accent); }
+.band.soon { opacity: .4; cursor: default; }
+.band.off { opacity: .35; }
+.band b { display: block; font-size: 13px; letter-spacing: .04em; color: var(--text); }
+.band b small { color: var(--muted); font-weight: 400; margin-left: 4px; }
+.testtag { font-style: normal; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--warn, #f59e0b); border: 1px solid currentColor; border-radius: 3px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
+
+/* Empfänger */
+.rx-host { padding: 8px 16px 4px; }
+.rx-wrap { position: relative; margin: 0 auto; overflow: hidden; border: 1px solid var(--line); background: #000; }
+/* Streifen über der ersten Skala für die Hörer-Marken (sonst lägen sie über dem Empfänger und würden abgeschnitten).
+   Höhe = MARKROW in ui.js und _crabFill in core.js */
+.rx-wrap { padding-top: 22px; }
+.rx-wrap > .scales, .rx-wrap > .lmarks { top: 22px; }
+.rx { width: 1024px; background: #000; touch-action: none; }
+.rx canvas { image-rendering: auto; }
+.scale { position: relative; }
+.scaleabs { position: absolute; }
+#edgelower:hover, #edgeupper:hover { filter: brightness(0) invert(1); }   /* Kante beim Überfahren weiß */
+#yellowbarr { background-color: #34d399; top: 2px; height: 1px; }
+#yellowbara:hover #yellowbarr { top: 2px; height: 2px; }
+.hideblind { display: none; }   /* Durchlass-Balken zeichnet ui.js in der Skala (.pband) */
+.showblind { display: none; }
+/* Kanal-Marker unter dem Wasserfall (von core.js erzeugt) */
+.statinfo0, .statinfo0l { float: left; white-space: nowrap; position: relative; font-size: 10px; line-height: 14px; padding: 0 5px; border-radius: 3px;
+  background: rgba(0,0,0,.8); color: rgba(255,255,255,.55); border: 1px solid rgba(255,255,255,.12); cursor: pointer; }
+.statinfo0:hover, .statinfo0l:hover { color: #fff; border-color: rgba(52,211,153,.6); }
+.statinfo0l { color: #34d399; }
+.statinfo1, .statinfo1l { float: left; position: relative; border: 0; }
+.statinfo1:hover, .statinfo1l:hover { z-index: 98; }
+.statinfo2, .statinfo2l { overflow: hidden; border: 0; position: absolute; padding-left: 4px; }
+.statinfo2:hover, .statinfo2l:hover { overflow: visible; }
+.statinfol { background: rgba(255,255,255,.2) !important; } .statinfoll { background: rgba(52,211,153,.4) !important; }
+
+/* Eigene Frequenzskala */
+.scales { position: absolute; left: 0; top: 0; width: 100%; height: 0; overflow: visible; pointer-events: none; }
+.fscale {
+  position: absolute; left: 0; height: 22px; background: var(--scalebg); border-bottom: 1px solid var(--line);
+  pointer-events: auto; cursor: crosshair; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.fscale i { position: absolute; bottom: 0; width: 1px; background: var(--faint); }
+.fscale i.maj { height: 9px; background: var(--muted); }
+.fscale i.min { height: 4px; }
+.fscale b { position: absolute; top: 2px; transform: translateX(-50%); font-size: 10px; font-weight: 500; color: var(--text); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fscale-band { position: absolute; right: 6px; top: 4px; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); background: var(--scalebg); padding: 0 4px; }
+/* Hörer-Marker */
+.lmarks { position: absolute; left: 0; top: 0; width: 100%; height: 0; overflow: visible; pointer-events: none; }
+.lmarks em {
+  position: absolute; transform: translateX(-50%); font: 500 9px/1 "JetBrains Mono", monospace; font-style: normal; letter-spacing: .04em;
+  color: rgba(255,255,255,.8); background: rgba(0,0,0,.8); border-left: 3px solid var(--c, #fff); padding: 2px 5px 3px; white-space: nowrap; opacity: .85;
+}
+.lmarks em::after { content: ""; position: absolute; left: 50%; top: 100%; margin-left: -1px; width: 2px; height: 6px; background: var(--c, #fff); opacity: .7; }
+.lmarks em.me { opacity: 1; color: #fff; border-left-width: 4px; }
+/* mehrere Hörer auf einer Frequenz: eine Marke, Farbstreifen aus allen Hörerfarben (senkrecht am Rand, waagerecht als Strich) */
+.lmarks em.multi { border-left: 0; padding-left: 8px; }
+.lmarks em.multi::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--gv); }
+.lmarks em.multi::after { width: calc(var(--n, 2) * 3px); margin-left: calc(var(--n, 2) * -1.5px); background: var(--gh); opacity: .9; }
+.lmarks em.multi.me::before { width: 4px; }
+/* eingestellte Frequenz als Linie durch den Wasserfall (halbtransparent, verdeckt keine Signale) */
+.lmarks i.tline { position: absolute; width: 1px; margin-left: -0.5px; background: rgba(248,113,113,.55); }
+/* Durchlassbereich in der Skala (Anzeige, Einstellung unten über die Bandbreite) */
+.lmarks i.pband { position: absolute; height: 22px; background: rgba(52,211,153,.18); border-left: 1px solid rgba(52,211,153,.7); border-right: 1px solid rgba(52,211,153,.7); }
+
+/* App-Layout (Desktop): Kopf + Bandleiste oben, Empfänger scrollt in der Mitte, Bedienleiste fest unten.
+   Auf dem Handy (<700 px) normaler Seitenfluss mit fester Kurzleiste (.mbar). */
+.main { min-width: 0; }
+@media (min-width: 700px) {
+  body.hoeren { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }   /* nur die Hörer-Seite; Digital/Pinnwand/Info scrollen normal */
+  body.hoeren .top, body.hoeren .bands, body.hoeren .panel, body.hoeren .foot { flex: none; }
+  body.hoeren .main { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-gutter: stable; }   /* gutter: Scrollleiste darf die Breite nicht ändern (sonst Rückkopplung mit fillHeight) */
+  body.hoeren .panel { border-top: 1px solid var(--line); background: var(--bg); box-shadow: 0 -6px 16px rgba(0,0,0,.25); }
+}
+
+/* Bedienfeld */
+.panel { padding: 6px 16px 8px; }
+/* Bedienleiste als Raster mit festen Stufen: breit = eine Reihe (S-Meter nimmt die Restbreite), mittel = zwei Reihen,
+   schmal = 3 Spalten x 2 Reihen. So gibt es keine zufälligen Umbrüche und keine Löcher. */
+.strip {
+  display: grid; gap: 6px 22px; align-items: start; padding: 2px 0;
+  grid-template-columns: max-content max-content max-content minmax(220px, 1fr) max-content max-content;
+  grid-template-areas: "freq mode bw sig vol wf";
+}
+.grp { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.grp .lbl { font-size: 10px; color: var(--faint); text-transform: uppercase; letter-spacing: .08em; }
+.grp-freq { grid-area: freq; display: grid; grid-template-columns: max-content max-content; column-gap: 8px; align-items: center; }
+.grp-freq .freq-mhz, .grp-freq .presetsel, .grp-freq .vfo, .grp-freq .memories, .grp-freq .snap { grid-column: 1 / -1; }
+.grp-mode { grid-area: mode; }
+.grp-bw { grid-area: bw; }
+.grp-sig { grid-area: sig; }
+.grp-vol { grid-area: vol; min-width: 170px; }
+.grp-wf { grid-area: wf; }
+@media (max-width: 1500px) {
+  .strip { grid-template-columns: max-content max-content max-content minmax(200px, 1fr); grid-template-areas: "freq mode bw sig" "freq vol wf sig"; }
+}
+@media (max-width: 1100px) {
+  .strip { grid-template-columns: repeat(3, 1fr); gap: 8px 14px; grid-template-areas: "freq mode bw" "sig vol wf"; }
+}
+.presetsel { width: 100%; max-width: 360px; min-width: 260px; }
+.volrow { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+details.card { padding: 0; }
+details.card summary { cursor: pointer; padding: 8px 12px; font-size: 13px; font-weight: 700; list-style: none; display: flex; align-items: center; gap: 8px; }
+details.card summary::-webkit-details-marker { display: none; }
+details.card summary::before { content: "▸"; color: var(--faint); font-size: 11px; }
+details.card[open] summary::before { content: "▾"; }
+details.card summary small { color: var(--faint); font-weight: 400; font-size: 11px; }
+details.card > :not(summary) { margin-left: 12px; margin-right: 12px; }
+details.card > :last-child { margin-bottom: 10px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.freq-mhz { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .02em; color: var(--accent); line-height: 1.1; }
+.freq-mhz small { font-size: 12px; color: var(--muted); font-weight: 500; margin-left: 6px; letter-spacing: .1em; }
+.freqform { display: flex; align-items: center; gap: 6px; margin: 0; }
+.freqform input[name=frequency] { width: 140px; font-size: 14px; font-weight: 600; }
+.freqform .unit { color: var(--faint); font-size: 11px; }
+.steps { display: flex; gap: 4px; flex-wrap: wrap; }
+.steps .btn { min-width: 36px; }
+.snap { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 11px; color: var(--muted); }
+.presets { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+.presets .btn { font-size: 11px; padding: 5px 8px; }
+.presets .btn small { color: var(--faint); margin-left: 4px; }
+
+
+.modes { display: flex; gap: 4px; flex-wrap: wrap; }
+.modes .btn { flex: 1; }
+.bw { display: flex; align-items: center; gap: 6px; }
+.bw .btn { min-width: 34px; }
+.bwpresets { display: flex; gap: 4px; flex-wrap: wrap; }
+.bwpresets .btn { flex: 1; min-width: 0; font-size: 11px; padding: 4px 6px; min-height: 30px; display: inline-flex; flex-direction: column; align-items: center; gap: 0; line-height: 1.2; }
+.bwpresets .btn small { font-size: 9px; color: var(--faint); }
+.bwval { flex: 1; text-align: center; font-variant-numeric: tabular-nums; color: var(--accent); }
+.toggles { display: flex; gap: 4px; flex-wrap: wrap; }
+.toggle { display: inline-flex; }
+.toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.toggle span { display: inline-block; padding: 7px 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg2); color: var(--muted); cursor: pointer; font-size: 12px; min-height: 34px; }
+.toggle input:checked + span { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+
+.smeter { margin: 0; }
+.smeter-scale { position: relative; height: 13px; font-size: 9px; color: var(--faint); letter-spacing: .04em; }
+.smeter-scale span { position: absolute; transform: translateX(-50%); }
+.smeter-scale span:first-child { transform: none; } .smeter-scale span:last-child { transform: translateX(-100%); }
+.smeter-track { position: relative; height: 12px; background: var(--bg2); border-radius: 3px; overflow: hidden; border: 1px solid var(--line2); }
+.smeter-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, var(--ok) 0 41%, var(--warn) 41% 60%, var(--bad) 60%); transition: width .08s linear; }
+.smeter-peak { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--strong); left: 0; transition: left .2s; }
+.smeter-num { margin-top: 5px; font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
+.smeter-num b { color: var(--accent); font-size: 14px; margin-right: 6px; }
+.smeter-num .gabs { color: var(--faint); }
+#volumecontrol2 { width: 100%; accent-color: var(--accent); }
+
+.wfbtns { display: flex; gap: 4px; flex-wrap: wrap; }
+.viewsel { display: grid; gap: 4px; }
+.viewsel .toggle span { display: block; }
+.onlyall { display: none; }
+body.allbands .onlyall { display: inline-flex; }
+.wfsel { display: grid; gap: 4px; }
+.wfsel label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+.hint { color: var(--faint); font-size: 10px; margin: 8px 0 0; line-height: 1.5; }
+
+/* Erweitert-Elemente */
+.vfo { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
+.vfo .btn { flex: 1; }
+.memories { margin-top: 8px; font-size: 11px; }
+.memories table { border-collapse: collapse; width: 100%; }
+.memories td { padding: 3px 4px; border-bottom: 1px solid var(--line2); vertical-align: middle; }
+.memories input[type=button] { background: var(--bg2); color: var(--muted); border: 1px solid var(--line); border-radius: 3px; padding: 3px 6px; font: inherit; font-size: 10px; cursor: pointer; margin-right: 3px; }
+.memories input[type=text] { padding: 3px 6px; font-size: 10px; width: 90px; min-height: 0; }
+.sgraphrow { margin-bottom: 8px; }
+.sgraphrow label { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+.sgraph { width: 100%; height: 60px; margin-top: 6px; background: var(--bg2); border-radius: 3px; }
+.recrow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 11px; color: var(--muted); }
+.recrow .btn { min-height: 28px; padding: 3px 10px; }
+.wflevel { display: grid; gap: 4px; margin-top: 8px; }
+.wflevel label { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); }
+.wflevel label span { width: 80px; }
+.wflevel input[type=range] { flex: 1; accent-color: var(--accent); }
+.wfopts { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.wfopts .btn { min-height: 30px; padding: 4px 10px; }
+
+/* Logbuch, Sysop, Chat */
+.logbook { max-height: 150px; overflow-y: auto; background: var(--bg2); border: 1px solid var(--line2); border-radius: var(--radius); padding: 4px 8px; font-size: 11px; line-height: 1.6; }
+.logbook div { display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--line2); padding: 2px 0; }
+.logbook div:last-child { border-bottom: 0; }
+.logbook .t { color: var(--faint); white-space: nowrap; }
+.logbook .f { font-variant-numeric: tabular-nums; color: var(--accent); }
+.logbook .c { font-weight: 700; }
+.logform { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 4px; margin-top: 6px; }
+.logform input { min-width: 0; }
+.sysop { display: grid; gap: 6px; }
+.sysrow { display: flex; gap: 4px; }
+.sysrow input { flex: 1; min-width: 0; }
+.sysbtns { display: flex; gap: 4px; flex-wrap: wrap; }
+.chatbox { height: 150px; overflow-y: auto; background: var(--bg2); border: 1px solid var(--line2); border-radius: var(--radius); padding: 6px 8px; font-size: 11px; line-height: 1.6; word-break: break-word; }
+.chatform { display: flex; gap: 4px; margin-top: 8px; }
+.chatform input { flex: 1; }
+.myname { width: 140px; font-size: 11px; }
+.toast { position: fixed; left: 50%; top: 64px; transform: translateX(-50%); background: var(--accent); color: var(--accent-fg); padding: 8px 14px; border-radius: var(--radius); font-size: 12px; z-index: 60; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+
+/* Fuß */
+.foot { padding: 3px 16px 5px; color: var(--faint); font-size: 10px; letter-spacing: .02em; border-top: 1px solid var(--line2); }
+.status { display: flex; gap: 12px; flex-wrap: wrap; padding: 2px 0; text-transform: uppercase; letter-spacing: .06em; }
+body.pinnwand .foot, body.digi .foot, body.info .foot { padding: 6px 16px 24px; border-top: 0; }
+.status .ok { color: var(--ok); } .status .warn { color: var(--warn); } .status .bad { color: var(--bad); }
+.about p { margin: 1px 0; }
+
+/* Einfacher Modus: erweiterte Bedienelemente nur mit Schalter */
+.adv { display: none !important; }
+#advbtn.on { border-color: var(--accent); color: var(--accent); }
+body.sticky.allbands .rx-host { position: sticky; top: 0; z-index: 40; background: var(--bg); box-shadow: 0 6px 12px rgba(0,0,0,.4); }
+
+/* Chat-Einblendung */
+.chatbtn { position: relative; }
+.chatbtn b { position: absolute; top: -5px; right: -5px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: var(--accent-fg); font-size: 10px; line-height: 16px; text-align: center; }
+.chatbtn.open { border-color: var(--accent); color: var(--accent); }
+/* Chat angedockt, verdeckt nie etwas: der Empfänger macht ihm Platz (fit()/fillHeight() reagieren über ResizeObserver auf .main).
+   breit (≥1100 px): Spalte rechts neben dem Wasserfall, zwischen Bandleiste und Bedienleiste  -> .main bekommt margin-right
+   mittel (700–1099): Streifen unter dem Wasserfall, über der Bedienleiste                      -> .main bekommt margin-bottom
+   Handy (<700): im Seitenfluss direkt unter dem Wasserfall. Breite/Höhe per Griff einstellbar (--chat-w / --chat-h). */
+:root { --chat-w: 340px; --chat-h: 240px; }
+.chatdrawer { display: flex; flex-direction: column; background: var(--bg2); border: 0 solid var(--line); z-index: 30; }
+.chatdrawer[hidden] { display: none; }
+.chatgrip { position: absolute; z-index: 1; touch-action: none; }
+.chatgrip::after { content: ""; position: absolute; background: var(--line); border-radius: 2px; opacity: .8; }
+.chatgrip:hover::after, .chatdrawer.resizing .chatgrip::after { background: var(--accent); opacity: 1; }
+@media (min-width: 700px) {
+  .chatdrawer { position: fixed; }
+  body.chat-side .chatdrawer { right: 0; top: var(--top-h, 100px); bottom: var(--panel-h, 190px); width: var(--chat-w); border-left-width: 1px; }
+  body.chat-side.chat-open .main { margin-right: var(--chat-w); }
+  body.chat-side .chatgrip { left: -4px; top: 0; bottom: 0; width: 9px; cursor: ew-resize; }
+  body.chat-side .chatgrip::after { left: 3px; top: 50%; width: 3px; height: 36px; margin-top: -18px; }
+  body.chat-bottom .chatdrawer { left: 0; right: 0; bottom: var(--panel-h, 190px); height: var(--chat-h); border-top-width: 1px; }
+  body.chat-bottom.chat-open .main { margin-bottom: var(--chat-h); }
+  body.chat-bottom .chatgrip { top: -4px; left: 0; right: 0; height: 9px; cursor: ns-resize; }
+  body.chat-bottom .chatgrip::after { top: 3px; left: 50%; height: 3px; width: 36px; margin-left: -18px; }
+}
+.chathead { display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; border-bottom: 1px solid var(--line2); font-size: 13px; }
+.chathead small { color: var(--faint); font-size: 11px; flex: 1; }
+.chatlist { flex: 1; overflow-y: auto; padding: 6px 10px; font-size: 12px; line-height: 1.7; word-break: break-word; }
+.chatlist .t { color: var(--faint); font-size: 10px; }
+.chatlist b { color: var(--accent); font-weight: 600; }
+.chatlist a { color: var(--accent); }
+.chatdrawer .chatform { margin: 0; padding: 6px; border-top: 1px solid var(--line2); }
+
+/* Handy-Leiste */
+.mbar { display: none; }
+
+@media (max-width: 1100px) { .grp-sig { max-width: none; } }
+@media (max-width: 700px) {
+  body { padding-bottom: calc(60px + var(--sab)); }
+  .top { padding: 6px 10px; gap: 6px; }
+  .brand h1 { font-size: 14px; } .logo { width: 28px; height: 28px; } .sub { display: none; }
+  .bands { padding: 6px 10px; gap: 4px; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .bands::-webkit-scrollbar { display: none; }
+  .band { flex: 0 0 auto; padding: 5px 10px; }
+  .band b { font-size: 12px; } .band > small { display: none; }
+  body.hoeren { display: flex; flex-direction: column; }
+  body.hoeren .main { display: contents; }
+  body.hoeren .rx-host { order: 1; } body.hoeren .panel { order: 2; } body.hoeren .foot { order: 4; } body.hoeren .mbar, body.hoeren .hidden-fields, body.hoeren .toast { order: 5; }
+  .rx-host, .panel, .foot { padding-left: 10px; padding-right: 10px; }
+  .toast { top: auto; bottom: 90px; }
+  .viewsel { display: none; }   /* Handy: immer ein Band */
+  body.hoeren .chatdrawer { order: 1; position: relative; height: var(--chat-h); margin: 4px 10px 6px; border-width: 1px; border-radius: var(--radius); }   /* direkt unter dem Wasserfall */
+  .chatgrip { left: 0; right: 0; bottom: -6px; height: 14px; cursor: ns-resize; }
+  .chatgrip::after { bottom: 5px; left: 50%; height: 3px; width: 36px; margin-left: -18px; }
+  .strip { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+  .grp-freq { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+  .grp-freq .freq-mhz, .grp-freq .presetsel { flex: 1 1 100%; }
+  .grp-freq .freqform { flex: 1 1 auto; } .grp-freq .freqform input[name=frequency] { width: 100%; min-width: 120px; }
+  .grp-freq .steps { flex: 0 0 auto; }
+  .grp-freq, .grp-sig, .grp-vol { flex: 1 1 100%; max-width: none; }
+  .freq-mhz { font-size: 26px; }
+  .fscale { height: 26px; } .fscale b { font-size: 11px; top: 4px; }
+  .fscale-band { display: none; }   /* Handy: Bandname steht schon in der Bandleiste, hier verdeckt er die Zahlen */
+  .grp-freq label.snap { margin-left: 8px; }
+  .logform { grid-template-columns: 1fr; } .myname { width: 110px; }
+  .mbar {
+    display: grid; grid-template-columns: 1fr auto 40px 40px 40px 40px; gap: 4px; align-items: center;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; padding: 6px 8px calc(6px + var(--sab));
+    background: var(--barbg); border-top: 1px solid var(--line); backdrop-filter: blur(8px);
+  }
+  .mbar .btn { min-width: 40px; padding: 6px 0; font-size: 16px; }
+  .mfreq { background: var(--bg2); color: var(--accent); border: 1px solid var(--line); border-radius: var(--radius); font: 700 18px/1 "JetBrains Mono", monospace; padding: 9px 8px; text-align: left; min-height: 40px; }
+  .mmode { min-width: 70px; }
+  .mrow { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
+  .mmeter { flex: 1; position: relative; height: 3px; background: var(--bg2); border-radius: 2px; overflow: hidden; }
+  .mtext { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .audio-ready .mbar { grid-template-columns: 1fr auto 40px 40px 40px; }
+}
+
+/* Aufnahme */
+.recbox { display: flex; align-items: center; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.recbtn.on { border-color: var(--bad); color: var(--bad); }
+#reclink a { font-size: 12px; color: var(--accent); }
+
+/* Chat: Name beim ersten Schreiben, „Meine Frequenz" */
+.chatdrawer .chatform { flex-wrap: wrap; }
+.chatform .chatname { flex: 1 1 100%; }
+.chatform input[name=chat] { min-width: 0; }
+.chatform .chatname[hidden] { display: none; }
+.chatlist a.tune { text-decoration: none; border-bottom: 1px dotted currentColor; }
+.chatlist .from { color: var(--accent); font-size: 11px; letter-spacing: .04em; }
+
+/* Tastatur-Hilfe */
+.keyhelp { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,.55); }
+.keyhelp[hidden] { display: none; }
+.keyhelp-box { background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 20px; max-width: 420px; width: calc(100% - 32px); font-size: 13px; }
+.keyhelp dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; margin: 12px 0 14px; }
+.keyhelp dt { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.keyhelp dd { margin: 0; color: var(--muted); }
+
+/* Wasserfall läuft an */
+.wfwarm { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); color: var(--faint); font-size: 12px; letter-spacing: .06em; pointer-events: none; transition: opacity .8s; z-index: 2; }
+.wfwarm.gone { opacity: 0; }
+
+/* Frequenzliste */
+.presetrow { display: flex; gap: 6px; }
+.presetrow .presetsel { flex: 1 1 auto; min-width: 0; }
+.flist-box { max-width: 760px; max-height: calc(100dvh - 48px); display: flex; flex-direction: column; }
+.flist-head { display: flex; align-items: center; justify-content: space-between; }
+.flist .hint { margin: 6px 0 10px; color: var(--muted); font-size: 12px; }
+.flist-scroll { overflow: auto; min-height: 0; }
+.flist-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.flist-table th { text-align: left; color: var(--faint); font-weight: 500; padding: 4px 8px; position: sticky; top: 0; background: var(--bg); border-bottom: 1px solid var(--line); }
+.flist-table td { padding: 5px 8px; border-bottom: 1px solid var(--line2); white-space: nowrap; }
+.flist-table td.info { white-space: normal; color: var(--muted); }
+.flist-table tr.band td { color: var(--accent); font-weight: 600; padding-top: 10px; border-bottom-color: var(--line); }
+.flist-table tbody tr[data-khz] { cursor: pointer; }
+.flist-table tbody tr[data-khz]:hover td { background: var(--bg2); }
+.flist-table td.mhz { color: var(--accent); font-variant-numeric: tabular-nums; }
+.flist-table .src { font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); }
+@media (max-width: 700px) { .flist-table th:nth-child(3), .flist-table td.info, .flist-table th:nth-child(7), .flist-table td:nth-child(7) { display: none; } }
+
+/* Teilen */
+.sharebtn { white-space: nowrap; }
+@media (max-width: 1400px) and (min-width: 700px) { .sharebtn span { display: none; } }
+
+/* ===== Handy-Aufbau (ui.js setzt body.phone): Wasserfall füllt den Bildschirm, feste Leiste unten, Einstellungen als
+   Menü von unten (body.sheet-open). Kopf nur Logo, Name der Station, Ton, Sprache und Reiter. ===== */
+@media (max-width: 700px) {
+  body.phone { padding-bottom: 0; overflow: hidden; height: 100dvh; }
+  body.phone .top #myname, body.phone .top .users, body.phone .top #chatbtn, body.phone .top #themebtn { display: none; }
+  body.phone .top { flex-wrap: nowrap; padding-top: calc(4px + env(safe-area-inset-top, 0px)) !important; }   /* PWA: Statusleiste des Handys nicht überdecken (look.css setzt padding, deshalb !important) */
+  body.phone .sheetback, body.phone .chatdrawer { top: auto; }
+  body.phone .top #audiobtn { display: none; }   /* Ton-Knopf gibt es unten in der Leiste */
+  body.phone .top .topright { flex-wrap: nowrap; }
+  body.phone .tabs.phonetabs { display: flex; gap: 2px; padding: 0 8px 4px; border-bottom: 1px solid var(--line2); }
+  body.phone .tabs.phonetabs .btn { flex: 1; text-align: center; padding: 5px 4px; font-size: 12px; }
+  body.phone .rx-host { flex: 1 1 auto; min-height: 0; padding-top: 4px; padding-bottom: 0; }
+  body.phone .foot { display: none; }
+  /* Einstellungen: Menü von unten */
+  body.phone .panel {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; max-height: min(82dvh, 100dvh - 60px); overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: var(--bg); border-top: 1px solid var(--line); border-radius: 12px 12px 0 0; box-shadow: 0 -8px 24px rgba(0,0,0,.45);
+    transform: translateY(102%); transition: transform .22s ease-out; padding: 0 12px calc(12px + var(--sab));
+  }
+  body.phone.sheet-open .panel { transform: none; }
+  body.phone .sheetback { display: none; position: fixed; inset: 0; z-index: 55; background: rgba(0,0,0,.45); }
+  body.phone.sheet-open .sheetback { display: block; }
+  .sheethead { display: flex; align-items: center; gap: 8px; padding: 10px 0 8px; position: sticky; top: 0; background: var(--bg); z-index: 1; border-bottom: 1px solid var(--line2); margin-bottom: 8px; }
+  .sheethead .sheettitle { display: none; }
+  .sheethead .myname { flex: 1 1 auto; min-width: 0; width: auto; }
+  .sheethead .users { white-space: nowrap; font-size: 11px; color: var(--muted); }
+  .sheethead .btn { flex: 0 0 auto; }
+  .sheetfoot { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--line2); font-size: 10px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
+  body.phone .panel .strip { gap: 10px 12px; }
+  body.phone .panel .grp-vol, body.phone .panel .grp-sig { flex: 1 1 100%; }
+  /* Leiste unten */
+  body.phone .mbar { grid-template-columns: 1fr auto 40px 40px 40px 40px; }
+  body.phone.audio-ready .mbar { grid-template-columns: 1fr auto 40px 40px 40px; }
+  body.phone .mbar .btn { font-size: 14px; }
+  body.phone .mbar .msq.active { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+  body.phone .mbar .msq.open { background: var(--accent-dim); }
+  body.phone .mbar .mmute.active { border-color: #f87171; color: #f87171; }
+  /* Chat als Fenster über der Leiste */
+  body.phone .chatdrawer { position: fixed; left: 8px; right: 8px; bottom: calc(66px + var(--sab)); height: 48vh; margin: 0; z-index: 58; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); box-shadow: 0 -8px 24px rgba(0,0,0,.45); }
+}

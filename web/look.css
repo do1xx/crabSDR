@@ -1,0 +1,207 @@
+/* look.css – Überlagerung für den crab-Look (lädt core.js).
+   Ziel: ruhiger, flacher, weniger Kästen. ui.css bleibt unverändert; alles hier ist rücknehmbar. */
+
+/* Grundton: flache Flächen, dünnere Linien, keine Schatten */
+body.look-crab { --radius: 3px; --bg2: transparent; }
+body.look-crab .btn, body.look-crab .toggle span, body.look-crab select, body.look-crab input[type=text] {
+  background: transparent; border-color: var(--line2); min-height: 30px; padding: 4px 9px;
+}
+body.look-crab .btn:hover, body.look-crab .toggle span:hover { background: var(--accent-dim); border-color: var(--line); color: var(--text); }
+body.look-crab .btn.active, body.look-crab .toggle input:checked + span { background: transparent; border-color: var(--accent); color: var(--accent); font-weight: 600; }
+body.look-crab .btn-accent { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+body.look-crab .btn-icon { min-width: 30px; }
+body.look-crab.hoeren .panel { box-shadow: none; border-top: 1px solid var(--line2); }
+
+/* Kopf: Reiter als Text mit Unterstrich, Name schlicht */
+body.look-crab .top { padding: 4px 16px; border-bottom-color: var(--line2); }
+body.look-crab .tabs { gap: 2px; }
+body.look-crab .tabs .btn { border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; padding: 6px 8px; min-height: 30px; }
+body.look-crab .tabs .btn.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+body.look-crab .myname { border-color: transparent; background: transparent; text-align: right; }
+body.look-crab .myname:focus { border-color: var(--line); }
+body.look-crab .users { padding: 0 8px; }
+
+/* Bandleiste: eine schlanke Zeile, aktives Band nur durch Farbe und Unterstrich */
+body.look-crab .bands { padding: 0 16px; gap: 0; border-bottom: 1px solid var(--line2); }
+body.look-crab .band { flex: 0 1 auto; background: transparent; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 7px 12px 6px; }
+body.look-crab .band:hover { background: transparent; }
+body.look-crab .band.active { background: transparent; border-bottom-color: var(--accent); }
+body.look-crab .band b { font-size: 12px; font-weight: 600; color: var(--muted); }
+body.look-crab .band.active b { color: var(--text); }
+body.look-crab .band b small { color: var(--faint); font-size: 10px; }
+body.look-crab .band.active b small { color: var(--accent); }
+
+/* Empfänger: ohne Rahmen, mehr Luft */
+body.look-crab .rx-host { padding: 10px 16px 2px; }
+body.look-crab .rx-wrap { border: 0; border-radius: 4px; }
+body.look-crab .fscale { background: var(--scalebg); border-bottom: 0; }
+body.look-crab .fscale b { font-weight: 500; color: var(--muted); }
+body.look-crab .fscale-band { color: var(--faint); }
+body.look-crab .lmarks em { background: rgba(0,0,0,.65); border-left-width: 2px; padding: 1px 5px 2px; }
+
+/* Bedienleiste: eine ruhige Reihe, kleine Beschriftungen nur wo nötig */
+body.look-crab .panel { padding: 6px 16px 6px; }
+body.look-crab .strip { gap: 4px 20px; }
+body.look-crab .grp { gap: 4px; }
+body.look-crab .grp .lbl { font-size: 9px; color: var(--faint); letter-spacing: .1em; }
+body.look-crab .grp-sig .lbl, body.look-crab .grp-vol .lbl { display: none; }
+body.look-crab .freq-mhz { font-size: 30px; letter-spacing: 0; }
+body.look-crab .freq-mhz small { letter-spacing: .06em; }
+body.look-crab .freqform input[name=frequency] { width: 124px; font-weight: 500; }
+body.look-crab .steps .btn { min-width: 30px; padding: 4px 6px; }
+body.look-crab .modes .btn { padding: 4px 8px; }
+body.look-crab .bwpresets .btn { border-color: transparent; }
+body.look-crab .bwpresets .btn.active { border-color: var(--accent); }
+body.look-crab .bwval { font-weight: 600; }
+body.look-crab .smeter-track { height: 8px; border: 0; background: var(--line2); border-radius: 4px; }
+body.look-crab .smeter-fill { background: linear-gradient(90deg, var(--ok) 0 41%, var(--warn) 41% 60%, var(--bad) 60%); }
+body.look-crab .smeter-peak { width: 1px; }
+body.look-crab .smeter-scale { height: 12px; }
+body.look-crab .smeter-num { margin-top: 3px; font-size: 11px; }
+body.look-crab .recbox { margin-top: 2px; }
+body.look-crab .recbtn { border-color: transparent; color: var(--faint); }
+body.look-crab .recbtn:hover, body.look-crab .recbtn.on { color: var(--bad); border-color: var(--bad); }
+body.look-crab .wfbtns .btn { min-width: 30px; }
+.segsel { font-size: 12px; max-width: 200px; }
+.x1bar .segsel { height: 26px; }
+.presetrow .segsel { margin-left: 4px; }
+body.look-crab .viewsel .toggle span { border-color: transparent; padding-left: 0; }
+body.look-crab .viewsel .toggle input:checked + span { border-color: transparent; }
+body.look-crab .viewsel .toggle span::before { content: "○ "; color: var(--faint); }
+body.look-crab .viewsel .toggle input:checked + span::before { content: "● "; color: var(--accent); }
+
+/* Fuß und Chat */
+body.look-crab .foot { border-top: 0; padding: 2px 16px 4px; }
+body.look-crab .chatdrawer { background: var(--bg); }
+body.look-crab .chathead { border-bottom-color: var(--line2); }
+
+/* Handy */
+@media (max-width: 700px) {
+  body.look-crab .bands { padding: 0 6px; flex-wrap: nowrap; overflow-x: auto; }
+  body.look-crab .band { flex: 0 0 auto; padding: 8px 10px 7px; white-space: nowrap; }
+  body.look-crab .band b small { display: none; }
+  body.look-crab .top { padding: 4px 8px; }
+  body.look-crab .tabs .btn { padding: 6px 6px; }
+  body.look-crab .mbar { background: var(--barbg); border-top-color: var(--line2); }
+  body.look-crab .mfreq { border-color: transparent; }
+}
+
+/* crabSDR-Zeichen in der Statuszeile, Offline-Krabbe im Wasserfall */
+body.look-crab .foot { display: flex; align-items: center; gap: 12px; }
+body.look-crab .foot .status { flex: 1; }
+.crabmark { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.crabmark:hover { color: var(--accent); text-decoration: none; }
+.crabmark img { height: 18px; width: auto; }
+.crabmark .crabemoji { font: 18px/1 "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; letter-spacing: 0; }
+/* Krabbe im Kopf neben dem Titel */
+.crabbrand { display: inline-flex; align-items: center; gap: 4px; margin-left: 10px; vertical-align: middle; text-transform: none; letter-spacing: .02em; font-size: 11px; font-weight: 600; color: var(--muted); }
+.crabbrand img { height: 24px; width: auto; margin: -6px 0; }
+.crabbrand:hover { color: var(--accent); text-decoration: none; }
+@media (max-width: 700px) { .crabbrand span { display: none; } .crabbrand img { height: 20px; } }
+.crab-offline { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  color: rgba(255,255,255,.7); font-size: 12px; letter-spacing: .04em; pointer-events: none; }
+.crab-offline img { width: 72px; height: 72px; opacity: .9; }
+
+/* ===== Bedienfeld neu (core.js _crabPanelBuild): zwei Zeilen, umbrechen statt überlappen ===== */
+body.x1panel .panel .strip.x1old { display: none; }
+body.x1panel .panel { padding: 8px 16px 6px; }
+.x1bar { display: flex; flex-direction: column; gap: 6px; }
+.x1row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; min-width: 0; }
+.x1tools { gap: 6px 16px; padding-top: 6px; border-top: 1px solid var(--line2); }
+.x1right { margin-left: auto; }
+.x1grp .agcrow .x1lbl { margin-right: 2px; }
+.x1bar .toggles { display: inline-flex; align-items: center; gap: 6px; }
+.x1bar .toggles .sqrow { margin-right: 4px; }
+.x1grp { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.x1sep { width: 1px; height: 18px; background: var(--line); flex: none; }
+.x1lbl { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+
+/* einheitliche Bedienelemente */
+.x1bar .btn, .x1bar .toggle span, .x1bar select, .x1bar input[type=text] {
+  min-height: 28px; height: 28px; padding: 0 10px; font-size: 12px; line-height: 26px; border-radius: 4px; box-sizing: border-box; }
+.x1tools .btn, .x1tools .toggle span, .x1tools select, .x1tools input[type=text] { min-height: 26px; height: 26px; line-height: 24px; font-size: 11px; padding: 0 8px; }
+.x1bar .toggle span { display: inline-flex; align-items: center; }
+
+/* Segmente: zusammenhängende Knopfreihen */
+.x1seg, .x1seg.presetrow, .x1seg.wfbtns, .x1bar .modes, .x1bar .bwpresets { display: inline-flex; flex-wrap: nowrap; gap: 0; }
+.x1seg .btn, .x1bar .modes .btn, .x1bar .bwpresets .btn { border-radius: 0; margin-left: -1px; flex: none; }
+.x1seg > .btn:first-child, .x1bar .modes .btn:first-child, .x1seg > :first-child .btn:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
+.x1seg > .btn:last-child, .x1bar .modes .btn:last-child, .x1seg > :last-child .btn:last-child { border-radius: 0 4px 4px 0; }
+.x1bar .modes .btn { min-width: 44px; padding: 0 8px; }
+.x1bar .btn.active { position: relative; z-index: 1; background: var(--accent-dim); }
+body.look-crab .x1bar .bwpresets .btn { border-color: var(--line2); }
+body.look-crab .x1bar .bwpresets .btn.active { border-color: var(--accent); }
+.x1bar .bwpresets .btn small { display: none; }
+.x1bw .bwval { font-size: 11px; color: var(--muted); font-weight: 500; white-space: nowrap; min-width: 52px; }
+
+/* Frequenz */
+.x1freq { gap: 10px; }
+.x1bar .freq-mhz { font-size: 30px; line-height: 1; white-space: nowrap; }
+.x1bar .freq-mhz small { font-size: 11px; }
+.x1bar .steps { display: inline-flex; gap: 0; }
+.x1bar .steps .btn { min-width: 28px; width: 28px; padding: 0; border-radius: 0; margin-left: -1px; }
+.x1bar .steps .btn:not(.adv):first-of-type, .x1bar .steps .btn:nth-child(3) { border-radius: 4px 0 0 4px; margin-left: 0; }
+.x1bar .steps .btn:nth-child(4) { border-radius: 0 4px 4px 0; }
+
+/* S-Meter nimmt den Rest der ersten Zeile */
+.x1meter { flex: 1 1 260px; min-width: 220px; }
+.x1meter .smeter { display: grid; grid-template-columns: 1fr auto; column-gap: 12px; align-items: center; width: 100%; }
+.x1meter .smeter-scale { grid-column: 1; grid-row: 1; }
+.x1meter .smeter-track { grid-column: 1; grid-row: 2; }
+.x1meter .smeter-num { grid-column: 2; grid-row: 1 / 3; margin: 0; font-size: 12px; white-space: nowrap; min-width: 92px; }
+
+/* Werkzeugzeile */
+.x1bar .freqform { display: inline-flex; align-items: center; gap: 4px; margin: 0; }
+.x1bar .freqform input[name=frequency] { width: 104px; font-variant-numeric: tabular-nums; }
+.x1bar .freqform .unit { font-size: 10px; color: var(--faint); }
+.x1bar .presetsel { min-width: 0; width: 180px; max-width: 220px; border-radius: 4px 0 0 4px; }
+.x1bar .presetrow .segsel { display: none; }   /* Bereich steht in der Leiste als eigene Gruppe */
+.x1range .segsel { width: 190px; }
+.x1bar .presetrow { gap: 0; }
+.x1bar .presetrow .btn { border-radius: 0 4px 4px 0; margin-left: -1px; }
+.x1bar label.snap { margin: 0; gap: 6px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.x1bar label.snap select { width: auto; text-transform: none; letter-spacing: 0; }
+.x1bar .toggles { gap: 4px; flex-wrap: nowrap; }
+.x1bar .volrow { gap: 6px; font-size: 12px; color: var(--faint); }
+.x1bar .volrow input[type=range] { width: 110px; }
+.x1bar .sqrow input[type=range] { width: 80px; }
+.sqrow #squelchdb { font-variant-numeric: tabular-nums; min-width: 34px; }
+.sqrow.off { opacity: .35; }
+.agcrow.off { display: none; }
+.agcrow select { font-size: 12px; }
+.x1bar .recbtn { border-color: transparent; }
+.x1share .btn span { display: none; }
+@media (min-width: 1500px) { .x1share .btn span { display: inline; } }
+
+/* Decoder-Menü */
+.x1dec { position: relative; margin-left: auto; }
+.x1decbtn .x1caret { font-size: 9px; color: var(--faint); margin-left: 2px; }
+.x1dec.open .x1decbtn { border-color: var(--accent); color: var(--accent); }
+.x1pop { display: none; position: absolute; right: 0; bottom: calc(100% + 8px); min-width: 250px; z-index: 50;
+  background: var(--bg); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.35); padding: 6px; }
+.x1dec.open .x1pop { display: block; }
+.x1pophead { font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); padding: 4px 8px 6px; }
+.x1popitem { display: flex; flex-direction: column; gap: 1px; padding: 7px 8px; border-radius: 4px; color: var(--text); text-decoration: none; }
+.x1popitem:hover { background: var(--accent-dim); text-decoration: none; }
+.x1popitem b { font-size: 12px; font-weight: 600; }
+.x1popitem small { font-size: 10px; color: var(--muted); }
+.x1popempty { font-size: 11px; color: var(--muted); padding: 6px 8px; }
+@media (max-width: 1250px) { .x1bar .presetsel { width: 160px; } .x1bar .volrow input[type=range] { width: 90px; } .x1row { gap: 8px 12px; } }
+/* Decoder-Menü mit Live-Zustand */
+.x1pop { min-width: 320px; max-width: 420px; max-height: 70vh; overflow-y: auto; }
+.x1decitem { padding: 8px; border-radius: 4px; border-top: 1px solid var(--line2); }
+.x1decitem:first-of-type { border-top: 0; }
+.x1dechead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.x1dechead b { font-size: 12px; }
+.x1decst { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.x1decst.ok { color: var(--accent); } .x1decst.warn { color: var(--warn, #d97706); }
+.x1decmeta { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.x1declast { margin-top: 5px; font-size: 11px; color: var(--text); display: flex; flex-direction: column; gap: 2px; }
+.x1declast div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.x1declast span { color: var(--faint); margin-right: 6px; font-variant-numeric: tabular-nums; }
+.x1decbtns { display: flex; gap: 6px; margin-top: 6px; }
+.x1decbtns .btn { min-height: 24px; height: 24px; line-height: 22px; font-size: 11px; padding: 0 8px; text-decoration: none; }
+/* Hinweis-Banner und Links unten ([ui] banner / impressum / datenschutz) */
+.x1banner { padding: 6px 16px; font-size: 12px; background: var(--accent-dim); color: var(--text); border-bottom: 1px solid var(--line2); }
+.x1links { display: inline-flex; gap: 12px; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+.x1links a { color: var(--muted); } .x1links a:hover { color: var(--accent); }
