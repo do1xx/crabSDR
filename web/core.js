@@ -783,6 +783,7 @@ function _crabConnect(b) {
         var j; try { j = JSON.parse(new TextDecoder().decode(u8.subarray(1))); } catch (e) { return; }
         if (j.type === 'level') { if (b === band) { _crab.level = j.db; _crab.floor = j.floor; _crab.sq = j.sq; } }
         else if (j.type === 'listeners') { _crabListenersFromWs(b, j.list || []); }
+        else if (j.type === 'decoder') { if (j.kind === 'sync') { _crab.decLock = _crab.decLock || {}; _crab.decLock[j.id] = !!(j.data && j.data.on); _crabMarkDec(); } }   // FreeDV-Lock → Knopf „DV“ leuchtet
         else if (j.type === 'system_stats') { if (b === band) { _crab.sysPct = (j.sys_pct != null) ? j.sys_pct : null; _crabStatus('Past 10 seconds: CPUload=' + (j.cpu_pct != null ? j.cpu_pct.toFixed(1) : '0.0') + '%, ' + j.clients + ' users; ' + j.channels + ' channels'); } }
       }
     };
@@ -1070,12 +1071,19 @@ function _crabDecButtons() {
 }
 function _crabMarkDec() {
   Array.prototype.forEach.call(document.querySelectorAll('#modes .btn'), function (b) {
-    if (b.dataset.dec) b.classList.toggle('active', b.dataset.dec === _crab.decAudio); else if (_crab.decAudio) b.classList.remove('active');
+    if (b.dataset.dec) { b.classList.toggle('active', b.dataset.dec === _crab.decAudio); b.classList.toggle('lock', !!(_crab.decLock && _crab.decLock[b.dataset.dec])); }
+    else if (_crab.decAudio) b.classList.remove('active');
   });
 }
 function _crabLoadAudioDecs() {
   var x = new XMLHttpRequest(); x.open('GET', 'api/decoders'); if (window.crabAccount) crabAccount.header(x);
-  x.onload = function () { try { _crab.audioDecs = JSON.parse(x.responseText).decoders.filter(function (d) { return d.audio; }); } catch (e) { _crab.audioDecs = []; } _crabDecButtons(); };
+  x.onload = function () {
+    try { _crab.audioDecs = JSON.parse(x.responseText).decoders.filter(function (d) { return d.audio; }); } catch (e) { _crab.audioDecs = []; }
+    _crabDecButtons();
+    // Anfangszustand des Locks aus den letzten Treffern (danach kommt er live über den WebSocket)
+    if (_crab.audioDecs.length) { var y = new XMLHttpRequest(); y.open('GET', 'api/decoders/events?limit=100'); if (window.crabAccount) crabAccount.header(y);
+      y.onload = function () { try { var L = {}; JSON.parse(y.responseText).events.forEach(function (e) { if (e.kind === 'sync') L[e.id] = !!(e.data && e.data.on); }); _crab.decLock = L; _crabMarkDec(); } catch (e) {} }; y.send(); }
+  };
   x.send();
 }
 function _crabListenDecoderById(id) {

@@ -5,7 +5,7 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 ## Unveröffentlicht
 
 ### Oberfläche
-- FreeDV als Betriebsart: Knopf „DV“ neben FM/AM/USB, wenn die Station im Band einen FreeDV-Decoder hat; er springt auf dessen Frequenz, zeigt USB und spielt die dekodierte Sprache. Abstimmen oder eine andere Betriebsart holt den normalen Kanal zurück. FreeDV steht nicht mehr auf der Digital-Seite.
+- FreeDV als Betriebsart: Knopf „DV“ neben FM/AM/USB, wenn die Station im Band einen FreeDV-Decoder hat; er springt auf dessen Frequenz, zeigt USB und spielt die dekodierte Sprache. Abstimmen oder eine andere Betriebsart holt den normalen Kanal zurück. Der Knopf pulsiert, solange der Decoder Sync hat (Lock), die Station meldet Sync und Text live an alle Hörer. FreeDV steht nicht mehr auf der Digital-Seite.
 
 ## 1.3.0 – 2026-10-07
 

@@ -138,6 +138,9 @@ pub struct Status {
     pub audio: bool,
     #[serde(skip)]
     pub stderr: VecDeque<String>,
+    /// Rundsender des Bandes: Sync/Text-Treffer von Ton-Decodern gehen live an alle Hörer (Knopf „DV“ leuchtet bei Lock)
+    #[serde(skip)]
+    pub bcast: Option<tokio::sync::broadcast::Sender<Vec<u8>>>,
 }
 
 pub struct DecoderHub {
@@ -246,6 +249,13 @@ impl DecoderHub {
         let ev = Event { seq: g.seq, t: now_f(), id: st.id.clone(), plugin: st.plugin.clone(), label: st.label.clone(), band: st.band.clone(), freq: st.freq, kind, data, public: st.public };
         if let Some(tx) = self.mqtt.lock().ok().and_then(|m| m.clone()) { let _ = tx.try_send(ev.clone()); }   // voll = verwerfen, nie blockieren
         g.events.push_back(ev);
+        // Live an die Hörer des Bandes (nur Ton-Decoder: Sync und Text), damit die Oberfläche einen Lock anzeigen kann
+        if st.audio && (kind == "sync" || kind == "text") {
+            if let Some(tx) = &st.bcast {
+                let msg = json!({ "type": "decoder", "id": st.id, "kind": kind, "data": g.events.back().map(|e| e.data.clone()).unwrap_or(Value::Null) });
+                let _ = tx.send(crabsdr_core::protocol::encode_json(&msg.to_string()));
+            }
+        }
         while g.events.len() > KEEP_EVENTS { g.events.pop_front(); }
         if let Some(s) = g.status.get_mut(idx) { s.events += 1; s.last_event = Some(now_s()); }
         drop(g);
@@ -279,7 +289,7 @@ impl DecoderHub {
             {
                 let mut g = self.inner.lock().await;
                 g.status.push(Status { id: id.clone(), plugin: c.plugin.clone(), label: label.clone(), band: band.as_ref().map(|b| b.id.clone()).unwrap_or_default(),
-                    freq: c.freq, mode, public: c.public, state: state.clone(), since: now_s(), restarts: 0, events: 0, last_event: None, audio_s: 0.0, audio: false, stderr: VecDeque::new() });
+                    freq: c.freq, mode, public: c.public, state: state.clone(), since: now_s(), restarts: 0, events: 0, last_event: None, audio_s: 0.0, audio: false, stderr: VecDeque::new(), bcast: band.as_ref().map(|b| b.spectrum_tx.clone()) });
             }
             let (Some(m), Some(pipe), true) = (manifest, band, c.enabled) else {
                 warn!("Decoder '{}': nicht gestartet ({})", id, state);
