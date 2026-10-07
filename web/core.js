@@ -79,7 +79,13 @@ function _crabTuneMsg() {
 }
 function _crabRetune() {
   var B = _crab.bands[band];
-  if (_crab.decAudio) { _crab.decAudio = null; _crabStatus(''); _crabMarkDec(); }   // Nutzer stimmt ab: zurück vom Decoder-Ton zum Kanal
+  if (_crab.decAudio && /^dv/.test(_crab.decAudio)) {
+    // DV klebt wie eine Betriebsart: neue Frequenz → die Station dekodiert FreeDV dort (nur ein anderer Betriebsarten-Knopf beendet DV)
+    _crab.dvFreq = Math.round(dialFreq() * 1000);
+    if (B && B.ws && B.ws.readyState === 1) B.ws.send(JSON.stringify({ type: 'dv', freq: _crab.dvFreq }));
+    drawPassband(); return;
+  }
+  if (_crab.decAudio) { _crab.decAudio = null; _crabStatus(''); _crabMarkDec(); }   // fester Decoder: Abstimmen holt den Kanal zurück
   if (B && B.ws && B.ws.readyState === 1) B.ws.send(JSON.stringify(_crabTuneMsg()));
   drawPassband();
 }
@@ -127,6 +133,8 @@ function freqSnap(dir, stepKhz) {
   (window.setFreqExact || setFreq)(Math.round(next * k * 1000) / 1000);   // am Kanalraster vorbei
 }
 function setMode(m, l, h) {
+  // Anderer Betriebsarten-Knopf (oder Taste) beendet DV; _crabDv selbst setzt die USB-Anzeige mit gesetzter Marke
+  if (_crab.decAudio && /^dv/.test(_crab.decAudio) && !_crab._dvSetting) { _crab.decAudio = null; _crabStatus(''); _crabMarkDec(); }
   mode = String(m).toUpperCase(); lo = Number(l); hi = Number(h);
   if (_crab.started) _crabSqForMode();
   _crabTextFreq();
@@ -769,7 +777,11 @@ function _crabConnect(b) {
     ws.onmessage = function (ev) {
       if (typeof ev.data === 'string') {
         var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-        if (m.type === 'error') { _crabStatus(m.msg || 'Abgelehnt'); console.warn('crabSDR:', m.msg); B.retry = 5; return; }   // Station voll o. ä.: Hinweis, langsam neu versuchen
+        if (m.type === 'error') {   // Station voll, DV nicht möglich o. ä.: Hinweis; bei DV zurück zum normalen Kanal
+          _crabStatus(m.msg || 'Abgelehnt'); console.warn('crabSDR:', m.msg); B.retry = 5;
+          if (_crab.decAudio && /^dv/.test(_crab.decAudio)) { _crab.decAudio = null; _crabMarkDec(); if (b === band && ws.readyState === 1) ws.send(JSON.stringify(_crabTuneMsg())); }
+          return;
+        }
         if (m.type === 'config') { bi[b].centerfreq = m.center_freq / 1000; bi[b].samplerate = m.sample_rate / 1000; if (m.fft_size && m.fft_size !== bi[b].fft) { bi[b].fft = m.fft_size; bi[b].zoom = Math.min(bi[b].zoom, _crabMaxZoom(bi[b])); } _crabGeom(b); B.myId = m.client_id; }
         return;
       }
@@ -1069,7 +1081,9 @@ function _crabDecButtons() {
 }
 /* Betriebsart DV: FreeDV auf der aktuellen Frequenz. Die Station startet dort bei Bedarf einen Decoder; Antwort {type:'dv', id}. */
 function _crabDv() {
+  _crab._dvSetting = true;
   if (mode !== 'USB') setMode('usb', 0.3, 2.7);                       // Anzeige USB; der Decoder hört ohnehin das SSB-Signal
+  _crab._dvSetting = false;
   _crab.dvFreq = Math.round(dialFreq() * 1000); _crab.decAudio = 'dv'; _crabAudioInit(); _crabAudioFlush(); _crabMarkDec();
   var B = _crab.bands[band]; if (B && B.ws && B.ws.readyState === 1) B.ws.send(JSON.stringify({ type: 'dv', freq: _crab.dvFreq }));
   _crabStatus('DV: FreeDV wird auf ' + (_crab.dvFreq / 1e6).toFixed(4).replace('.', ',') + ' MHz dekodiert – abstimmen oder USB wählen schaltet zurück');
