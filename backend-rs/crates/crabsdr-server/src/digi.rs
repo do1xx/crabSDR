@@ -34,6 +34,8 @@ async fn first(state: &AppState, headers: &HeaderMap, plugin: &str, file: &str) 
 pub async fn aprs(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response { first(&s, &h, "aprs", "aprs.json").await }
 pub async fn relais(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response { first(&s, &h, "aprs", "relais.json").await }
 pub async fn ft8(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response { first(&s, &h, "ft8", "ft8.json").await }
+pub async fn pocsag(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response { first(&s, &h, "pocsag", "pocsag.json").await }
+pub async fn freedv(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response { first(&s, &h, "freedv", "freedv.json").await }
 
 pub async fn sstv(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response {
     let list = ids(&s, &h, "sstv").await;

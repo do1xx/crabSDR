@@ -292,6 +292,52 @@ pub async fn pair(
     respond("audio/wav", &title, out_rx)
 }
 
+/// `GET /stream/decoder/<id>.ogg` – dekodierter Ton eines Decoders (z. B. FreeDV) als Ogg/Opus; öffentliche Decoder frei,
+/// andere mit Sysop-Token oder Stream-Schlüssel. Opus kommt fertig aus dem Verteiler (24 kHz), hier nur Ogg und Stille.
+pub async fn decoder(
+    Path(file): Path<String>,
+    Query(q): Query<StreamQuery>,
+    headers: HeaderMap,
+    State(state): State<Arc<AppState>>,
+) -> Response {
+    let Some(id) = file.strip_suffix(".ogg") else { return err(StatusCode::NOT_FOUND, "nur .ogg").into_response() };
+    let Some(public) = state.decoders.is_public(id).await else { return err(StatusCode::NOT_FOUND, "Decoder gibt es nicht").into_response() };
+    if !public {
+        let tok = access::bearer(&headers).or_else(|| q.token.clone());
+        let key = state.config.read().await.stream_key.clone();
+        let admin = (!key.is_empty() && key.len() >= 16 && tok.as_deref() == Some(key.as_str()))
+            || access::resolve(&state, tok.as_deref()).await.map(|p| p.is_admin()).unwrap_or(false);
+        if !admin { return err(StatusCode::FORBIDDEN, "Decoder nur für den Sysop (?token=…)").into_response(); }
+    }
+    let client_id = crate::NEXT_CLIENT_ID.fetch_add(1, Ordering::Relaxed);
+    let (tx, mut rx) = mpsc::channel::<Vec<u8>>(64);
+    if !state.decoders.subscribe_audio(id, client_id, tx).await { return err(StatusCode::NOT_FOUND, "Dieser Decoder liefert keinen Ton").into_response(); }
+    let station = state.config.read().await.station.name.clone();
+    let title = format!("{} · {}", id, station);
+    let title_resp = title.clone();
+    let hub = state.decoders.clone();
+    let (out_tx, out_rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(16);
+    tokio::spawn(async move {
+        let mut mux = OggOpus::new(client_id as u32 ^ 0x6465_6364, 1);
+        let silence = { let mut e = crate::dsp_thread::OpusEnc::new(32_000, 5); e.as_mut().and_then(|e| e.encode(&vec![0i16; (crate::dsp_thread::OPUS_RATE / 50) as usize]).pop()).unwrap_or_else(|| vec![0xf8, 0xff, 0xfe]) };
+        if out_tx.send(Ok(Bytes::from(mux.headers(&Tags { title: title.clone(), artist: format!("{station} · crabSDR"), picture: None })))).await.is_err() { hub.unsubscribe_audio(client_id); return; }
+        let mut queue: VecDeque<Vec<u8>> = VecDeque::new();
+        let mut tick = tokio::time::interval(Duration::from_millis(20));
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Burst);
+        loop {
+            tokio::select! {
+                f = rx.recv() => match f { Some(f) if f.first() == Some(&protocol::TAG_AUDIO_OPUS) && f.len() > 1 => { if queue.len() >= 25 { queue.pop_front(); } queue.push_back(f[1..].to_vec()); }, Some(_) => {}, None => break },
+                _ = tick.tick() => {
+                    mux.add(queue.pop_front().unwrap_or_else(|| silence.clone()));
+                    if mux.pending.len() >= PER_PAGE && out_tx.send(Ok(Bytes::from(mux.flush()))).await.is_err() { break; }
+                }
+            }
+        }
+        hub.unsubscribe_audio(client_id);
+    });
+    respond("audio/ogg", &title_resp, out_rx)
+}
+
 fn respond(ctype: &'static str, title: &str, out_rx: mpsc::Receiver<Result<Bytes, std::io::Error>>) -> Response {
     let body = Body::from_stream(futures_util::stream::unfold(out_rx, |mut rx| async { rx.recv().await.map(|b| (b, rx)) }));
     Response::builder()

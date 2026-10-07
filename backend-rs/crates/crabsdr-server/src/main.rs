@@ -189,6 +189,7 @@ async fn main() {
         .route("/ws/{sdr_id}", get(ws_handler))
         .route("/stream/presets.m3u", get(stream::m3u))
         .route("/stream/pair.wav", get(stream::pair))
+        .route("/stream/decoder/{file}", get(stream::decoder))
         .route("/stream/{freq}/{file}", get(stream::ogg))
         .route("/api/bands", get(api_list_bands))
         .route("/api/health", get(api_health))
@@ -207,6 +208,8 @@ async fn main() {
         .route("/digi/relais.json", get(digi::relais))
         .route("/digi/ft8.json", get(digi::ft8))
         .route("/digi/sstv.json", get(digi::sstv))
+        .route("/digi/pocsag.json", get(digi::pocsag))
+        .route("/digi/freedv.json", get(digi::freedv))
         .merge(auth_api)
         .merge(admin_api)
         .merge(admin_page)
@@ -296,10 +299,12 @@ async fn ws_handler(
         else if max_ip > 0 && clients.count_ip(&ip) >= max_ip as usize { Some(format!("Zu viele Verbindungen von deiner Adresse (höchstens {})", max_ip)) }
         else { None }
     };
-    ws.max_message_size(16 * 1024).on_upgrade(move |socket| handle_ws(socket, pipeline, is_admin, role, ip, max_ch, refuse)).into_response()
+    let hub = state.decoders.clone();
+    ws.max_message_size(16 * 1024).on_upgrade(move |socket| handle_ws(socket, pipeline, hub, is_admin, role, ip, max_ch, refuse)).into_response()
 }
 
-async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, is_admin: bool, role: String, ip: String, max_channels: u32, refuse: Option<String>) {
+#[allow(clippy::too_many_arguments)]
+async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, hub: Arc<decoders::DecoderHub>, is_admin: bool, role: String, ip: String, max_channels: u32, refuse: Option<String>) {
     if let Some(msg) = refuse {
         let _ = socket.send(Message::Text(json!({"type": "error", "msg": msg}).to_string().into())).await;
         let _ = socket.send(Message::Close(None)).await;
@@ -308,6 +313,7 @@ async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, is_admin: 
     let client_id = NEXT_CLIENT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
     let (audio_tx, mut audio_rx) = mpsc::channel::<Vec<u8>>(32);
+    let dec_tx = audio_tx.clone();   // derselbe Weg zum Browser, wenn er den Ton eines Decoders hört
 
     {
         let mut clients = pipeline.clients.lock().await;
@@ -360,7 +366,7 @@ async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, is_admin: 
             msg = socket.recv() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
-                        if let Some(err) = handle_client_message(client_id, &text, &pipeline, is_admin, max_channels).await {
+                        if let Some(err) = handle_client_message(client_id, &text, &pipeline, &hub, &dec_tx, is_admin, max_channels).await {
                             let _ = socket.send(Message::Text(json!({"type": "error", "msg": err}).to_string().into())).await;
                         }
                     }
@@ -375,11 +381,13 @@ async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, is_admin: 
         let mut clients = pipeline.clients.lock().await;
         clients.remove(client_id);
     }
+    hub.unsubscribe_audio(client_id);
     info!("[{}] Client {} disconnected", pipeline.id, client_id);
 }
 
 /// Gibt einen Hinweis an den Hörer zurück, wenn ein Befehl abgelehnt wurde (z. B. Kanalgrenze)
-async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipeline, is_admin: bool, max_channels: u32) -> Option<String> {
+#[allow(clippy::too_many_arguments)]
+async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipeline, hub: &decoders::DecoderHub, dec_tx: &mpsc::Sender<Vec<u8>>, is_admin: bool, max_channels: u32) -> Option<String> {
     let msg: serde_json::Value = match serde_json::from_str(text) {
         Ok(v) => v,
         Err(e) => {
@@ -417,6 +425,7 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
 
             // SSB: untere Kante des Durchlassbereichs (Browser schickt lo in Hz, Voreinstellung 300)
             let pass_lo = msg.get("lo").and_then(|v| v.as_u64()).map(|v| v.min(5000) as u32).unwrap_or(300);
+            hub.unsubscribe_audio(client_id);   // zurück vom Decoder-Ton zum normalen Kanal
             let mut clients = pipeline.clients.lock().await;
             if !clients.try_tune(client_id, freq, mode, bandwidth, pass_lo, max_channels) {
                 info!("[{}] Client {} abgelehnt: Kanalgrenze {} erreicht", pipeline.id, client_id, max_channels);
@@ -472,8 +481,21 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
             clients.set_opus(client_id, use_opus);
         }
         "untune" => {
+            hub.unsubscribe_audio(client_id);
             let mut clients = pipeline.clients.lock().await;
             clients.untune(client_id);
+        }
+        "listen_decoder" => {
+            // Ton eines Decoders hören (z. B. FreeDV dekodiert) statt eines Kanals: {"type":"listen_decoder","id":"freedv-144..."}
+            let id = msg.get("id").and_then(|v| v.as_str()).unwrap_or("");
+            match hub.is_public(id).await {
+                None => return Some("Decoder gibt es nicht".into()),
+                Some(false) if !is_admin => return Some("Decoder nur für den Sysop".into()),
+                _ => {}
+            }
+            { let mut clients = pipeline.clients.lock().await; clients.untune(client_id); }
+            if !hub.subscribe_audio(id, client_id, dec_tx.clone()).await { return Some("Dieser Decoder liefert keinen Ton".into()); }
+            info!("[{}] Client {} hört Decoder {}", pipeline.id, client_id, id);
         }
         "set_squelch" => {
             // {"type":"set_squelch","mode":"off|auto|manual","db":-60,"margin":6,"hang_ms":500}

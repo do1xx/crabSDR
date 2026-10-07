@@ -79,6 +79,7 @@ function _crabTuneMsg() {
 }
 function _crabRetune() {
   var B = _crab.bands[band];
+  if (_crab.decAudio) { _crab.decAudio = null; _crabStatus(''); }   // Nutzer stimmt ab: zurück vom Decoder-Ton zum Kanal
   if (B && B.ws && B.ws.readyState === 1) B.ws.send(JSON.stringify(_crabTuneMsg()));
   drawPassband();
 }
@@ -745,7 +746,7 @@ function _crabEnsureSockets() {
     var want = band2id(b) >= 0, B = _crab.bands[b];
     if (want && !B.ws) _crabConnect(b);
     else if (!want && B.ws) { B.closing = true; try { B.ws.close(); } catch (e) {} B.ws = null; }
-    else if (want && B.ws && B.ws.readyState === 1) { _crabSendWf(b); if (b === band) B.ws.send(JSON.stringify(_crabTuneMsg())); }
+    else if (want && B.ws && B.ws.readyState === 1) { _crabSendWf(b); if (b === band) B.ws.send(JSON.stringify(_crab.decAudio ? { type: 'listen_decoder', id: _crab.decAudio } : _crabTuneMsg())); }
   }
 }
 function _crabConnect(b) {
@@ -762,7 +763,7 @@ function _crabConnect(b) {
       if (_crab.squelchOn) ws.send(JSON.stringify(_crabSqMsg()));
       if (_crab.agcMode && _crab.agcMode !== 'medium') ws.send(JSON.stringify({ type: 'set_agc', mode: _crab.agcMode }));
       B.prev = null; B.clearOnNext = true; _crabSendWf(b);
-      if (b === band) { _crabAudioFlush(); ws.send(JSON.stringify(_crabTuneMsg())); }
+      if (b === band) { _crabAudioFlush(); ws.send(JSON.stringify(_crab.decAudio ? { type: 'listen_decoder', id: _crab.decAudio } : _crabTuneMsg())); }
     };
     ws.onmessage = function (ev) {
       if (typeof ev.data === 'string') {
@@ -997,6 +998,8 @@ function _crabPanelBuild() {
   db.onclick = function (ev) { ev.stopPropagation(); dec.classList.toggle('open'); if (dec.classList.contains('open')) _crabDecLoad(); };
   document.addEventListener('click', function (ev) { if (!dec.contains(ev.target)) dec.classList.remove('open'); });
   pop.addEventListener('click', function (ev) {
+    var a = ev.target.closest ? ev.target.closest('[data-decaudio]') : null;
+    if (a) { ev.preventDefault(); _crabListenDecoder(a.dataset.decaudio, a.dataset.band, Number(a.dataset.freq)); dec.classList.remove('open'); return; }
     var b = ev.target.closest ? ev.target.closest('[data-tune]') : null; if (!b) return;
     ev.preventDefault(); _crabTuneTo(Number(b.dataset.tune), b.dataset.mode); dec.classList.remove('open');
   });
@@ -1018,7 +1021,7 @@ function _crabDecText(e) {
   return d.text || d.msg || d.message || JSON.stringify(d).slice(0, 80);
 }
 function _crabAgo(t) { var s = Math.max(0, Date.now() / 1000 - t); return s < 90 ? 'gerade' : s < 5400 ? 'vor ' + Math.round(s / 60) + ' min' : 'vor ' + Math.round(s / 3600) + ' h'; }
-var _crabDIGI = { aprs: 'aprs', ft8: 'ft8', sstv: 'sstv' };
+var _crabDIGI = { aprs: 'aprs', ft8: 'ft8', sstv: 'sstv', pocsag: 'pocsag', freedv: 'freedv' };
 function _crabDecLoad() {
   var pop = document.getElementById('x1decpop'); if (!pop) return;
   var get = function (u, cb) { var x = new XMLHttpRequest(); x.open('GET', u); if (window.crabAccount) crabAccount.header(x); x.onload = function () { try { cb(JSON.parse(x.responseText)); } catch (e) { cb(null); } }; x.onerror = function () { cb(null); }; x.send(); };
@@ -1034,12 +1037,27 @@ function _crabDecLoad() {
         return '<div class="x1decitem"><div class="x1dechead"><b>' + _crabEsc(d.label) + '</b><span class="x1decst ' + (run ? 'ok' : 'warn') + '">' + _crabEsc(d.state) + '</span></div>' +
           '<div class="x1decmeta">' + (d.freq / 1e6).toFixed(3).replace('.', ',') + ' MHz · ' + d.events + ' Treffer' + (d.last_event ? ' · zuletzt ' + _crabAgo(d.last_event) : '') + '</div>' +
           (mine.length ? '<div class="x1declast">' + mine.map(function (e) { return '<div><span>' + new Date(e.t * 1000).toTimeString().slice(0, 5) + '</span>' + _crabEsc(_crabDecText(e)) + '</div>'; }).join('') + '</div>' : '') +
-          '<div class="x1decbtns"><button class="btn" type="button" data-tune="' + d.freq + '" data-mode="' + mode + '">Hören</button>' + digi + '</div></div>';
+          '<div class="x1decbtns"><button class="btn" type="button" data-tune="' + d.freq + '" data-mode="' + mode + '">' + (d.audio ? 'Frequenz' : 'Hören') + '</button>' + (d.audio ? '<button class="btn btn-accent" type="button" data-decaudio="' + _crabEsc(d.id) + '" data-band="' + _crabEsc(d.band) + '" data-freq="' + d.freq + '">🔊 Dekodiert hören</button>' : '') + digi + '</div></div>';
       }).join('');
       pop.innerHTML = h;
     });
   });
 }
+/* Dekodierten Ton eines Decoders hören (z. B. FreeDV): Band des Decoders einblenden, Frequenz anzeigen, dann statt des
+   Kanals den Decoder-Ton bestellen. Jede eigene Abstimmung (Klick, Taste, Schnellwahl) holt den normalen Kanal zurück. */
+function _crabListenDecoder(id, bandName, hz) {
+  var b = -1; for (var i = 0; i < bi.length; i++) if (bi[i].name === bandName) b = i;
+  if (b >= 0) { if (b !== band) setBand(b); if (hz) setFreqText(String(hz / 1000)); }
+  _crab.decAudio = id; _crabAudioInit(); _crabAudioFlush();
+  var B = _crab.bands[band]; if (B && B.ws && B.ws.readyState === 1) B.ws.send(JSON.stringify({ type: 'listen_decoder', id: id }));
+  _crabStatus('🔊 Dekodiert: ' + id + ' – zum Zurückschalten einfach abstimmen');
+}
+function _crabListenDecoderById(id) {
+  var x = new XMLHttpRequest(); x.open('GET', 'api/decoders'); if (window.crabAccount) crabAccount.header(x);
+  x.onload = function () { try { var d = JSON.parse(x.responseText).decoders.filter(function (y) { return y.id === id; })[0]; if (d) _crabListenDecoder(d.id, d.band, d.freq); } catch (e) {} };
+  x.send();
+}
+
 /* Auf eine Frequenz (Hz) abstimmen, Band suchen und einblenden, Betriebsart setzen */
 function _crabTuneTo(hz, m) {
   var khz = hz / 1000;
@@ -1112,6 +1130,7 @@ function crabStart() {
     var mn = /[?&]name=([^&]+)/.exec(qs);
     if (mn && document.usernameform) { try { document.usernameform.username.value = decodeURIComponent(mn[1].replace(/\+/g, ' ')).slice(0, 32); } catch (e) {} }
     if (/[?&]ui=min\b/.test(qs)) document.body.classList.add('min');   // nur Frequenz, Betriebsart, Pegel, Ton – für viele Tabs
+    var mdc = /[?&]dec=([^&]+)/.exec(qs); if (mdc) setTimeout(function () { _crabListenDecoderById(decodeURIComponent(mdc[1])); }, 1200);   // ?dec=<id>: Decoder-Ton (z. B. FreeDV)
   })();
   _crabTextFreq();
   updateBw();

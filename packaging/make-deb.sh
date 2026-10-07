@@ -36,7 +36,7 @@ Architecture: $a
 Maintainer: DO1XX <do1xx@pm.me>
 Installed-Size: $SIZE
 Depends: adduser, rtl-sdr
-Recommends: python3, python3-numpy, python3-pil, direwolf
+Recommends: python3, python3-numpy, python3-pil, direwolf, multimon-ng, libcodec2-1.2
 Suggests: wsjtx
 Homepage: https://crabsdr.de
 Description: modernes, minimalistisches WebSDR

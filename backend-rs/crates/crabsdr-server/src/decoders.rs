@@ -57,7 +57,22 @@ pub struct Manifest {
     /// Programme, die im PATH (oder im Plugin-Verzeichnis) vorhanden sein müssen
     #[serde(default)]
     pub requires: Vec<String>,
+    /// Liefert der Decoder Ton zurück (z. B. FreeDV: dekodierte Sprache)? Dann ist stdout rohes s16le mono mit `rate`,
+    /// Treffer kommen als JSON-Zeilen auf stderr (Zeilen, die mit `{` beginnen). crabSDR verteilt den Ton als Opus an
+    /// Hörer, die `listen_decoder` gewählt haben, und unter /stream/decoder/<id>.ogg.
+    #[serde(default)]
+    pub output: Option<OutputSpec>,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct OutputSpec {
+    #[serde(default = "d_kind")]
+    #[allow(dead_code)]
+    pub kind: String,
+    #[serde(default = "d_out_rate")]
+    pub rate: u32,
+}
+fn d_out_rate() -> u32 { 8000 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct InputSpec {
@@ -119,6 +134,8 @@ pub struct Status {
     pub events: u64,
     pub last_event: Option<u64>,
     pub audio_s: f64,
+    /// liefert Ton zurück (hörbar über listen_decoder / /stream/decoder/<id>.ogg)
+    pub audio: bool,
     #[serde(skip)]
     pub stderr: VecDeque<String>,
 }
@@ -130,6 +147,17 @@ pub struct DecoderHub {
     /// Zusätzliche Umgebung für alle Plugins (Station: CRAB_STATION_NAME/_CALL/_LOCATOR/_LAT/_LON)
     extra_env: std::sync::Mutex<Vec<(String, String)>>,
     mqtt: std::sync::Mutex<Option<mpsc::Sender<Event>>>,
+    /// Ton aus Decodern: je Decoder-ID ein Kodierer, je Hörer ein Sender (WebSocket-Hörer und Streams)
+    audio: std::sync::Mutex<AudioFan>,
+}
+
+/// Verteilt dekodierten Ton (PCM vom Plugin) als Opus-Rahmen (Tag 0x82, 24 kHz wie die Band-Kanäle) an Abonnenten
+#[derive(Default)]
+struct AudioFan {
+    /// Decoder-ID → (Umrechner auf 24 kHz, Opus-Kodierer)
+    enc: HashMap<String, (crabsdr_dsp::resample::Resampler, crate::dsp_thread::OpusEnc)>,
+    /// Hörer-ID → Sender; welche Decoder-ID er hört
+    subs: HashMap<u64, (String, mpsc::Sender<Vec<u8>>)>,
 }
 struct Inner {
     seq: u64,
@@ -165,7 +193,43 @@ impl DecoderHub {
     }
 
     pub fn new(data_dir: PathBuf) -> Arc<Self> {
-        Arc::new(Self { inner: Mutex::new(Inner { seq: 0, events: VecDeque::new(), status: Vec::new() }), notify: Notify::new(), data_dir, extra_env: std::sync::Mutex::new(Vec::new()), mqtt: std::sync::Mutex::new(None) })
+        Arc::new(Self { inner: Mutex::new(Inner { seq: 0, events: VecDeque::new(), status: Vec::new() }), notify: Notify::new(), data_dir, extra_env: std::sync::Mutex::new(Vec::new()), mqtt: std::sync::Mutex::new(None), audio: std::sync::Mutex::new(AudioFan::default()) })
+    }
+
+    /// Hörer abonniert den Ton eines Decoders (ersetzt sein Band-Abstimmen); false, wenn der Decoder keinen Ton liefert
+    pub async fn subscribe_audio(&self, id: &str, client: u64, tx: mpsc::Sender<Vec<u8>>) -> bool {
+        let ok = self.inner.lock().await.status.iter().any(|s| s.id == id && s.audio);
+        if ok { self.audio.lock().unwrap().subs.insert(client, (id.to_string(), tx)); }
+        ok
+    }
+    pub fn unsubscribe_audio(&self, client: u64) { self.audio.lock().unwrap().subs.remove(&client); }
+    /// Sichtbarkeit eines Decoders: Some(public) oder None, wenn es ihn nicht gibt
+    pub async fn is_public(&self, id: &str) -> Option<bool> { self.inner.lock().await.status.iter().find(|s| s.id == id).map(|s| s.public) }
+    pub fn audio_listeners(&self, id: &str) -> usize { self.audio.lock().unwrap().subs.values().filter(|(d, _)| d == id).count() }
+
+    /// PCM (s16le mono, `rate`) vom Plugin: auf 24 kHz, Opus, an alle Abonnenten dieses Decoders
+    fn audio_frame(&self, id: &str, rate: u32, bytes: &[u8]) {
+        let mut g = self.audio.lock().unwrap();
+        if !g.subs.values().any(|(d, _)| d == id) { g.enc.remove(id); return; }   // niemand hört: nichts kodieren
+        let (res, enc) = match g.enc.entry(id.to_string()) {
+            std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
+            std::collections::hash_map::Entry::Vacant(v) => {
+                let Some(enc) = crate::dsp_thread::OpusEnc::new(32_000, 5) else { return };
+                v.insert((crabsdr_dsp::resample::Resampler::new(rate, crate::dsp_thread::OPUS_RATE), enc))
+            }
+        };
+        let f: Vec<f32> = bytes.chunks_exact(2).map(|b| i16::from_le_bytes([b[0], b[1]]) as f32 / 32768.0).collect();
+        let up = res.process(&f);
+        let pcm: Vec<i16> = up.iter().map(|&s| (s.clamp(-1.0, 1.0) * 32767.0) as i16).collect();
+        let packets = enc.encode(&pcm);
+        if packets.is_empty() { return; }
+        let frames: Vec<Vec<u8>> = packets.iter().map(|p| crabsdr_core::protocol::encode_opus_audio(p)).collect();
+        let mut dead = Vec::new();
+        for (cid, (d, tx)) in g.subs.iter() {
+            if d != id { continue; }
+            for fr in &frames { if tx.try_send(fr.clone()).is_err() && tx.is_closed() { dead.push(*cid); } }
+        }
+        for c in dead { g.subs.remove(&c); }
     }
 
     async fn set_state(&self, idx: usize, state: &str) {
@@ -215,7 +279,7 @@ impl DecoderHub {
             {
                 let mut g = self.inner.lock().await;
                 g.status.push(Status { id: id.clone(), plugin: c.plugin.clone(), label: label.clone(), band: band.as_ref().map(|b| b.id.clone()).unwrap_or_default(),
-                    freq: c.freq, mode, public: c.public, state: state.clone(), since: now_s(), restarts: 0, events: 0, last_event: None, audio_s: 0.0, stderr: VecDeque::new() });
+                    freq: c.freq, mode, public: c.public, state: state.clone(), since: now_s(), restarts: 0, events: 0, last_event: None, audio_s: 0.0, audio: false, stderr: VecDeque::new() });
             }
             let (Some(m), Some(pipe), true) = (manifest, band, c.enabled) else {
                 warn!("Decoder '{}': nicht gestartet ({})", id, state);
@@ -300,12 +364,24 @@ async fn run_instance(hub: Arc<DecoderHub>, idx: usize, m: Manifest, pdir: PathB
             }
             Ok(mut child) => {
                 hub.set_state(idx, "läuft").await;
-                { let mut g = hub.inner.lock().await; if let Some(s) = g.status.get_mut(idx) { s.restarts = restarts; } }
+                { let mut g = hub.inner.lock().await; if let Some(s) = g.status.get_mut(idx) { s.restarts = restarts; s.audio = m.output.is_some(); } }
                 let mut stdin = child.stdin.take();
-                // stdout → Treffer
+                let audio_out = m.output.as_ref().map(|o| o.rate);
+                // stdout → Treffer (Textdecoder) oder Ton (output = audio)
                 if let Some(out) = child.stdout.take() {
-                    let hub2 = hub.clone();
+                    let hub2 = hub.clone(); let id = env.id.clone();
                     tokio::spawn(async move {
+                        if let Some(rate) = audio_out {
+                            use tokio::io::AsyncReadExt;
+                            let mut out = out; let mut buf = vec![0u8; 4096]; let mut rest: Vec<u8> = Vec::new();
+                            while let Ok(n) = out.read(&mut buf).await {
+                                if n == 0 { break; }
+                                rest.extend_from_slice(&buf[..n]);
+                                let even = rest.len() & !1;
+                                if even > 0 { let chunk: Vec<u8> = rest.drain(..even).collect(); hub2.audio_frame(&id, rate, &chunk); }
+                            }
+                            return;
+                        }
                         let mut lines = BufReader::new(out).lines();
                         while let Ok(Some(l)) = lines.next_line().await {
                             let l = l.trim(); if l.is_empty() { continue; }
@@ -317,12 +393,19 @@ async fn run_instance(hub: Arc<DecoderHub>, idx: usize, m: Manifest, pdir: PathB
                         }
                     });
                 }
-                // stderr → Log + Rest für die Statusanzeige
+                // stderr → Log + Rest für die Statusanzeige; bei Ton-Decodern sind JSON-Zeilen hier die Treffer
                 if let Some(err) = child.stderr.take() {
                     let hub2 = hub.clone(); let id = env.id.clone();
                     tokio::spawn(async move {
                         let mut lines = BufReader::new(err).lines();
                         while let Ok(Some(l)) = lines.next_line().await {
+                            if audio_out.is_some() && l.trim_start().starts_with('{') {
+                                if let Ok(Value::Object(o)) = serde_json::from_str::<Value>(l.trim()) {
+                                    let kind = o.get("kind").and_then(|k| k.as_str()).unwrap_or("text").to_string();
+                                    hub2.push(idx, kind, Value::Object(o)).await;
+                                    continue;
+                                }
+                            }
                             tracing::debug!("Decoder '{}' stderr: {}", id, l);
                             let mut g = hub2.inner.lock().await;
                             if let Some(s) = g.status.get_mut(idx) { s.stderr.push_back(l.chars().take(200).collect()); while s.stderr.len() > STDERR_TAIL { s.stderr.pop_front(); } }

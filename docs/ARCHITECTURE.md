@@ -92,6 +92,11 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt.
 `decoder.json` beschreibt, was das Plugin braucht; das Programm liest Ton von stdin und schreibt Meldungen als
 JSON-Zeilen auf stdout. Der Server kümmert sich um Start, Neustart, Pegel und Weitergabe.
 
+Liefert ein Plugin Ton zurück (`"output": {"kind": "audio", "rate": 8000}`, z. B. FreeDV), ist stdout rohes s16le mono
+mit dieser Rate und die Meldungen kommen als JSON-Zeilen auf stderr (Zeilen, die mit `{` beginnen). Der Server rechnet
+den Ton auf 24 kHz um, kodiert ihn als Opus und gibt ihn an Hörer weiter, die per `listen_decoder` statt eines Kanals den
+Decoder gewählt haben, sowie unter `/stream/decoder/<id>.ogg`. Kodiert wird nur, solange jemand zuhört.
+
 ```json
 {
   "name": "aprs",

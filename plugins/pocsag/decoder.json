@@ -1,0 +1,8 @@
+{
+  "name": "pocsag",
+  "label": "Pager (POCSAG)",
+  "description": "POCSAG 512/1200/2400 Bd mit multimon-ng, z. B. DAPNET auf 439,9875 MHz: Rufe mit RIC und Text",
+  "input": { "kind": "audio", "mode": "data", "rate": 22050, "bandwidth": 12500, "level": "raw", "gain": 10 },
+  "command": ["python3", "pocsag.py"],
+  "requires": ["multimon-ng", "python3"]
+}

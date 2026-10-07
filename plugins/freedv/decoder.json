@@ -1,0 +1,9 @@
+{
+  "name": "freedv",
+  "label": "FreeDV",
+  "description": "FreeDV (Codec 2) aus SSB: 700D, 700E und 1600 parallel; dekodierte Sprache ist als Kanal hörbar, Rufzeichen aus dem Textkanal",
+  "input": { "kind": "audio", "mode": "usb", "rate": 8000, "bandwidth": 3000, "level": "norm" },
+  "output": { "kind": "audio", "rate": 8000 },
+  "command": ["python3", "freedv.py"],
+  "requires": ["python3"]
+}

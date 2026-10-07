@@ -61,3 +61,5 @@ body:not(.dec-aprs) .aprsonly { display: none; }
 .tag.dir { color: var(--accent); } .tag.via { color: var(--faint); } .tag.digi { color: #fbbf24; }
 .pk.isvia { opacity: .55; }
 body:not(.dec-reichweite) .rwonly { display: none; }
+
+body.dec-nomap .card-map { display: none; }

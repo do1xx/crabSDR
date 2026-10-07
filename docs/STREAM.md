@@ -56,6 +56,15 @@ Damit niemand eine Station leersaugt, gelten je Band die Grenzen aus der Konfigu
 (16 verschiedene Frequenz/Betriebsart/Bandbreite-Kombinationen; Hörer auf demselben Kanal teilen ihn). Darüber
 antwortet der Server mit 503 bzw. 429 und einem Satz, was los ist.
 
+### Dekodierter Ton eines Decoders
+
+```
+https://<station>/stream/decoder/<decoder-id>.ogg      z. B. …/stream/decoder/freedv-144350.ogg
+```
+
+Decoder, die Sprache zurückliefern (FreeDV), gibt es als eigenen Stream; die Decoder-ID steht auf der Digital-Seite und in
+`/api/decoders`. Öffentliche Decoder sind frei, andere brauchen das Sysop-Token oder den Stream-Schlüssel.
+
 ### I/Q-Stream (komplexes Basisband, für TETRA, DMR und alles, was einen SDR-Decoder braucht)
 
 ```

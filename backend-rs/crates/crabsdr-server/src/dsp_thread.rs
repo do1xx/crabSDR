@@ -60,20 +60,20 @@ fn read_cpu_load() -> Option<[f32; 3]> {
 }
 
 /// Opus-Encoder je Kanal (nicht je Hörer): 24 kHz mono, 20-ms-Pakete.
-struct OpusEnc {
+pub(crate) struct OpusEnc {
     enc: opus::Encoder,
     buf: Vec<i16>,
     frame: usize,
 }
 
 impl OpusEnc {
-    fn new(bitrate: i32, complexity: i32) -> Option<Self> {
+    pub(crate) fn new(bitrate: i32, complexity: i32) -> Option<Self> {
         let mut enc = opus::Encoder::new(OPUS_RATE, opus::Channels::Mono, opus::Application::Audio).ok()?;
         let _ = enc.set_bitrate(opus::Bitrate::Bits(bitrate));
         let _ = enc.set_complexity(complexity);
         Some(Self { enc, buf: Vec::with_capacity(2048), frame: (OPUS_RATE / 50) as usize })
     }
-    fn encode(&mut self, pcm: &[i16]) -> Vec<Vec<u8>> {
+    pub(crate) fn encode(&mut self, pcm: &[i16]) -> Vec<Vec<u8>> {
         self.buf.extend_from_slice(pcm);
         let mut out = Vec::new();
         let mut tmp = [0u8; 4000];

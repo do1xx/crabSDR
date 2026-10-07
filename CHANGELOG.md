@@ -2,6 +2,15 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+Zwei neue Decoder: FreeDV und Pager.
+
+### Decoder
+- **FreeDV** (Plugin `freedv`, libcodec2): Codec-2-Modes 700D, 700E und 1600 laufen parallel auf einem USB-Kanal; die dekodierte Sprache ist als Kanal hörbar (Knopf „Dekodiert hören“ im Decoder-Fenster, Digital-Seite, `?dec=<id>`), Rufzeichen aus dem Textkanal als Treffer, Sync und SNR je Mode. Braucht `libcodec2-1.2`.
+- **Pager/POCSAG** (Plugin `pocsag`, multimon-ng): 512/1200/2400 Bd auf der Betriebsart `data`, Rufe mit RIC, Funktion und Text, Übersicht auf der Digital-Seite. Für DAPNET auf 439,9875 MHz.
+- Decoder können jetzt Ton zurückliefern (`output` in `decoder.json`): crabSDR kodiert ihn als Opus, verteilt ihn an Hörer, die `listen_decoder` gewählt haben, und unter `/stream/decoder/<id>.ogg` (öffentliche Decoder frei, andere mit Sysop-Token oder Stream-Schlüssel).
+
 ## 1.2.2 – 2026-10-07
 
 ### Härtung
