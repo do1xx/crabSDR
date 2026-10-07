@@ -36,7 +36,7 @@ Downloads: [Releases](https://github.com/do1xx/crabSDR/releases).
 newer, `amd64`: PC):
 
 ```bash
-sudo apt install ./crabsdr_1.1.0_arm64.deb
+sudo apt install ./crabsdr_1.1.1_arm64.deb
 ```
 
 Then open `http://<machine>:8080`. The admin page is behind the crab in the bottom right corner; the first password
@@ -46,7 +46,7 @@ Configuration: `/etc/crabsdr/config.toml` (or on the admin page). Updates never 
 **Other Linux** – release archive:
 
 ```bash
-tar xzf crabsdr-1.1.0.tar.gz && cd crabsdr-1.1.0 && sudo ./install.sh
+tar xzf crabsdr-1.1.1.tar.gz && cd crabsdr-1.1.1 && sudo ./install.sh
 ```
 
 **Docker** – the archive contains `docker-compose.yml`: `docker compose up -d`.

@@ -2,7 +2,7 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## Unveröffentlicht
+## 1.1.1 – 2026-10-07
 
 ### Stream
 - Ogg/Opus-Stream trägt Titel (Frequenz, Betriebsart, Station) und Künstler in den OpusTags; liegt `logo.png` oder `logo.jpg` im Stationsordner, wird es als Titelbild mitgeschickt (VLC zeigt beides).
