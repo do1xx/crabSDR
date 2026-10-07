@@ -747,7 +747,7 @@ function _crabEnsureSockets() {
     var want = band2id(b) >= 0, B = _crab.bands[b];
     if (want && !B.ws) _crabConnect(b);
     else if (!want && B.ws) { B.closing = true; try { B.ws.close(); } catch (e) {} B.ws = null; }
-    else if (want && B.ws && B.ws.readyState === 1) { _crabSendWf(b); if (b === band) B.ws.send(JSON.stringify(_crab.decAudio ? { type: 'listen_decoder', id: _crab.decAudio } : _crabTuneMsg())); }
+    else if (want && B.ws && B.ws.readyState === 1) { _crabSendWf(b); if (b === band) B.ws.send(JSON.stringify(_crabDecMsg() || _crabTuneMsg())); }
   }
 }
 function _crabConnect(b) {
@@ -764,7 +764,7 @@ function _crabConnect(b) {
       if (_crab.squelchOn) ws.send(JSON.stringify(_crabSqMsg()));
       if (_crab.agcMode && _crab.agcMode !== 'medium') ws.send(JSON.stringify({ type: 'set_agc', mode: _crab.agcMode }));
       B.prev = null; B.clearOnNext = true; _crabSendWf(b);
-      if (b === band) { _crabAudioFlush(); ws.send(JSON.stringify(_crab.decAudio ? { type: 'listen_decoder', id: _crab.decAudio } : _crabTuneMsg())); }
+      if (b === band) { _crabAudioFlush(); ws.send(JSON.stringify(_crabDecMsg() || _crabTuneMsg())); }
     };
     ws.onmessage = function (ev) {
       if (typeof ev.data === 'string') {
@@ -784,6 +784,7 @@ function _crabConnect(b) {
         if (j.type === 'level') { if (b === band) { _crab.level = j.db; _crab.floor = j.floor; _crab.sq = j.sq; } }
         else if (j.type === 'listeners') { _crabListenersFromWs(b, j.list || []); }
         else if (j.type === 'decoder') { if (j.kind === 'sync') { _crab.decLock = _crab.decLock || {}; _crab.decLock[j.id] = !!(j.data && j.data.on); _crabMarkDec(); } }   // FreeDV-Lock → Knopf „DV“ leuchtet
+        else if (j.type === 'dv') { if (_crab.decAudio) _crab.decAudio = j.id; _crabMarkDec(); }
         else if (j.type === 'system_stats') { if (b === band) { _crab.sysPct = (j.sys_pct != null) ? j.sys_pct : null; _crabStatus('Past 10 seconds: CPUload=' + (j.cpu_pct != null ? j.cpu_pct.toFixed(1) : '0.0') + '%, ' + j.clients + ' users; ' + j.channels + ' channels'); } }
       }
     };
@@ -1059,32 +1060,43 @@ function _crabListenDecoder(id, bandName, hz) {
 function _crabDecButtons() {
   var row = document.getElementById('modes'); if (!row) return;
   Array.prototype.forEach.call(row.querySelectorAll('.btn[data-dec]'), function (b) { b.remove(); });
-  var name = bi[band] && bi[band].name;
-  (_crab.audioDecs || []).forEach(function (d) {
-    if (d.band !== name) return;
-    var b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.dataset.mode = 'FREEDV'; b.dataset.dec = d.id;
-    b.textContent = d.plugin === 'freedv' ? 'DV' : d.label; b.title = 'FreeDV (Codec 2) · ' + d.label + ' · ' + (d.freq / 1e6).toFixed(3).replace('.', ',') + ' MHz · dekodierte Sprache';
-    b.onclick = function () { _crabListenDecoder(d.id, d.band, d.freq); };
-    row.appendChild(b);
-  });
+  if (!_crab.dvAvail) { _crabMarkDec(); return; }
+  var b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.dataset.mode = 'DV'; b.dataset.dec = 'dv';
+  b.textContent = 'DV'; b.title = 'FreeDV (Codec 2): digitale Sprache auf der eingestellten Frequenz dekodieren';
+  b.onclick = function () { _crabDv(); };
+  row.appendChild(b);
   _crabMarkDec();
 }
+/* Betriebsart DV: FreeDV auf der aktuellen Frequenz. Die Station startet dort bei Bedarf einen Decoder; Antwort {type:'dv', id}. */
+function _crabDv() {
+  if (mode !== 'USB') setMode('usb', 0.3, 2.7);                       // Anzeige USB; der Decoder hört ohnehin das SSB-Signal
+  _crab.dvFreq = Math.round(dialFreq() * 1000); _crab.decAudio = 'dv'; _crabAudioInit(); _crabAudioFlush(); _crabMarkDec();
+  var B = _crab.bands[band]; if (B && B.ws && B.ws.readyState === 1) B.ws.send(JSON.stringify({ type: 'dv', freq: _crab.dvFreq }));
+  _crabStatus('DV: FreeDV wird auf ' + (_crab.dvFreq / 1e6).toFixed(4).replace('.', ',') + ' MHz dekodiert – abstimmen oder USB wählen schaltet zurück');
+}
 function _crabMarkDec() {
+  var mine = _crab.decAudio, lock = !!(mine && _crab.decLock && _crab.decLock[mine]);
   Array.prototype.forEach.call(document.querySelectorAll('#modes .btn'), function (b) {
-    if (b.dataset.dec) { b.classList.toggle('active', b.dataset.dec === _crab.decAudio); b.classList.toggle('lock', !!(_crab.decLock && _crab.decLock[b.dataset.dec])); }
-    else if (_crab.decAudio) b.classList.remove('active');
+    if (b.dataset.dec) { b.classList.toggle('active', !!mine); b.classList.toggle('lock', lock); }
+    else if (mine) b.classList.remove('active');
   });
 }
 function _crabLoadAudioDecs() {
   var x = new XMLHttpRequest(); x.open('GET', 'api/decoders'); if (window.crabAccount) crabAccount.header(x);
   x.onload = function () {
-    try { _crab.audioDecs = JSON.parse(x.responseText).decoders.filter(function (d) { return d.audio; }); } catch (e) { _crab.audioDecs = []; }
+    try { var J = JSON.parse(x.responseText); _crab.audioDecs = J.decoders.filter(function (d) { return d.audio; }); _crab.dvAvail = !!J.dv; } catch (e) { _crab.audioDecs = []; }
     _crabDecButtons();
     // Anfangszustand des Locks aus den letzten Treffern (danach kommt er live über den WebSocket)
     if (_crab.audioDecs.length) { var y = new XMLHttpRequest(); y.open('GET', 'api/decoders/events?limit=100'); if (window.crabAccount) crabAccount.header(y);
       y.onload = function () { try { var L = {}; JSON.parse(y.responseText).events.forEach(function (e) { if (e.kind === 'sync') L[e.id] = !!(e.data && e.data.on); }); _crab.decLock = L; _crabMarkDec(); } catch (e) {} }; y.send(); }
   };
   x.send();
+}
+/* Beim (Wieder-)Verbinden: statt tune den Decoder-Ton bestellen, falls gerade einer gehört wird */
+function _crabDecMsg() {
+  if (!_crab.decAudio) return null;
+  if (_crab.decAudio === 'dv' || /^dv-/.test(_crab.decAudio)) return { type: 'dv', freq: _crab.dvFreq };
+  return { type: 'listen_decoder', id: _crab.decAudio };
 }
 function _crabListenDecoderById(id) {
   var x = new XMLHttpRequest(); x.open('GET', 'api/decoders'); if (window.crabAccount) crabAccount.header(x);

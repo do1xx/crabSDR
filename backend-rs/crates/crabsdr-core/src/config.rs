@@ -12,6 +12,7 @@ fn default_max_channels() -> u32 { 16 }
 fn default_max_streams() -> u32 { 6 }
 fn default_iq_stream() -> String { "admin".into() }
 fn default_max_iq() -> u32 { 1 }
+fn default_dv_max() -> u32 { 3 }
 
 /// Ein Band (`[[bands]]`, früher `[[sdrs]]`) = ein Empfänger. Neue Schlüsselnamen (driver, device, host, port, mode),
 /// die alten (sdr_driver, sdr_device, sdr_tcp_host, sdr_tcp_port, default_mode) gelten weiter.
@@ -292,6 +293,10 @@ pub struct ServerConfig {
     /// ab, wird auf der Admin-Seite gesetzt. Leer = aus. Lang und zufällig wählen; bei Verlust einfach ändern.
     #[serde(default)]
     pub stream_key: String,
+    /// Betriebsart DV: Hörer können FreeDV (Plugin `freedv`) auf ihrer Frequenz dekodieren lassen; so viele solcher
+    /// Decoder laufen höchstens gleichzeitig (je einer pro Frequenz, Hörer teilen ihn; endet nach 90 s ohne Hörer). 0 = aus
+    #[serde(default = "default_dv_max")]
+    pub dv_max: u32,
     /// Stationsangaben für die neutrale Oberfläche (Platzhalter in index.html)
     #[serde(default)]
     pub station: StationConfig,
@@ -514,6 +519,7 @@ impl Config {
             iq_stream: "admin".into(),
             max_iq: 1,
             stream_key: String::new(),
+            dv_max: 3,
             station: StationConfig::default(),
             source: None,
         }

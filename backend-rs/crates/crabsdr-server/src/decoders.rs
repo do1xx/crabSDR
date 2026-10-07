@@ -141,6 +141,16 @@ pub struct Status {
     /// Rundsender des Bandes: Sync/Text-Treffer von Ton-Decodern gehen live an alle Hörer (Knopf „DV“ leuchtet bei Lock)
     #[serde(skip)]
     pub bcast: Option<tokio::sync::broadcast::Sender<Vec<u8>>>,
+    /// zur Laufzeit angelegt (Betriebsart DV: FreeDV auf der Frequenz des Hörers), endet, wenn niemand mehr hört
+    pub dynamic: bool,
+    #[serde(skip)]
+    pub idle: u8,
+    #[serde(skip)]
+    pub client_id: u64,
+    #[serde(skip)]
+    pub opts: HashMap<String, String>,
+    #[serde(skip)]
+    pub enabled: bool,
 }
 
 pub struct DecoderHub {
@@ -152,6 +162,9 @@ pub struct DecoderHub {
     mqtt: std::sync::Mutex<Option<mpsc::Sender<Event>>>,
     /// Ton aus Decodern: je Decoder-ID ein Kodierer, je Hörer ein Sender (WebSocket-Hörer und Streams)
     audio: std::sync::Mutex<AudioFan>,
+    /// Plugin-Ordner und Bänder, damit Decoder auch zur Laufzeit entstehen können (DV)
+    plugin_dir: std::sync::Mutex<PathBuf>,
+    pipelines: std::sync::Mutex<HashMap<String, Arc<SdrPipeline>>>,
 }
 
 /// Verteilt dekodierten Ton (PCM vom Plugin) als Opus-Rahmen (Tag 0x82, 24 kHz wie die Band-Kanäle) an Abonnenten
@@ -196,7 +209,7 @@ impl DecoderHub {
     }
 
     pub fn new(data_dir: PathBuf) -> Arc<Self> {
-        Arc::new(Self { inner: Mutex::new(Inner { seq: 0, events: VecDeque::new(), status: Vec::new() }), notify: Notify::new(), data_dir, extra_env: std::sync::Mutex::new(Vec::new()), mqtt: std::sync::Mutex::new(None), audio: std::sync::Mutex::new(AudioFan::default()) })
+        Arc::new(Self { inner: Mutex::new(Inner { seq: 0, events: VecDeque::new(), status: Vec::new() }), notify: Notify::new(), data_dir, extra_env: std::sync::Mutex::new(Vec::new()), mqtt: std::sync::Mutex::new(None), audio: std::sync::Mutex::new(AudioFan::default()), plugin_dir: std::sync::Mutex::new(PathBuf::new()), pipelines: std::sync::Mutex::new(HashMap::new()) })
     }
 
     /// Hörer abonniert den Ton eines Decoders (ersetzt sein Band-Abstimmen); false, wenn der Decoder keinen Ton liefert
@@ -265,62 +278,144 @@ impl DecoderHub {
 
     /// Alle `[[decoders]]` starten. Braucht die laufenden Bänder (für den virtuellen Hörer).
     pub async fn start(self: &Arc<Self>, cfgs: &[DecoderInstanceConfig], plugin_dir: &Path, pipelines: &HashMap<String, Arc<SdrPipeline>>) {
-        for (idx, c) in cfgs.iter().enumerate() {
-            let id = c.id.clone().unwrap_or_else(|| format!("{}-{}", c.plugin, c.freq / 1000));
-            let pdir = plugin_dir.join(&c.plugin);
-            let pdir = std::path::absolute(&pdir).unwrap_or(pdir);
-            let manifest: Option<Manifest> = std::fs::read_to_string(pdir.join("decoder.json")).ok().and_then(|s| match serde_json::from_str(&s) {
-                Ok(m) => Some(m),
-                Err(e) => { warn!("Decoder '{}': decoder.json unlesbar: {}", id, e); None }
-            });
-            // Band: angegeben, sonst das erste, in dem der Kanal ganz liegt (mit Abstand zum Rand)
-            let bw = manifest.as_ref().map(|m| m.input.bandwidth as u64).unwrap_or(12_500);
-            let band = match &c.band {
-                Some(b) => pipelines.get(b).cloned(),
-                None => pipelines.values().find(|p| {
-                    let cf = crate::sdr_pipeline::corrected_center(p.center_freq.load(std::sync::atomic::Ordering::Relaxed), p.corr_ppm);
-                    let half = p.sample_rate.load(std::sync::atomic::Ordering::Relaxed) as u64 / 2;
-                    let margin = bw / 2 + 10_000;
-                    c.freq >= cf.saturating_sub(half) + margin && c.freq + margin <= cf + half
-                }).cloned(),
-            };
-            let label = c.label.clone().or_else(|| manifest.as_ref().map(|m| if m.label.is_empty() { m.name.clone() } else { m.label.clone() })).unwrap_or_else(|| c.plugin.clone());
-            let mode = manifest.as_ref().map(|m| m.input.mode.clone()).unwrap_or_default();
-            let state = if !c.enabled { "aus".to_string() } else if manifest.is_none() { "Plugin fehlt".into() } else if band.is_none() { "kein Band".into() } else { "startet".into() };
-            {
-                let mut g = self.inner.lock().await;
-                g.status.push(Status { id: id.clone(), plugin: c.plugin.clone(), label: label.clone(), band: band.as_ref().map(|b| b.id.clone()).unwrap_or_default(),
-                    freq: c.freq, mode, public: c.public, state: state.clone(), since: now_s(), restarts: 0, events: 0, last_event: None, audio_s: 0.0, audio: false, stderr: VecDeque::new(), bcast: band.as_ref().map(|b| b.spectrum_tx.clone()) });
-            }
-            let (Some(m), Some(pipe), true) = (manifest, band, c.enabled) else {
-                warn!("Decoder '{}': nicht gestartet ({})", id, state);
-                continue;
-            };
-            if let Some(miss) = m.requires.iter().find(|p| !have_program(p, &pdir)) {
-                warn!("Decoder '{}': Programm '{}' fehlt", id, miss);
-                self.set_state(idx, &format!("fehlt: {}", miss)).await;
-                continue;
-            }
-            let data = self.data_dir.join("decoders").join(&id);
-            let _ = std::fs::create_dir_all(&data);
-            // absolut: die Plugins laufen in ihrem eigenen Ordner, ein relativer data_dir zeigte sonst dorthin
-            let data = std::path::absolute(&data).unwrap_or(data);
-            // virtueller Hörer im Band: Rohton in der Rate des Plugins
-            let client_id = DECODER_CLIENT_BASE + idx as u64;
-            let (tx, rx) = mpsc::channel::<Vec<u8>>(64);
-            {
-                let dm = DemodMode::from_str(&m.input.mode).unwrap_or(DemodMode::Fm);
-                let mut cm = pipe.clients.lock().await;
-                cm.add(client_id, tx);
-                cm.update_tune(client_id, c.freq, dm, m.input.bandwidth);
-                cm.set_output_rate(client_id, m.input.rate, true);
-                cm.set_agc_mode(client_id, AgcMode::Off);
-            }
-            info!("Decoder '{}' ({}) auf {} Hz im Band '{}', {} {} Hz, bw {}", id, m.name, c.freq, pipe.id, m.input.mode, m.input.rate, m.input.bandwidth);
-            let env = Env { freq: c.freq, rate: m.input.rate, mode: m.input.mode.clone(), band: pipe.id.clone(), id: id.clone(), label: label.clone(), data: data.clone(), opts: c.options.clone() };
-            let hub = self.clone();
-            tokio::spawn(run_instance(hub, idx, m, pdir, env, rx));
+        *self.plugin_dir.lock().unwrap() = std::path::absolute(plugin_dir).unwrap_or(plugin_dir.to_path_buf());
+        *self.pipelines.lock().unwrap() = pipelines.clone();
+        for c in cfgs {
+            let idx = self.add_status(c, false).await;
+            self.launch(idx).await;
         }
+        self.spawn_janitor();
+    }
+
+    fn manifest_of(&self, plugin: &str) -> (PathBuf, Option<Manifest>) {
+        let pdir = self.plugin_dir.lock().unwrap().join(plugin);
+        let m = std::fs::read_to_string(pdir.join("decoder.json")).ok().and_then(|s| match serde_json::from_str::<Manifest>(&s) {
+            Ok(m) => Some(m),
+            Err(e) => { warn!("Plugin '{}': decoder.json unlesbar: {}", plugin, e); None }
+        });
+        (pdir, m)
+    }
+
+    /// Band, in dem der Kanal ganz liegt (mit Abstand zum Rand)
+    fn band_for(&self, freq: u64, bw: u64, wanted: Option<&str>) -> Option<Arc<SdrPipeline>> {
+        let pipes = self.pipelines.lock().unwrap();
+        if let Some(b) = wanted { return pipes.get(b).cloned(); }
+        pipes.values().find(|p| {
+            let cf = crate::sdr_pipeline::corrected_center(p.center_freq.load(std::sync::atomic::Ordering::Relaxed), p.corr_ppm);
+            let half = p.sample_rate.load(std::sync::atomic::Ordering::Relaxed) as u64 / 2;
+            let margin = bw / 2 + 10_000;
+            freq >= cf.saturating_sub(half) + margin && freq + margin <= cf + half
+        }).cloned()
+    }
+
+    /// Statuszeile anlegen (noch nicht gestartet); liefert den Index
+    async fn add_status(&self, c: &DecoderInstanceConfig, dynamic: bool) -> usize {
+        let id = c.id.clone().unwrap_or_else(|| format!("{}-{}", c.plugin, c.freq / 1000));
+        let (_, manifest) = self.manifest_of(&c.plugin);
+        let bw = manifest.as_ref().map(|m| m.input.bandwidth as u64).unwrap_or(12_500);
+        let band = self.band_for(c.freq, bw, c.band.as_deref());
+        let label = c.label.clone().or_else(|| manifest.as_ref().map(|m| if m.label.is_empty() { m.name.clone() } else { m.label.clone() })).unwrap_or_else(|| c.plugin.clone());
+        let mode = manifest.as_ref().map(|m| m.input.mode.clone()).unwrap_or_default();
+        let state = if !c.enabled { "aus".to_string() } else if manifest.is_none() { "Plugin fehlt".into() } else if band.is_none() { "kein Band".into() } else { "startet".into() };
+        let mut g = self.inner.lock().await;
+        let idx = g.status.len();
+        g.status.push(Status { id, plugin: c.plugin.clone(), label, band: band.as_ref().map(|b| b.id.clone()).unwrap_or_default(),
+            freq: c.freq, mode, public: c.public, state, since: now_s(), restarts: 0, events: 0, last_event: None, audio_s: 0.0, audio: false, stderr: VecDeque::new(),
+            bcast: band.as_ref().map(|b| b.spectrum_tx.clone()), dynamic, idle: 0, client_id: DECODER_CLIENT_BASE + idx as u64, opts: c.options.clone(), enabled: c.enabled });
+        idx
+    }
+
+    /// Decoder mit Statusindex starten: Plugin prüfen, virtuellen Hörer im Band anmelden, Prozess betreuen
+    async fn launch(self: &Arc<Self>, idx: usize) {
+        let st = { let g = self.inner.lock().await; g.status.get(idx).cloned() };
+        let Some(st) = st else { return };
+        let (pdir, manifest) = self.manifest_of(&st.plugin);
+        let band = if st.band.is_empty() { None } else { self.pipelines.lock().unwrap().get(&st.band).cloned() };
+        let (Some(m), Some(pipe), true) = (manifest, band, st.enabled) else {
+            warn!("Decoder '{}': nicht gestartet ({})", st.id, st.state);
+            return;
+        };
+        if let Some(miss) = m.requires.iter().find(|p| !have_program(p, &pdir)) {
+            warn!("Decoder '{}': Programm '{}' fehlt", st.id, miss);
+            self.set_state(idx, &format!("fehlt: {}", miss)).await;
+            return;
+        }
+        let data = self.data_dir.join("decoders").join(&st.id);
+        let _ = std::fs::create_dir_all(&data);
+        // absolut: die Plugins laufen in ihrem eigenen Ordner, ein relativer data_dir zeigte sonst dorthin
+        let data = std::path::absolute(&data).unwrap_or(data);
+        // virtueller Hörer im Band: Rohton in der Rate des Plugins
+        let (tx, rx) = mpsc::channel::<Vec<u8>>(64);
+        {
+            let dm = DemodMode::from_str(&m.input.mode).unwrap_or(DemodMode::Fm);
+            let mut cm = pipe.clients.lock().await;
+            cm.add(st.client_id, tx);
+            cm.update_tune(st.client_id, st.freq, dm, m.input.bandwidth);
+            cm.set_output_rate(st.client_id, m.input.rate, true);
+            cm.set_agc_mode(st.client_id, AgcMode::Off);
+        }
+        self.set_state(idx, "startet").await;
+        info!("Decoder '{}' ({}) auf {} Hz im Band '{}', {} {} Hz, bw {}", st.id, m.name, st.freq, pipe.id, m.input.mode, m.input.rate, m.input.bandwidth);
+        let env = Env { freq: st.freq, rate: m.input.rate, mode: m.input.mode.clone(), band: pipe.id.clone(), id: st.id.clone(), label: st.label.clone(), data: data.clone(), opts: st.opts.clone() };
+        let hub = self.clone();
+        tokio::spawn(run_instance(hub, idx, m, pdir, env, rx));
+    }
+
+    /// Betriebsart DV: FreeDV-Decoder auf der Frequenz des Hörers (auf 100 Hz gerundet) im Band `band` – vorhandenen
+    /// wiederverwenden, beendeten neu starten, sonst anlegen (höchstens `max` laufende dynamische Decoder je Station)
+    pub async fn ensure_dynamic(self: &Arc<Self>, plugin: &str, freq: u64, band: &str, max: u32) -> Result<String, String> {
+        let freq = (freq + 50) / 100 * 100;
+        let id = format!("dv-{}", freq);
+        let existing = { let g = self.inner.lock().await; g.status.iter().enumerate().find(|(_, s)| s.id == id).map(|(i, s)| (i, s.state.clone())) };
+        match existing {
+            Some((_, state)) if state != "beendet" && !state.starts_with("fehlt") && state != "kein Band" => return Ok(id),
+            Some((idx, _)) => {
+                { let mut g = self.inner.lock().await; if let Some(s) = g.status.get_mut(idx) { s.idle = 0; s.band = band.to_string(); s.enabled = true; s.events = 0; } }
+                self.launch(idx).await;
+                let ok = self.inner.lock().await.status.get(idx).map(|s| s.state == "startet" || s.state == "läuft").unwrap_or(false);
+                return if ok { Ok(id) } else { Err("Decoder konnte nicht starten (Plugin oder Programm fehlt)".into()) };
+            }
+            None => {}
+        }
+        let running = self.inner.lock().await.status.iter().filter(|s| s.dynamic && s.state != "beendet").count();
+        if running >= max as usize { return Err(format!("Schon {} DV-Decoder in Betrieb (dv_max), bitte später", max)); }
+        let (_, m) = self.manifest_of(plugin);
+        let bw = m.as_ref().map(|m| m.input.bandwidth as u64).unwrap_or(3000);
+        if self.band_for(freq, bw, Some(band)).is_none() { return Err("Band unbekannt".into()); }
+        let c = DecoderInstanceConfig { plugin: plugin.to_string(), freq, id: Some(id.clone()), band: Some(band.to_string()),
+            label: Some(format!("DV {:.3} MHz", freq as f64 / 1e6)), enabled: true, public: true, options: HashMap::new() };
+        let idx = self.add_status(&c, true).await;
+        self.launch(idx).await;
+        let ok = self.inner.lock().await.status.get(idx).map(|s| s.state == "startet" || s.state == "läuft").unwrap_or(false);
+        if ok { Ok(id) } else { Err("Decoder konnte nicht starten (Plugin oder Programm fehlt)".into()) }
+    }
+
+    /// Dynamischen Decoder beenden: virtuellen Hörer abmelden → run_instance endet, Prozess wird beendet
+    async fn stop_instance(&self, idx: usize) {
+        let st = { let g = self.inner.lock().await; g.status.get(idx).cloned() };
+        let Some(st) = st else { return };
+        let pipe = self.pipelines.lock().unwrap().get(&st.band).cloned();
+        if let Some(p) = pipe { p.clients.lock().await.remove(st.client_id); }
+        self.audio.lock().unwrap().enc.remove(&st.id);
+        self.set_state(idx, "beendet").await;
+        info!("Decoder '{}' beendet (niemand hört mehr)", st.id);
+    }
+
+    /// Alle 30 s: dynamische Decoder ohne Hörer nach drei Runden (≈ 90 s) beenden
+    fn spawn_janitor(self: &Arc<Self>) {
+        let hub = self.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(30)).await;
+                let candidates: Vec<(usize, String)> = hub.inner.lock().await.status.iter().enumerate()
+                    .filter(|(_, s)| s.dynamic && s.state != "beendet").map(|(i, s)| (i, s.id.clone())).collect();
+                for (idx, id) in candidates {
+                    let listeners = hub.audio_listeners(&id);
+                    let stop = { let mut g = hub.inner.lock().await; match g.status.get_mut(idx) { Some(s) => { if listeners == 0 { s.idle += 1; } else { s.idle = 0; } s.idle >= 3 } None => false } };
+                    if stop { hub.stop_instance(idx).await; }
+                }
+            }
+        });
     }
 }
 
@@ -429,7 +524,7 @@ async fn run_instance(hub: Arc<DecoderHub>, idx: usize, m: Manifest, pdir: PathB
                     tokio::select! {
                         st = child.wait() => { warn!("Decoder '{}' beendet: {:?}", env.id, st.ok()); break; }
                         f = rx.recv() => {
-                            let Some(frame) = f else { return };
+                            let Some(frame) = f else { hub.set_state(idx, "beendet").await; return };
                             if frame.len() < 3 || frame[0] != crabsdr_core::protocol::TAG_AUDIO { continue; }
                             let bytes = &frame[1..];
                             let gain = m.input.gain;
@@ -462,7 +557,7 @@ async fn run_instance(hub: Arc<DecoderHub>, idx: usize, m: Manifest, pdir: PathB
         loop {
             tokio::select! {
                 _ = tokio::time::sleep_until(until) => break,
-                f = rx.recv() => { if f.is_none() { return; } }
+                f = rx.recv() => { if f.is_none() { hub.set_state(idx, "beendet").await; return; } }
             }
         }
         { let mut g = hub.inner.lock().await; if let Some(s) = g.status.get_mut(idx) { s.restarts = restarts; } }
@@ -518,8 +613,11 @@ impl DecoderHub {
 pub async fn api_list(State(state): State<Arc<AppState>>, headers: axum::http::HeaderMap) -> impl IntoResponse {
     let p = crate::access::from_headers_or_guest(&state, &headers).await;
     let g = state.decoders.inner.lock().await;
-    let list: Vec<Value> = g.status.iter().filter(|s| p.may_decoder(&s.id, s.public)).map(|s| serde_json::to_value(s).unwrap_or(Value::Null)).collect();
-    ([(header::CACHE_CONTROL, "no-store")], Json(json!({ "decoders": list, "t": now_s() })))
+    let list: Vec<Value> = g.status.iter().filter(|s| p.may_decoder(&s.id, s.public) && !(s.dynamic && s.state == "beendet")).map(|s| serde_json::to_value(s).unwrap_or(Value::Null)).collect();
+    drop(g);
+    // Betriebsart DV (FreeDV auf beliebiger Frequenz) verfügbar? Plugin vorhanden und dv_max > 0
+    let dv = state.config.read().await.dv_max > 0 && state.decoders.plugin_dir.lock().unwrap().join("freedv").join("decoder.json").exists();
+    ([(header::CACHE_CONTROL, "no-store")], Json(json!({ "decoders": list, "dv": dv, "t": now_s() })))
 }
 
 #[derive(Deserialize)]

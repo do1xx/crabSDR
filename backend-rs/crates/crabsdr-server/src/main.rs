@@ -292,7 +292,7 @@ async fn ws_handler(
     let (is_admin, role) = (p.is_admin(), p.role.clone());
     // Lastgrenzen (docs/CONFIG.md): zu viele Verbindungen insgesamt oder von einer Adresse → Hinweis und Schluss
     let ip = access::client_ip(&headers, Some(peer));
-    let (max_l, max_ip, max_ch) = { let c = state.config.read().await; (c.max_listeners, c.max_per_ip, c.max_channels) };
+    let (max_l, max_ip, max_ch, dv_max) = { let c = state.config.read().await; (c.max_listeners, c.max_per_ip, c.max_channels, c.dv_max) };
     let refuse = {
         let clients = pipeline.clients.lock().await;
         if max_l > 0 && clients.count_real() >= max_l as usize { Some(format!("Station voll ({} Hörer), bitte später noch einmal", max_l)) }
@@ -300,11 +300,11 @@ async fn ws_handler(
         else { None }
     };
     let hub = state.decoders.clone();
-    ws.max_message_size(16 * 1024).on_upgrade(move |socket| handle_ws(socket, pipeline, hub, is_admin, role, ip, max_ch, refuse)).into_response()
+    ws.max_message_size(16 * 1024).on_upgrade(move |socket| handle_ws(socket, pipeline, hub, is_admin, role, ip, max_ch, dv_max, refuse)).into_response()
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, hub: Arc<decoders::DecoderHub>, is_admin: bool, role: String, ip: String, max_channels: u32, refuse: Option<String>) {
+async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, hub: Arc<decoders::DecoderHub>, is_admin: bool, role: String, ip: String, max_channels: u32, dv_max: u32, refuse: Option<String>) {
     if let Some(msg) = refuse {
         let _ = socket.send(Message::Text(json!({"type": "error", "msg": msg}).to_string().into())).await;
         let _ = socket.send(Message::Close(None)).await;
@@ -366,8 +366,8 @@ async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, hub: Arc<d
             msg = socket.recv() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
-                        if let Some(err) = handle_client_message(client_id, &text, &pipeline, &hub, &dec_tx, is_admin, max_channels).await {
-                            let _ = socket.send(Message::Text(json!({"type": "error", "msg": err}).to_string().into())).await;
+                        if let Some(reply) = handle_client_message(client_id, &text, &pipeline, &hub, &dec_tx, is_admin, max_channels, dv_max).await {
+                            let _ = socket.send(Message::Text(reply.to_string().into())).await;
                         }
                     }
                     Some(Ok(Message::Close(_))) | None => break,
@@ -387,7 +387,8 @@ async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, hub: Arc<d
 
 /// Gibt einen Hinweis an den Hörer zurück, wenn ein Befehl abgelehnt wurde (z. B. Kanalgrenze)
 #[allow(clippy::too_many_arguments)]
-async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipeline, hub: &decoders::DecoderHub, dec_tx: &mpsc::Sender<Vec<u8>>, is_admin: bool, max_channels: u32) -> Option<String> {
+async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipeline, hub: &Arc<decoders::DecoderHub>, dec_tx: &mpsc::Sender<Vec<u8>>, is_admin: bool, max_channels: u32, dv_max: u32) -> Option<serde_json::Value> {
+    let err = |m: String| Some(json!({ "type": "error", "msg": m }));
     let msg: serde_json::Value = match serde_json::from_str(text) {
         Ok(v) => v,
         Err(e) => {
@@ -409,7 +410,7 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
                 .and_then(|v| v.as_str())
                 .unwrap_or("wfm");
             let mode = DemodMode::from_str(mode_str).unwrap_or(DemodMode::Wfm);
-            if mode == DemodMode::Iq { return Some("I/Q gibt es nur als Stream (/stream/<kHz>/iq.wav)".into()); }
+            if mode == DemodMode::Iq { return err("I/Q gibt es nur als Stream (/stream/<kHz>/iq.wav)".into()); }
             // Bandbreite begrenzen: ein Kanal mit Megahertz-Breite würde den DSP mit voller Abtastrate demodulieren lassen
             let bandwidth = msg
                 .get("bandwidth")
@@ -420,7 +421,7 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
             let center = crate::sdr_pipeline::corrected_center(pipeline.center_freq.load(std::sync::atomic::Ordering::Relaxed), pipeline.corr_ppm) as i64;
             let half = pipeline.sample_rate.load(std::sync::atomic::Ordering::Relaxed) as i64 / 2;
             if (freq as i64 - center).abs() > half {
-                return Some(format!("Frequenz {} kHz liegt außerhalb dieses Bandes ({}–{} kHz)", freq / 1000, (center - half) / 1000, (center + half) / 1000));
+                return err(format!("Frequenz {} kHz liegt außerhalb dieses Bandes ({}–{} kHz)", freq / 1000, (center - half) / 1000, (center + half) / 1000));
             }
 
             // SSB: untere Kante des Durchlassbereichs (Browser schickt lo in Hz, Voreinstellung 300)
@@ -429,7 +430,7 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
             let mut clients = pipeline.clients.lock().await;
             if !clients.try_tune(client_id, freq, mode, bandwidth, pass_lo, max_channels) {
                 info!("[{}] Client {} abgelehnt: Kanalgrenze {} erreicht", pipeline.id, client_id, max_channels);
-                return Some(format!("Station voll: schon {} verschiedene Kanäle in Betrieb – bitte eine Frequenz wählen, die schon jemand hört, oder später wieder", max_channels));
+                return err(format!("Station voll: schon {} verschiedene Kanäle in Betrieb – bitte eine Frequenz wählen, die schon jemand hört, oder später wieder", max_channels));
             }
 
             info!(
@@ -485,16 +486,29 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
             let mut clients = pipeline.clients.lock().await;
             clients.untune(client_id);
         }
+        "dv" => {
+            // Betriebsart DV: FreeDV auf der Frequenz des Hörers – Decoder entsteht bei Bedarf, Hörer teilen ihn
+            if dv_max == 0 { return err("DV ist auf dieser Station aus".into()); }
+            let freq = msg.get("freq").and_then(|v| v.as_u64()).unwrap_or(0);
+            let center = crate::sdr_pipeline::corrected_center(pipeline.center_freq.load(std::sync::atomic::Ordering::Relaxed), pipeline.corr_ppm) as i64;
+            let half = pipeline.sample_rate.load(std::sync::atomic::Ordering::Relaxed) as i64 / 2;
+            if freq == 0 || (freq as i64 - center).abs() > half - 10_000 { return err("Frequenz liegt nicht in diesem Band".into()); }
+            let id = match hub.ensure_dynamic("freedv", freq, &pipeline.id, dv_max).await { Ok(id) => id, Err(e) => return err(e) };
+            { let mut clients = pipeline.clients.lock().await; clients.untune(client_id); }
+            if !hub.subscribe_audio(&id, client_id, dec_tx.clone()).await { return err("DV-Decoder liefert keinen Ton".into()); }
+            info!("[{}] Client {} hört DV {}", pipeline.id, client_id, id);
+            return Some(json!({ "type": "dv", "id": id, "freq": (freq + 50) / 100 * 100 }));
+        }
         "listen_decoder" => {
             // Ton eines Decoders hören (z. B. FreeDV dekodiert) statt eines Kanals: {"type":"listen_decoder","id":"freedv-144..."}
             let id = msg.get("id").and_then(|v| v.as_str()).unwrap_or("");
             match hub.is_public(id).await {
-                None => return Some("Decoder gibt es nicht".into()),
-                Some(false) if !is_admin => return Some("Decoder nur für den Sysop".into()),
+                None => return err("Decoder gibt es nicht".into()),
+                Some(false) if !is_admin => return err("Decoder nur für den Sysop".into()),
                 _ => {}
             }
             { let mut clients = pipeline.clients.lock().await; clients.untune(client_id); }
-            if !hub.subscribe_audio(id, client_id, dec_tx.clone()).await { return Some("Dieser Decoder liefert keinen Ton".into()); }
+            if !hub.subscribe_audio(id, client_id, dec_tx.clone()).await { return err("Dieser Decoder liefert keinen Ton".into()); }
             info!("[{}] Client {} hört Decoder {}", pipeline.id, client_id, id);
         }
         "set_squelch" => {
