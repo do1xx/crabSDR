@@ -336,7 +336,7 @@
     var t = $('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
     t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove('show'); }, 1800);
   }
-  function tuneLink() { return location.origin + location.pathname + '?tune=' + dialFreq().toFixed(3) + mode.toLowerCase() + '&pb=' + lo.toFixed(2) + ',' + hi.toFixed(2); }   // pb = Durchlassbereich lo,hi in kHz
+  function tuneLink() { var u = location.origin + location.pathname + '?tune=' + dialFreq().toFixed(3) + mode.toLowerCase() + '&pb=' + lo.toFixed(2) + ',' + hi.toFixed(2); if (_crab.squelchOn) u += '&sq=auto:' + _crab.sqMargin; else if (mode === 'FM') u += '&sq=off'; if (_crab.agcMode && _crab.agcMode !== 'medium') u += '&agc=' + _crab.agcMode; return u; }   // pb = Durchlassbereich lo,hi in kHz
   // Teilen: auf Handys das System-Menü (WhatsApp, Telegram, …), sonst Link + kurzer Text in die Zwischenablage
   function copyLink() {
     var url = tuneLink(), f = (dialFreq() / 1000).toFixed(4).replace('.', ',') + ' MHz ' + mode;

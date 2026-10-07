@@ -6,6 +6,10 @@ use tracing::{info, warn};
 fn default_true() -> bool { true }
 fn default_chat_keep_hours() -> u32 { 3 }
 fn default_chat_keep_lines() -> u32 { 50 }
+fn default_max_listeners() -> u32 { 50 }
+fn default_max_per_ip() -> u32 { 10 }
+fn default_max_channels() -> u32 { 16 }
+fn default_max_streams() -> u32 { 6 }
 
 /// Ein Band (`[[bands]]`, früher `[[sdrs]]`) = ein Empfänger. Neue Schlüsselnamen (driver, device, host, port, mode),
 /// die alten (sdr_driver, sdr_device, sdr_tcp_host, sdr_tcp_port, default_mode) gelten weiter.
@@ -265,6 +269,17 @@ pub struct ServerConfig {
     /// Die Station reicht weiter, Hörer-IPs verlassen sie nicht. Voreinstellung aus.
     #[serde(default)]
     pub chat_verbund: bool,
+    /// Lastgrenzen je Band, 0 = keine Grenze. Verbindungen insgesamt und je Absenderadresse; verschiedene Kanäle (jede
+    /// andere Frequenz, Betriebsart oder Bandbreite kostet einen DSP-Kanal, Hörer auf demselben Kanal teilen ihn);
+    /// Streams über /stream/… (zählen zusätzlich bei den Verbindungen mit)
+    #[serde(default = "default_max_listeners")]
+    pub max_listeners: u32,
+    #[serde(default = "default_max_per_ip")]
+    pub max_per_ip: u32,
+    #[serde(default = "default_max_channels")]
+    pub max_channels: u32,
+    #[serde(default = "default_max_streams")]
+    pub max_streams: u32,
     /// Stationsangaben für die neutrale Oberfläche (Platzhalter in index.html)
     #[serde(default)]
     pub station: StationConfig,
@@ -480,6 +495,10 @@ impl Config {
             chat_keep_lines: 50,
             chat_keep_hours: 3,
             chat_verbund: false,
+            max_listeners: 50,
+            max_per_ip: 10,
+            max_channels: 16,
+            max_streams: 6,
             station: StationConfig::default(),
             source: None,
         }

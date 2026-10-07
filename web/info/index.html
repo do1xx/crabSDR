@@ -76,10 +76,15 @@ sys();window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change
     <dt>?</dt><dd>Tastenhilfe ein/aus · Esc schließt</dd>
   </dl>
 
-  <h2>Stream</h2>
-  <p>Jeden Kanal gibt es auch als Ton-Stream für VLC, mpv oder Home Assistant, ohne Oberfläche:
-    <code>…/stream/145700/fm.ogg</code> (Frequenz in kHz, Betriebsart fm, am, usb, lsb, cw oder data für Decoder).
-    Die Schnellwahl als Senderliste: <a href="../stream/presets.m3u">presets.m3u</a>. Parameter und Beispiele in
+  <h2>Link und Stream</h2>
+  <p>Der Teilen-Link trägt Frequenz, Betriebsart, Bandbreite, Rauschsperre und AGC. Zusätzlich im Link möglich:
+    <code>&amp;vol=-10</code> (Lautstärke in dB), <code>&amp;mute=1</code>, <code>&amp;name=…</code> und <code>&amp;ui=min</code>
+    für eine Minimal-Ansicht ohne Wasserfall, z. B. für viele Tabs nebeneinander; der Tab-Titel zeigt die Frequenz.</p>
+  <p>Jeden Kanal gibt es auch als Ton-Stream für VLC, mpv, Home Assistant oder Decoder, ohne Oberfläche:
+    <code>…/stream/145700/fm.ogg</code> (Opus) oder <code>…/stream/145700/data.wav</code> (PCM, verlustfrei; Frequenz in kHz,
+    Betriebsart fm, am, usb, lsb, cw oder data für Decoder), zwei Kanäle auf links und rechts mit
+    <code>…/stream/pair.wav?l=145700/fm&amp;r=145725/fm</code>. Die Schnellwahl als Senderliste:
+    <a href="../stream/presets.m3u">presets.m3u</a>. Parameter und Beispiele in
     <a href="https://github.com/do1xx/crabSDR/blob/main/docs/STREAM.md">docs/STREAM.md</a>.</p>
 
   <h2>Software</h2>

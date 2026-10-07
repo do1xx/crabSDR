@@ -1,35 +1,41 @@
-//! Ton als Ogg/Opus-Stream über HTTP, wie Webradio: `/stream/<kHz>/<betriebsart>.ogg` spielt VLC, mpv, jeder Browser,
-//! Home Assistant. Das Band sucht der Server anhand der Frequenz. Rechte wie im Browser (Band-Freigabe, `?token=`),
-//! der Stream zählt als Hörer. Bei geschlossener Rauschsperre läuft Stille weiter, sonst bricht der Spieler ab.
+//! Ton als Stream über HTTP, wie Webradio: `/stream/<kHz>/<betriebsart>.ogg` (Opus) oder `.wav` (PCM 16 bit, 48 kHz) spielt
+//! VLC, mpv, jeder Browser, Home Assistant oder ein Decoder. `/stream/pair.wav?l=<kHz>/<mode>&r=<kHz>/<mode>` legt zwei
+//! Kanäle auf links und rechts. Das Band sucht der Server anhand der Frequenz. Rechte wie im Browser (Band-Freigabe,
+//! `?token=`), Lastgrenzen aus der Konfiguration (max_streams, max_per_ip, max_listeners, max_channels), jeder Stream zählt
+//! als Hörer. Bei geschlossener Rauschsperre läuft Stille weiter, sonst bricht der Spieler ab.
 //! `/stream/presets.m3u` liefert die Schnellwahl der Station als Senderliste.
 //!
+//! Der DSP liefert PCM (48 kHz); Opus wird hier je Stream kodiert, damit `br` (Bitrate kbit/s) je Hörer gilt.
 //! Parameter: `bw` Bandbreite Hz · `pb=lo,hi` SSB-Durchlass Hz · `sq=auto|auto:<dB>|<dBFS>|off` · `agc=fast|medium|slow|off`
-//! · `name` Anzeigename · `band` Band-ID (nur nötig, wenn zwei Bänder die Frequenz abdecken) · `token`.
+//! · `br` Opus-Bitrate 8–128 · `name` Anzeigename · `band` Band-ID · `token`.
 
 use crate::access;
 use crate::client::{Squelch, SquelchMode};
 use crate::sdr_pipeline::{corrected_center, SdrPipeline};
 use crate::AppState;
 use axum::body::Body;
-use axum::extract::{Path, Query, State};
+use axum::extract::{ConnectInfo, Path, Query, State};
 use axum::http::{header, HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use bytes::Bytes;
 use crabsdr_core::{protocol, AgcMode, DemodMode};
 use serde::Deserialize;
 use std::collections::VecDeque;
+use std::net::SocketAddr;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::info;
 
-/// Opus-Rahmen 20 ms; Ogg zählt immer in 48-kHz-Abtastwerten
-const GRANULE_PER_PACKET: u64 = 960;
-/// Rahmen je Ogg-Seite (100 ms): wenig Kopfdaten, kaum zusätzliche Verzögerung
-const PACKETS_PER_PAGE: usize = 5;
-/// Mehr als so viele wartende Rahmen (0,5 s) werden verworfen, sonst wächst die Verzögerung bei Netzstau
-const MAX_QUEUE: usize = 25;
+/// Abtastrate des Streams; der DSP rechnet auf diese Rate um
+const RATE: u32 = 48_000;
+/// 20 ms je Rahmen (Opus) bzw. je Takt (PCM)
+const FRAME: usize = (RATE / 50) as usize;
+/// Rahmen je Ogg-Seite bzw. Sendeblock (100 ms)
+const PER_PAGE: usize = 5;
+/// Mehr als 0,5 s wartender Ton wird verworfen, sonst wächst die Verzögerung bei Netzstau
+const MAX_BUFFER: usize = FRAME * 25;
 
 #[derive(Deserialize, Default)]
 pub struct StreamQuery {
@@ -38,13 +44,18 @@ pub struct StreamQuery {
     pub pb: Option<String>,
     pub sq: Option<String>,
     pub agc: Option<String>,
+    pub br: Option<u32>,
     pub name: Option<String>,
     pub band: Option<String>,
+    pub l: Option<String>,
+    pub r: Option<String>,
 }
 
-fn err(code: StatusCode, msg: &str) -> Response { (code, msg.to_string()).into_response() }
+/// Fehler als (Status, Text); erst am Ende zur Antwort gemacht (Clippy: große Err-Variante vermeiden)
+type Fail = (StatusCode, String);
+fn err(code: StatusCode, msg: &str) -> Fail { (code, msg.to_string()) }
 
-/// Frequenz aus dem Pfad: kHz („145700“, „145700.5“) oder MHz („145.700“); Werte unter 1000 gelten als MHz
+/// Frequenz: kHz („145700“, „145700.5“) oder MHz („145.700“); Werte unter 1000 gelten als MHz
 fn parse_freq(s: &str) -> Option<u64> {
     let v: f64 = s.trim().replace(',', ".").parse().ok()?;
     if v <= 0.0 || v.is_nan() { return None; }
@@ -81,112 +92,209 @@ fn parse_squelch(s: Option<&str>, mode: DemodMode) -> Squelch {
     sq
 }
 
-/// `GET /stream/<freq>/<mode>.ogg`
-pub async fn ogg(
-    Path((freq_s, file)): Path<(String, String)>,
-    Query(q): Query<StreamQuery>,
-    headers: HeaderMap,
-    State(state): State<Arc<AppState>>,
-) -> Response {
-    let Some(stem) = file.strip_suffix(".ogg") else { return err(StatusCode::NOT_FOUND, "nur .ogg") };
-    let Some(mode) = DemodMode::from_str(stem) else { return err(StatusCode::BAD_REQUEST, "Betriebsart unbekannt (fm, data, am, sam, usb, lsb, cw, wfm)") };
-    let Some(freq) = parse_freq(&freq_s) else { return err(StatusCode::BAD_REQUEST, "Frequenz in kHz, z. B. 145700") };
-    let Some(pipeline) = find_pipeline(&state, freq, q.band.as_deref()).await else {
-        return err(StatusCode::NOT_FOUND, "Kein Band dieser Station deckt die Frequenz ab");
-    };
-    let tok = access::bearer(&headers).or_else(|| q.token.clone());
-    let Ok(p) = access::resolve(&state, tok.as_deref()).await else { return err(StatusCode::UNAUTHORIZED, "Sitzung abgelaufen") };
-    let (public, admin_only) = (pipeline.guest.load(Ordering::Relaxed), pipeline.admin_only.load(Ordering::Relaxed));
-    if !p.may_band(&pipeline.id, public, admin_only) {
-        return err(StatusCode::FORBIDDEN, "Band nur für angemeldete Hörer (?token=…)");
-    }
+/// Ein abgestimmter Kanal: Frequenz, Betriebsart und die Hörer-Einstellungen aus der URL
+#[derive(Clone)]
+struct Spec { freq: u64, mode: DemodMode, bandwidth: u32, pass_lo: u32, squelch: Squelch, agc: AgcMode }
 
-    // Durchlass: SSB wie im Teilen-Link (lo,hi), sonst Bandbreite
+fn spec(freq_s: &str, mode_s: &str, q: &StreamQuery) -> Result<Spec, Fail> {
+    let Some(mode) = DemodMode::from_str(mode_s) else { return Err(err(StatusCode::BAD_REQUEST, "Betriebsart unbekannt (fm, data, am, sam, usb, lsb, cw, wfm)")) };
+    let Some(freq) = parse_freq(freq_s) else { return Err(err(StatusCode::BAD_REQUEST, "Frequenz in kHz, z. B. 145700")) };
     let (mut bandwidth, mut pass_lo) = (q.bw.unwrap_or_else(|| mode.default_bandwidth()).clamp(100, 250_000), 300u32);
     if let Some((lo, hi)) = q.pb.as_deref().and_then(|pb| pb.split_once(',')) {
         if let (Ok(lo), Ok(hi)) = (lo.trim().parse::<u32>(), hi.trim().parse::<u32>()) {
             if hi > lo { pass_lo = lo.min(5000); bandwidth = (hi - lo).clamp(100, 20_000); }
         }
     }
-    let agc = q.agc.as_deref().and_then(AgcMode::from_str).unwrap_or(AgcMode::Medium);
-    let squelch = parse_squelch(q.sq.as_deref(), mode);
-    let name = q.name.clone().unwrap_or_else(|| "Stream".into());
+    Ok(Spec { freq, mode, bandwidth, pass_lo, squelch: parse_squelch(q.sq.as_deref(), mode), agc: q.agc.as_deref().and_then(AgcMode::from_str).unwrap_or(AgcMode::Medium) })
+}
 
-    let client_id = crate::NEXT_CLIENT_ID.fetch_add(1, Ordering::Relaxed);
-    let (audio_tx, mut audio_rx) = mpsc::channel::<Vec<u8>>(32);
+/// Ein laufender Kanal: beim Band angemeldet, PCM kommt über `rx`; beim Fallenlassen wird abgemeldet
+struct Tap { pipeline: Arc<SdrPipeline>, id: u64, rx: mpsc::Receiver<Vec<u8>> }
+
+impl Drop for Tap {
+    fn drop(&mut self) {
+        let (p, id) = (self.pipeline.clone(), self.id);
+        tokio::spawn(async move { p.clients.lock().await.remove(id); info!("[{}] Stream {} beendet", p.id, id); });
+    }
+}
+
+/// Rechte und Lastgrenzen prüfen, Kanal beim Band anmelden
+async fn attach(state: &AppState, headers: &HeaderMap, peer: SocketAddr, q: &StreamQuery, sp: &Spec, name: &str) -> Result<Tap, Fail> {
+    let Some(pipeline) = find_pipeline(state, sp.freq, q.band.as_deref()).await else {
+        return Err(err(StatusCode::NOT_FOUND, "Kein Band dieser Station deckt die Frequenz ab"));
+    };
+    let tok = access::bearer(headers).or_else(|| q.token.clone());
+    let Ok(p) = access::resolve(state, tok.as_deref()).await else { return Err(err(StatusCode::UNAUTHORIZED, "Sitzung abgelaufen")) };
+    let (public, admin_only) = (pipeline.guest.load(Ordering::Relaxed), pipeline.admin_only.load(Ordering::Relaxed));
+    if !p.may_band(&pipeline.id, public, admin_only) {
+        return Err(err(StatusCode::FORBIDDEN, "Band nur für angemeldete Hörer (?token=…)"));
+    }
+    let ip = access::client_ip(headers, Some(peer));
+    let (max_l, max_ip, max_ch, max_st) = { let c = state.config.read().await; (c.max_listeners, c.max_per_ip, c.max_channels, c.max_streams) };
+    let id = crate::NEXT_CLIENT_ID.fetch_add(1, Ordering::Relaxed);
+    let (tx, rx) = mpsc::channel::<Vec<u8>>(32);
     {
         let mut clients = pipeline.clients.lock().await;
-        clients.add(client_id, audio_tx);
-        clients.set_opus(client_id, true);
-        clients.set_name(client_id, &name);
-        clients.set_session(client_id, &format!("stream{client_id}"));
-        clients.set_agc_mode(client_id, agc);
-        clients.set_squelch(client_id, squelch);
-        clients.update_tune_lo(client_id, freq, mode, bandwidth, pass_lo);
+        if max_st > 0 && clients.count_streams() >= max_st as usize { return Err(err(StatusCode::SERVICE_UNAVAILABLE, "Zu viele Streams auf dieser Station, bitte später")); }
+        if max_l > 0 && clients.count_real() >= max_l as usize { return Err(err(StatusCode::SERVICE_UNAVAILABLE, "Station voll, bitte später")); }
+        if max_ip > 0 && clients.count_ip(&ip) >= max_ip as usize { return Err(err(StatusCode::TOO_MANY_REQUESTS, "Zu viele Verbindungen von deiner Adresse")); }
+        clients.add(id, tx);
+        clients.set_origin(id, &ip, true);
+        clients.set_opus(id, false);
+        clients.set_output_rate(id, RATE, false);
+        clients.set_name(id, name);
+        clients.set_session(id, &format!("stream{id}"));
+        clients.set_agc_mode(id, sp.agc);
+        clients.set_squelch(id, sp.squelch);
+        if !clients.try_tune(id, sp.freq, sp.mode, sp.bandwidth, sp.pass_lo, max_ch) {
+            clients.remove(id);
+            return Err(err(StatusCode::SERVICE_UNAVAILABLE, "Station voll: zu viele verschiedene Kanäle in Betrieb"));
+        }
     }
-    info!("[{}] Stream {} ({}): {} Hz {} bw {}", pipeline.id, client_id, name, freq, mode.as_str(), bandwidth);
+    info!("[{}] Stream {} ({}): {} Hz {} bw {}", pipeline.id, id, name, sp.freq, sp.mode.as_str(), sp.bandwidth);
+    Ok(Tap { pipeline, id, rx })
+}
 
+/// PCM-Rahmen (Tag 0x02, s16le) in den Puffer; zu viel Rückstand wird verworfen
+fn push_pcm(buf: &mut VecDeque<i16>, frame: &[u8]) {
+    if frame.first() != Some(&protocol::TAG_AUDIO) || frame.len() < 3 { return; }
+    for c in frame[1..].chunks_exact(2) { buf.push_back(i16::from_le_bytes([c[0], c[1]])); }
+    while buf.len() > MAX_BUFFER { buf.pop_front(); }
+}
+
+/// 20 ms aus dem Puffer, sonst Stille
+fn take_frame(buf: &mut VecDeque<i16>, out: &mut [i16]) {
+    for s in out.iter_mut() { *s = buf.pop_front().unwrap_or(0); }
+}
+
+enum Format { Ogg, Wav }
+
+fn format_of(file: &str) -> Option<(&str, Format)> {
+    if let Some(stem) = file.strip_suffix(".ogg") { return Some((stem, Format::Ogg)); }
+    if let Some(stem) = file.strip_suffix(".wav") { return Some((stem, Format::Wav)); }
+    None
+}
+
+/// `GET /stream/<freq>/<mode>.ogg|.wav` – ein Kanal, mono
+pub async fn ogg(
+    Path((freq_s, file)): Path<(String, String)>,
+    Query(q): Query<StreamQuery>,
+    headers: HeaderMap,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    State(state): State<Arc<AppState>>,
+) -> Response {
+    let Some((stem, format)) = format_of(&file) else { return err(StatusCode::NOT_FOUND, "nur .ogg oder .wav").into_response() };
+    let sp = match spec(&freq_s, stem, &q) { Ok(s) => s, Err(r) => return r.into_response() };
+    let name = q.name.clone().unwrap_or_else(|| "Stream".into());
+    let mut tap = match attach(&state, &headers, peer, &q, &sp, &name).await { Ok(t) => t, Err(r) => return r.into_response() };
+    let bitrate = q.br.map(|b| b.clamp(8, 128) * 1000).unwrap_or(state.config.read().await.opus_bitrate);
+    let title = format!("crabSDR {} {} {}", tap.pipeline.label, fmt_khz(sp.freq), sp.mode.as_str().to_uppercase());
     let (out_tx, out_rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(16);
-    let pipe = pipeline.clone();
+    let ctype = match format { Format::Ogg => "audio/ogg", Format::Wav => "audio/wav" };
     tokio::spawn(async move {
-        let mut mux = OggOpus::new(client_id as u32 ^ 0x6372_6162);
-        let silence = encode_silence();
-        if out_tx.send(Ok(Bytes::from(mux.headers()))).await.is_err() { pipe.clients.lock().await.remove(client_id); return; }
-        let mut queue: VecDeque<Vec<u8>> = VecDeque::new();
+        let mut enc = match format { Format::Ogg => Some(match Encoder::new(bitrate, 1, tap.id as u32) { Some(e) => e, None => return }), Format::Wav => None };
+        let head = match &mut enc { Some(e) => e.headers(), None => wav_header(1) };
+        if out_tx.send(Ok(Bytes::from(head))).await.is_err() { return; }
+        let mut buf = VecDeque::with_capacity(MAX_BUFFER);
+        let mut frame = vec![0i16; FRAME];
+        let mut block = Vec::with_capacity(FRAME * 2 * PER_PAGE);
         let mut tick = tokio::time::interval(Duration::from_millis(20));
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Burst);
-        let mut started = false;
-        let start = tokio::time::Instant::now();
+        let (mut started, start, mut n) = (false, tokio::time::Instant::now(), 0usize);
         loop {
             tokio::select! {
-                frame = audio_rx.recv() => {
-                    match frame {
-                        Some(f) if f.first() == Some(&protocol::TAG_AUDIO_OPUS) && f.len() > 1 => {
-                            if queue.len() >= MAX_QUEUE { queue.pop_front(); }
-                            queue.push_back(f[1..].to_vec());
-                        }
-                        Some(_) => {}
-                        None => break,
-                    }
-                }
+                f = tap.rx.recv() => match f { Some(f) => push_pcm(&mut buf, &f), None => break },
                 _ = tick.tick() => {
-                    // Anlauf: erst mit zwei Rahmen Vorrat senden, damit die DSP-Stöße (3 Rahmen je 60 ms) nicht lückeln
-                    if !started { if queue.len() >= 2 || start.elapsed() > Duration::from_millis(200) { started = true; } else { continue; } }
-                    let pkt = queue.pop_front().unwrap_or_else(|| silence.clone());
-                    mux.add(pkt);
-                    if mux.pending() >= PACKETS_PER_PAGE && out_tx.send(Ok(Bytes::from(mux.flush()))).await.is_err() { break; }
+                    // Anlauf mit 100 ms Vorrat, damit die DSP-Stöße (ein Rahmen je 50–60 ms) nicht lückeln
+                    if !started { if buf.len() >= FRAME * 5 || start.elapsed() > Duration::from_millis(300) { started = true; } else { continue; } }
+                    take_frame(&mut buf, &mut frame);
+                    match &mut enc {
+                        Some(e) => { e.push(&frame); }
+                        None => for s in &frame { block.extend_from_slice(&s.to_le_bytes()); },
+                    }
+                    n += 1;
+                    if n % PER_PAGE == 0 {
+                        let out = match &mut enc { Some(e) => e.flush(), None => std::mem::take(&mut block) };
+                        if out_tx.send(Ok(Bytes::from(out))).await.is_err() { break; }
+                    }
                 }
             }
         }
-        pipe.clients.lock().await.remove(client_id);
-        info!("[{}] Stream {} beendet", pipe.id, client_id);
     });
+    respond(ctype, &title, out_rx)
+}
 
+/// `GET /stream/pair.wav?l=<kHz>/<mode>&r=<kHz>/<mode>` – zwei Kanäle auf links und rechts, für Decoder am Audiokabel
+pub async fn pair(
+    Query(q): Query<StreamQuery>,
+    headers: HeaderMap,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    State(state): State<Arc<AppState>>,
+) -> Response {
+    let parse = |s: Option<&str>| -> Result<Spec, Fail> {
+        let Some((f, m)) = s.and_then(|v| v.split_once('/')) else { return Err(err(StatusCode::BAD_REQUEST, "l und r als <kHz>/<betriebsart>, z. B. l=145700/fm&r=145725/fm")) };
+        spec(f, m, &q)
+    };
+    let (sl, sr) = match (parse(q.l.as_deref()), parse(q.r.as_deref())) { (Ok(a), Ok(b)) => (a, b), (Err(r), _) | (_, Err(r)) => return r.into_response() };
+    let name = q.name.clone().unwrap_or_else(|| "Stream".into());
+    let mut tl = match attach(&state, &headers, peer, &q, &sl, &format!("{name} L")).await { Ok(t) => t, Err(r) => return r.into_response() };
+    let mut tr = match attach(&state, &headers, peer, &q, &sr, &format!("{name} R")).await { Ok(t) => t, Err(r) => return r.into_response() };
+    let title = format!("crabSDR {} {} | {} {}", fmt_khz(sl.freq), sl.mode.as_str().to_uppercase(), fmt_khz(sr.freq), sr.mode.as_str().to_uppercase());
+    let (out_tx, out_rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(16);
+    tokio::spawn(async move {
+        if out_tx.send(Ok(Bytes::from(wav_header(2)))).await.is_err() { return; }
+        let (mut bl, mut br) = (VecDeque::with_capacity(MAX_BUFFER), VecDeque::with_capacity(MAX_BUFFER));
+        let (mut fl, mut fr) = (vec![0i16; FRAME], vec![0i16; FRAME]);
+        let mut block = Vec::with_capacity(FRAME * 4 * PER_PAGE);
+        let mut tick = tokio::time::interval(Duration::from_millis(20));
+        tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Burst);
+        let (mut started, start, mut n) = (false, tokio::time::Instant::now(), 0usize);
+        loop {
+            tokio::select! {
+                f = tl.rx.recv() => match f { Some(f) => push_pcm(&mut bl, &f), None => break },
+                f = tr.rx.recv() => match f { Some(f) => push_pcm(&mut br, &f), None => break },
+                _ = tick.tick() => {
+                    if !started { if (bl.len() >= FRAME * 5 && br.len() >= FRAME * 5) || start.elapsed() > Duration::from_millis(300) { started = true; } else { continue; } }
+                    take_frame(&mut bl, &mut fl); take_frame(&mut br, &mut fr);
+                    for (a, b) in fl.iter().zip(&fr) { block.extend_from_slice(&a.to_le_bytes()); block.extend_from_slice(&b.to_le_bytes()); }
+                    n += 1;
+                    if n % PER_PAGE == 0 && out_tx.send(Ok(Bytes::from(std::mem::take(&mut block)))).await.is_err() { break; }
+                }
+            }
+        }
+    });
+    respond("audio/wav", &title, out_rx)
+}
+
+fn respond(ctype: &'static str, title: &str, out_rx: mpsc::Receiver<Result<Bytes, std::io::Error>>) -> Response {
     let body = Body::from_stream(futures_util::stream::unfold(out_rx, |mut rx| async { rx.recv().await.map(|b| (b, rx)) }));
-    let title = format!("crabSDR {} {} {}", pipeline.label, fmt_khz(freq), mode.as_str().to_uppercase());
     Response::builder()
         .status(StatusCode::OK)
-        .header(header::CONTENT_TYPE, "audio/ogg")
+        .header(header::CONTENT_TYPE, ctype)
         .header(header::CACHE_CONTROL, "no-store")
         .header("icy-name", title.chars().filter(|c| c.is_ascii() && !c.is_ascii_control()).collect::<String>())
         .header("X-Accel-Buffering", "no")
         .body(body)
-        .unwrap_or_else(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "Antwort"))
+        .unwrap_or_else(|_| err(StatusCode::INTERNAL_SERVER_ERROR, "Antwort").into_response())
 }
 
 fn fmt_khz(hz: u64) -> String {
-    let khz = hz as f64 / 1000.0;
-    if hz.is_multiple_of(1000) { format!("{} kHz", hz / 1000) } else { format!("{khz:.1} kHz") }
+    if hz.is_multiple_of(1000) { format!("{} kHz", hz / 1000) } else { format!("{:.1} kHz", hz as f64 / 1000.0) }
 }
 
-/// 20 ms Stille als Opus-Rahmen, wird bei geschlossener Rauschsperre wiederholt
-fn encode_silence() -> Vec<u8> {
-    let mut out = vec![0u8; 400];
-    if let Ok(mut enc) = opus::Encoder::new(crate::dsp_thread::OPUS_RATE, opus::Channels::Mono, opus::Application::Audio) {
-        let zeros = vec![0i16; (crate::dsp_thread::OPUS_RATE / 50) as usize];
-        if let Ok(n) = enc.encode(&zeros, &mut out) { out.truncate(n); return out; }
-    }
-    vec![0xf8, 0xff, 0xfe]   // Notnagel: leerer CELT-Rahmen
+/// WAV-Kopf für einen endlosen Strom (Längen 0xFFFFFFFF; VLC, ffmpeg und sox spielen so lange, wie Daten kommen)
+fn wav_header(channels: u16) -> Vec<u8> {
+    let mut h = Vec::with_capacity(44);
+    h.extend_from_slice(b"RIFF"); h.extend_from_slice(&0xFFFF_FFFFu32.to_le_bytes()); h.extend_from_slice(b"WAVE");
+    h.extend_from_slice(b"fmt "); h.extend_from_slice(&16u32.to_le_bytes());
+    h.extend_from_slice(&1u16.to_le_bytes());                                  // PCM
+    h.extend_from_slice(&channels.to_le_bytes());
+    h.extend_from_slice(&RATE.to_le_bytes());
+    h.extend_from_slice(&(RATE * channels as u32 * 2).to_le_bytes());          // Bytes je Sekunde
+    h.extend_from_slice(&(channels * 2).to_le_bytes());                        // Blockgröße
+    h.extend_from_slice(&16u16.to_le_bytes());                                 // Bit je Abtastwert
+    h.extend_from_slice(b"data"); h.extend_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
+    h
 }
 
 /// `GET /stream/presets.m3u`: Schnellwahl der Station (presets.json aus Stationsordner oder Oberfläche) als Senderliste
@@ -212,26 +320,39 @@ pub async fn m3u(headers: HeaderMap, State(state): State<Arc<AppState>>) -> Resp
     ([(header::CONTENT_TYPE, "audio/x-mpegurl; charset=utf-8"), (header::CACHE_CONTROL, "no-store")], out).into_response()
 }
 
-/// Ogg-Seiten für Opus von Hand (RFC 3533 / RFC 7845): ein Strom, Kopfseiten OpusHead + OpusTags, dann Tonseiten.
-struct OggOpus {
-    serial: u32,
-    seq: u32,
-    granule: u64,
-    pending: Vec<Vec<u8>>,
+/// Opus-Kodierer je Stream plus Ogg-Verpackung (RFC 3533 / RFC 7845): Kopfseiten OpusHead + OpusTags, dann Tonseiten
+struct Encoder { enc: opus::Encoder, mux: OggOpus, buf: Vec<u8>, channels: u16 }
+
+impl Encoder {
+    fn new(bitrate: u32, channels: u16, serial: u32) -> Option<Self> {
+        let ch = if channels == 2 { opus::Channels::Stereo } else { opus::Channels::Mono };
+        let mut enc = opus::Encoder::new(RATE, ch, opus::Application::Audio).ok()?;
+        let _ = enc.set_bitrate(opus::Bitrate::Bits(bitrate as i32));
+        Some(Self { enc, mux: OggOpus::new(serial, channels), buf: vec![0u8; 4000], channels })
+    }
+    fn headers(&mut self) -> Vec<u8> { self.mux.headers() }
+    /// ein 20-ms-Rahmen (mono: FRAME Werte, stereo: 2·FRAME verschränkt)
+    fn push(&mut self, pcm: &[i16]) {
+        debug_assert_eq!(pcm.len(), FRAME * self.channels as usize);
+        if let Ok(n) = self.enc.encode(pcm, &mut self.buf) { self.mux.add(self.buf[..n].to_vec()); }
+    }
+    fn flush(&mut self) -> Vec<u8> { self.mux.flush() }
 }
 
+struct OggOpus { serial: u32, seq: u32, granule: u64, channels: u16, pending: Vec<Vec<u8>> }
+
 impl OggOpus {
-    fn new(serial: u32) -> Self { Self { serial, seq: 0, granule: 0, pending: Vec::new() } }
+    fn new(serial: u32, channels: u16) -> Self { Self { serial, seq: 0, granule: 0, channels, pending: Vec::new() } }
 
     fn headers(&mut self) -> Vec<u8> {
         let mut head = Vec::new();
         head.extend_from_slice(b"OpusHead");
         head.push(1);                                              // Version
-        head.push(1);                                              // Kanäle
-        head.extend_from_slice(&312u16.to_le_bytes());             // Pre-Skip (Encoder-Vorlauf)
-        head.extend_from_slice(&crate::dsp_thread::OPUS_RATE.to_le_bytes());
+        head.push(self.channels as u8);
+        head.extend_from_slice(&312u16.to_le_bytes());             // Pre-Skip (Kodierer-Vorlauf)
+        head.extend_from_slice(&RATE.to_le_bytes());
         head.extend_from_slice(&0i16.to_le_bytes());               // Verstärkung
-        head.push(0);                                              // Kanalabbildung
+        head.push(0);                                              // Kanalabbildung (1–2 Kanäle)
         let mut tags = Vec::new();
         tags.extend_from_slice(b"OpusTags");
         let vendor = b"crabSDR";
@@ -244,11 +365,11 @@ impl OggOpus {
     }
 
     fn add(&mut self, packet: Vec<u8>) { self.pending.push(packet); }
-    fn pending(&self) -> usize { self.pending.len() }
 
     fn flush(&mut self) -> Vec<u8> {
+        if self.pending.is_empty() { return Vec::new(); }
         let packets = std::mem::take(&mut self.pending);
-        self.granule += GRANULE_PER_PACKET * packets.len() as u64;
+        self.granule += FRAME as u64 * packets.len() as u64;      // 48-kHz-Abtastwerte je Rahmen
         self.page(0x00, self.granule, &packets)
     }
 
@@ -316,34 +437,54 @@ mod tests {
         assert!(matches!(parse_squelch(Some("off"), DemodMode::Fm).mode, SquelchMode::Off));
     }
 
-    /// Bekannter Prüfwert: Ogg-CRC der ersten Kopfseite eines Opus-Stroms mit Seriennummer 0 (Wert aus opusenc nachgerechnet)
     #[test]
     fn ogg_seiten_aufbau() {
-        let mut m = OggOpus::new(7);
+        let mut m = OggOpus::new(7, 1);
         let h = m.headers();
         assert_eq!(&h[0..4], b"OggS");
         assert_eq!(h[5], 0x02);                                   // erste Seite = Beginn des Stroms
         assert_eq!(h[26], 1);                                     // ein Segment
         assert_eq!(h[27], 19);                                    // OpusHead ist 19 Byte
         assert_eq!(&h[28..36], b"OpusHead");
-        // zweite Seite folgt direkt und trägt OpusTags
         let second = 28 + 19;
         assert_eq!(&h[second..second + 4], b"OggS");
         assert_eq!(&h[second + 28..second + 36], b"OpusTags");
-        // Tonseite: Granule zählt 960 je Rahmen, Lacing teilt lange Pakete in 255er
         for _ in 0..5 { m.add(vec![1u8; 300]); }
         let page = m.flush();
-        assert_eq!(u64::from_le_bytes(page[6..14].try_into().unwrap()), 5 * 960);
+        assert_eq!(u64::from_le_bytes(page[6..14].try_into().unwrap()), 5 * FRAME as u64);
         assert_eq!(page[26], 10);                                 // je Paket 255 + 45
         assert_eq!(page.len(), 27 + 10 + 5 * 300);
-        // CRC über die Seite mit genullten CRC-Bytes muss dem eingetragenen Wert entsprechen
         let mut z = page.clone(); z[22..26].copy_from_slice(&[0; 4]);
         assert_eq!(ogg_crc(&z).to_le_bytes(), page[22..26]);
     }
 
     #[test]
     fn ogg_crc_bekannter_wert() {
-        // Referenz aus der Ogg-Spezifikation: CRC("123456789") mit diesem Verfahren = 0x89a1897f
         assert_eq!(ogg_crc(b"123456789"), 0x89a1_897f);
+    }
+
+    /// Kodierer: Stille und ein Ton ergeben gültige Opus-Pakete und Seiten mit wachsender Granule
+    #[test]
+    fn opus_kodierer_laeuft() {
+        let mut e = Encoder::new(32_000, 1, 1).expect("Opus-Kodierer");
+        let h = e.headers(); assert!(h.len() > 60);
+        let silence = vec![0i16; FRAME];
+        let tone: Vec<i16> = (0..FRAME).map(|i| ((i as f32 * 0.1).sin() * 8000.0) as i16).collect();
+        for _ in 0..5 { e.push(&silence); }
+        let p1 = e.flush(); assert!(p1.len() > 27, "Seite {}", p1.len());
+        for _ in 0..5 { e.push(&tone); }
+        let p2 = e.flush();
+        assert_eq!(u64::from_le_bytes(p2[6..14].try_into().unwrap()), 10 * FRAME as u64);
+        assert!(p2.len() > p1.len(), "Ton braucht mehr Bytes als Stille");
+    }
+
+    #[test]
+    fn wav_kopf() {
+        let h = wav_header(2);
+        assert_eq!(h.len(), 44);
+        assert_eq!(&h[0..4], b"RIFF"); assert_eq!(&h[8..12], b"WAVE");
+        assert_eq!(u16::from_le_bytes([h[22], h[23]]), 2);
+        assert_eq!(u32::from_le_bytes(h[24..28].try_into().unwrap()), 48_000);
+        assert_eq!(u16::from_le_bytes([h[32], h[33]]), 4);
     }
 }

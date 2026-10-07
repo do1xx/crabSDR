@@ -53,6 +53,10 @@ Station unangetastet.
 | `db_path` | `data_dir/crabsdr.db` | Benutzerdatenbank (Admin, Gäste) |
 | `builtin_chat` | `true` | Chat und Logbuch der Hörer (SQLite `data_dir/pinnwand.db`). `false` nur, wenn ein anderer Dienst sie übernimmt |
 | `chat_keep_lines` | `50` | Chat behält nur die letzten so vielen Zeilen (FIFO), `0` = alle behalten. Das Logbuch bleibt |
+| `max_listeners` | `50` | Verbindungen je Band insgesamt (Browser und Streams), `0` = keine Grenze |
+| `max_per_ip` | `10` | Verbindungen je Band und Absenderadresse (mehrere Tabs/Bänder einer Person zählen einzeln) |
+| `max_channels` | `16` | verschiedene Kanäle je Band: jede andere Frequenz, Betriebsart oder Bandbreite kostet einen DSP-Kanal, Hörer auf demselben Kanal teilen ihn. Darüber: „Station voll“ |
+| `max_streams` | `6` | gleichzeitige Streams (`/stream/…`) je Band |
 | `chat_keep_hours` | `3` | Zusätzlich Chat-Zeilen nach so vielen Stunden löschen, `0` = aus |
 | `chat_verbund` | `false` | Verbund-Chat: Chatzeilen (Name, Text, Uhrzeit, Stationskürzel) über crabsdr.de mit allen teilnehmenden Stationen teilen. Die Station reicht weiter, Hörer-IPs verlassen sie nicht; dort 24 h. Braucht `[directory] enabled` |
 | `opus_bitrate` | `32000` | bit/s je belegter Frequenz (Opus, 24 kHz mono); 32 k reicht für Sprache, 48 k für Rundfunk |

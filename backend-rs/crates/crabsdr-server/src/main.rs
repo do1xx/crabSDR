@@ -188,6 +188,7 @@ async fn main() {
     let app = Router::new()
         .route("/ws/{sdr_id}", get(ws_handler))
         .route("/stream/presets.m3u", get(stream::m3u))
+        .route("/stream/pair.wav", get(stream::pair))
         .route("/stream/{freq}/{file}", get(stream::ogg))
         .route("/api/bands", get(api_list_bands))
         .route("/api/health", get(api_health))
@@ -270,6 +271,7 @@ async fn ws_handler(
     AxumPath(sdr_id): AxumPath<String>,
     Query(q): Query<TokenQuery>,
     headers: HeaderMap,
+    axum::extract::ConnectInfo(peer): axum::extract::ConnectInfo<std::net::SocketAddr>,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
     let pipeline = match state.manager.read().await.get(&sdr_id) {
@@ -285,10 +287,24 @@ async fn ws_handler(
         return (axum::http::StatusCode::FORBIDDEN, "Band nur für angemeldete Hörer").into_response();
     }
     let (is_admin, role) = (p.is_admin(), p.role.clone());
-    ws.on_upgrade(move |socket| handle_ws(socket, pipeline, is_admin, role)).into_response()
+    // Lastgrenzen (docs/CONFIG.md): zu viele Verbindungen insgesamt oder von einer Adresse → Hinweis und Schluss
+    let ip = access::client_ip(&headers, Some(peer));
+    let (max_l, max_ip, max_ch) = { let c = state.config.read().await; (c.max_listeners, c.max_per_ip, c.max_channels) };
+    let refuse = {
+        let clients = pipeline.clients.lock().await;
+        if max_l > 0 && clients.count_real() >= max_l as usize { Some(format!("Station voll ({} Hörer), bitte später noch einmal", max_l)) }
+        else if max_ip > 0 && clients.count_ip(&ip) >= max_ip as usize { Some(format!("Zu viele Verbindungen von deiner Adresse (höchstens {})", max_ip)) }
+        else { None }
+    };
+    ws.on_upgrade(move |socket| handle_ws(socket, pipeline, is_admin, role, ip, max_ch, refuse)).into_response()
 }
 
-async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, is_admin: bool, role: String) {
+async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, is_admin: bool, role: String, ip: String, max_channels: u32, refuse: Option<String>) {
+    if let Some(msg) = refuse {
+        let _ = socket.send(Message::Text(json!({"type": "error", "msg": msg}).to_string().into())).await;
+        let _ = socket.send(Message::Close(None)).await;
+        return;
+    }
     let client_id = NEXT_CLIENT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
     let (audio_tx, mut audio_rx) = mpsc::channel::<Vec<u8>>(32);
@@ -296,6 +312,7 @@ async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, is_admin: 
     {
         let mut clients = pipeline.clients.lock().await;
         clients.add(client_id, audio_tx);
+        clients.set_origin(client_id, &ip, false);
     }
 
     info!("[{}] Client {} connected (admin={})", pipeline.id, client_id, is_admin);
@@ -343,7 +360,9 @@ async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, is_admin: 
             msg = socket.recv() => {
                 match msg {
                     Some(Ok(Message::Text(text))) => {
-                        handle_client_message(client_id, &text, &pipeline, is_admin).await;
+                        if let Some(err) = handle_client_message(client_id, &text, &pipeline, is_admin, max_channels).await {
+                            let _ = socket.send(Message::Text(json!({"type": "error", "msg": err}).to_string().into())).await;
+                        }
                     }
                     Some(Ok(Message::Close(_))) | None => break,
                     _ => {}
@@ -359,7 +378,8 @@ async fn handle_ws(mut socket: WebSocket, pipeline: Arc<SdrPipeline>, is_admin: 
     info!("[{}] Client {} disconnected", pipeline.id, client_id);
 }
 
-async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipeline, is_admin: bool) {
+/// Gibt einen Hinweis an den Hörer zurück, wenn ein Befehl abgelehnt wurde (z. B. Kanalgrenze)
+async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipeline, is_admin: bool, max_channels: u32) -> Option<String> {
     let msg: serde_json::Value = match serde_json::from_str(text) {
         Ok(v) => v,
         Err(e) => {
@@ -367,7 +387,7 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
                 "[{}] Client {} sent invalid JSON: {}",
                 pipeline.id, client_id, e
             );
-            return;
+            return None;
         }
     };
 
@@ -390,7 +410,10 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
             // SSB: untere Kante des Durchlassbereichs (Browser schickt lo in Hz, Voreinstellung 300)
             let pass_lo = msg.get("lo").and_then(|v| v.as_u64()).map(|v| v.min(5000) as u32).unwrap_or(300);
             let mut clients = pipeline.clients.lock().await;
-            clients.update_tune_lo(client_id, freq, mode, bandwidth, pass_lo);
+            if !clients.try_tune(client_id, freq, mode, bandwidth, pass_lo, max_channels) {
+                info!("[{}] Client {} abgelehnt: Kanalgrenze {} erreicht", pipeline.id, client_id, max_channels);
+                return Some(format!("Station voll: schon {} verschiedene Kanäle in Betrieb – bitte eine Frequenz wählen, die schon jemand hört, oder später wieder", max_channels));
+            }
 
             info!(
                 "[{}] Client {} tuned to {} Hz ({})",
@@ -403,7 +426,7 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
         "set_gain" => {
             if !is_admin || !pipeline.admin_only.load(std::sync::atomic::Ordering::Relaxed) {
                 warn!("[{}] Client {} tried set_gain (admin={}, admin_only={})", pipeline.id, client_id, is_admin, pipeline.admin_only.load(std::sync::atomic::Ordering::Relaxed));
-                return;
+                return None;
             }
             if let Some(gain) = msg.get("gain").and_then(|v| v.as_f64()) {
                 let _ = pipeline
@@ -417,7 +440,7 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
             if !is_admin || !pipeline.admin_only.load(std::sync::atomic::Ordering::Relaxed) {
                 warn!("[{}] Client {} tried set_center_freq (admin={}, admin_only={})",
                     pipeline.id, client_id, is_admin, pipeline.admin_only.load(std::sync::atomic::Ordering::Relaxed));
-                return;
+                return None;
             }
             if let Some(freq) = msg.get("freq").and_then(|v| v.as_u64()) {
                 pipeline.center_freq.store(freq, std::sync::atomic::Ordering::Relaxed);
@@ -503,6 +526,7 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
             );
         }
     }
+    None
 }
 
 // --- REST API ---

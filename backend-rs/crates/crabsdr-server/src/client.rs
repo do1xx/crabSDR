@@ -60,6 +60,9 @@ pub struct WaterfallSub {
 }
 
 pub struct ClientState {
+    /// Absenderadresse und ob es ein Stream (/stream/…) ist – für die Lastgrenzen
+    pub ip: String,
+    pub stream: bool,
     pub tx: mpsc::Sender<Vec<u8>>,
     pub tune_freq: Option<u64>,
     pub mode: DemodMode,
@@ -126,6 +129,8 @@ impl ClientManager {
                 squelch: Squelch::default(),
                 name: String::new(),
                 session: String::new(),
+                ip: String::new(),
+                stream: false,
                 waterfall: None,
                 wf_seq: 0,
                 wf_hist_rows: 0,
@@ -151,6 +156,27 @@ impl ClientManager {
             c.pass_lo = pass_lo;
         }
     }
+
+    /// Abstimmen mit Kanalgrenze: ein neuer Kanal (Frequenz/Betriebsart/Bandbreite, den noch niemand hört) wird nur
+    /// angelegt, wenn weniger als `max_channels` verschiedene Kanäle laufen (0 = keine Grenze). Plugins zählen mit.
+    pub fn try_tune(&mut self, id: u64, freq: u64, mode: DemodMode, bandwidth: u32, pass_lo: u32, max_channels: u32) -> bool {
+        if max_channels > 0 {
+            let Some(me) = self.clients.get(&id) else { return false };
+            let key = ChannelKey { freq, mode, bandwidth, agc: me.agc_mode, out_rate: me.output_sample_rate, raw: me.raw_audio, pass_lo };
+            let others: std::collections::HashSet<ChannelKey> = self.clients.iter().filter(|(&cid, c)| cid != id && c.tune_freq.is_some())
+                .map(|(_, c)| ChannelKey { freq: c.tune_freq.unwrap_or(0), mode: c.mode, bandwidth: c.bandwidth, agc: c.agc_mode, out_rate: c.output_sample_rate, raw: c.raw_audio, pass_lo: c.pass_lo })
+                .collect();
+            if !others.contains(&key) && others.len() >= max_channels as usize { return false; }
+        }
+        self.update_tune_lo(id, freq, mode, bandwidth, pass_lo);
+        true
+    }
+
+    pub fn set_origin(&mut self, id: u64, ip: &str, stream: bool) {
+        if let Some(c) = self.clients.get_mut(&id) { c.ip = ip.to_string(); c.stream = stream; }
+    }
+    pub fn count_ip(&self, ip: &str) -> usize { self.clients.values().filter(|c| c.ip == ip).count() }
+    pub fn count_streams(&self) -> usize { self.clients.values().filter(|c| c.stream).count() }
 
     /// Abstimmung aufheben (Hörer hört nur noch Wasserfall / wechselt das Band)
     pub fn untune(&mut self, id: u64) {
@@ -245,5 +271,26 @@ impl ClientManager {
             .collect();
         v.sort_by_key(|e| e["id"].as_u64().unwrap_or(0));
         v
+    }
+}
+
+#[cfg(test)]
+mod lasttests {
+    use super::*;
+
+    /// Kanalgrenze: ein dritter verschiedener Kanal wird abgelehnt, dieselbe Frequenz wie ein anderer Hörer geht immer
+    #[test]
+    fn kanalgrenze() {
+        let mut m = ClientManager::new();
+        let (tx, _rx) = mpsc::channel(4);
+        for id in 1..=4 { m.add(id, tx.clone()); }
+        assert!(m.try_tune(1, 145_500_000, DemodMode::Fm, 12_500, 0, 2));
+        assert!(m.try_tune(2, 145_725_000, DemodMode::Fm, 12_500, 0, 2));
+        assert!(!m.try_tune(3, 145_600_000, DemodMode::Fm, 12_500, 0, 2), "dritter Kanal muss abgelehnt werden");
+        assert!(m.try_tune(3, 145_500_000, DemodMode::Fm, 12_500, 0, 2), "bestehender Kanal geht");
+        assert!(m.try_tune(4, 144_300_000, DemodMode::Usb, 2_700, 300, 0), "0 = keine Grenze");
+        m.set_origin(1, "1.2.3.4", true); m.set_origin(2, "1.2.3.4", false);
+        assert_eq!(m.count_ip("1.2.3.4"), 2);
+        assert_eq!(m.count_streams(), 1);
     }
 }

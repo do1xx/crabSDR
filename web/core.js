@@ -63,6 +63,8 @@ function isCw() { return mode === 'CW'; }
 function dialFreq() { return freq + (isCw() ? (hi + lo) / 2 : 0); }
 function _crabTextFreq() {
   try { if (!freqTextLock) document.freqform.frequency.value = dialFreq().toFixed(2); } catch (e) {}
+  // Tab-Titel = Frequenz und Betriebsart, damit man bei vielen Tabs sieht, welcher was hört
+  try { if (_crab.started) document.title = (dialFreq() / 1000).toFixed(4) + ' MHz ' + mode + ' · ' + (window.STATION_NAME || 'crabSDR'); } catch (e) {}
 }
 function _crabBandRange(b) { var e = bi[b]; return { lo: e.centerfreq - e.samplerate / 2, hi: e.centerfreq + e.samplerate / 2 }; }
 
@@ -765,6 +767,7 @@ function _crabConnect(b) {
     ws.onmessage = function (ev) {
       if (typeof ev.data === 'string') {
         var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+        if (m.type === 'error') { _crabStatus(m.msg || 'Abgelehnt'); console.warn('crabSDR:', m.msg); B.retry = 5; return; }   // Station voll o. ä.: Hinweis, langsam neu versuchen
         if (m.type === 'config') { bi[b].centerfreq = m.center_freq / 1000; bi[b].samplerate = m.sample_rate / 1000; if (m.fft_size && m.fft_size !== bi[b].fft) { bi[b].fft = m.fft_size; bi[b].zoom = Math.min(bi[b].zoom, _crabMaxZoom(bi[b])); } _crabGeom(b); B.myId = m.client_id; }
         return;
       }
@@ -1082,7 +1085,7 @@ function crabStart() {
   var un = readCookie('username'); if (document.usernameform) document.usernameform.username.value = (un && decodeURIComponent(un) !== 'Hörer') ? decodeURIComponent(un) : _crabGuestName();
   // Deep-Link ?tune=<kHz><modus>
   var start = { b: 0, f: null, m: null };
-  var mt = /[?&]tune=([\d.]+)(fm|am|usb|lsb|cw)?/i.exec(location.search);
+  var mt = /[?&]tune=([\d.]+)(fm|am|usb|lsb|cw|data)?/i.exec(location.search);
   if (mt) { var f0 = parseFloat(mt[1]); for (var k = 0; k < bi.length; k++) { var r = _crabBandRange(k); if (f0 >= r.lo && f0 <= r.hi) { start.b = k; start.f = f0; start.m = mt[2] ? mt[2].toLowerCase() : null; } } }
   if (start.m) { var mf = start.m === 'fm' ? [-8, 8] : _crabMODEFILTER[start.m]; mode = start.m.toUpperCase(); lo = mf[0]; hi = mf[1]; }
   // Durchlassbereich aus dem Link (&pb=lo,hi in kHz), z. B. SSB 0.30,2.70
@@ -1097,6 +1100,19 @@ function crabStart() {
   _crab.started = true;
   setBand(start.b);
   if (start.f != null) setFreqText(String(start.f));
+  // Weitere Einstellungen aus dem Link (docs/STREAM.md): &sq=auto:8|off|-85 &agc=slow &vol=-10 (dB) &mute=1 &name=… &ui=min
+  (function () {
+    var qs = location.search;
+    var ms = /[?&]sq=(off|auto(?::(\d+))?|-?\d+)/i.exec(qs);
+    if (ms) { _crab.sqUser = true; if (/^off$/i.test(ms[1])) setSquelch(false); else { if (ms[2]) setSquelchLevel(Number(ms[2])); setSquelch(true); } }
+    var ma = /[?&]agc=(fast|medium|slow|off)/i.exec(qs); if (ma && typeof setAgc === 'function') setAgc(ma[1].toLowerCase());
+    var mv = /[?&]vol=(-?\d+)/.exec(qs);
+    if (mv) { var db = Math.max(-20, Math.min(6, Number(mv[1]))); var vr = document.getElementById('volumecontrol2'); if (vr) vr.value = db; crabAudio.setvolume(Math.pow(10, db / 10)); }
+    if (/[?&]mute=1\b/.test(qs)) setMute(true);
+    var mn = /[?&]name=([^&]+)/.exec(qs);
+    if (mn && document.usernameform) { try { document.usernameform.username.value = decodeURIComponent(mn[1].replace(/\+/g, ' ')).slice(0, 32); } catch (e) {} }
+    if (/[?&]ui=min\b/.test(qs)) document.body.classList.add('min');   // nur Frequenz, Betriebsart, Pegel, Ton – für viele Tabs
+  })();
   _crabTextFreq();
   updateBw();
   window.addEventListener('mousemove', function () {});

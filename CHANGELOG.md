@@ -2,6 +2,22 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+Stream in WAV und Stereo, Link mit allen Einstellungen, Lastgrenzen.
+
+### Stream
+- `.wav` zusätzlich zu `.ogg`: PCM 16 bit 48 kHz, verlustfrei für Decoder (DMR, POCSAG, AFSK).
+- `pair.wav?l=<kHz>/<mode>&r=<kHz>/<mode>`: zwei Kanäle auf links und rechts, für ein Audiokabel mit zwei Decodern.
+- `br`: Opus-Bitrate je Stream (8–128 kbit/s); Opus wird jetzt je Stream kodiert, der DSP liefert PCM.
+
+### Oberfläche
+- Teilen-Link trägt Rauschsperre und AGC; im Link außerdem `vol`, `mute`, `name` und `ui=min` (Minimal-Ansicht ohne Wasserfall für viele Tabs). Tab-Titel zeigt Frequenz und Betriebsart.
+- Hinweis statt stummem Fehlschlag, wenn die Station voll ist.
+
+### Lastgrenzen
+- Neue Schlüssel `max_listeners` (50), `max_per_ip` (10), `max_channels` (16), `max_streams` (6) je Band, 0 = keine Grenze. Jede andere Frequenz/Betriebsart/Bandbreite kostet einen DSP-Kanal, Hörer auf demselben Kanal teilen ihn; darüber „Station voll“.
+
 ## 1.0.0 – 2026-10-07
 
 Erste Veröffentlichung.

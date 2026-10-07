@@ -454,3 +454,8 @@ body.sticky.allbands .rx-host { position: sticky; top: 0; z-index: 40; backgroun
   /* Chat als Fenster über der Leiste */
   body.phone .chatdrawer { position: fixed; left: 8px; right: 8px; bottom: calc(66px + var(--sab)); height: 48vh; margin: 0; z-index: 58; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); box-shadow: 0 -8px 24px rgba(0,0,0,.45); }
 }
+
+/* ===== Minimal-Ansicht (?ui=min): nur Frequenz, Betriebsart, Bandbreite, Pegel – für viele Tabs nebeneinander ===== */
+body.min #bandbar, body.min #waterfalls, body.min #scales, body.min .x1row.x1tools, body.min #chatdrawer, body.min #chatbtn,
+body.min .top .users, body.min #users, body.min #x1banner { display: none !important; }
+body.min .main { min-height: 0; }
