@@ -187,12 +187,13 @@ pub async fn ogg(
     let sp = match spec(&freq_s, stem, &q) { Ok(s) => s, Err(r) => return r.into_response() };
     let name = q.name.clone().unwrap_or_else(|| "Stream".into());
     let mut tap = match attach(&state, &headers, peer, &q, &sp, &name).await { Ok(t) => t, Err(r) => return r.into_response() };
-    let bitrate = q.br.map(|b| b.clamp(8, 128) * 1000).unwrap_or(state.config.read().await.opus_bitrate);
-    let title = format!("crabSDR {} {} {}", tap.pipeline.label, fmt_khz(sp.freq), sp.mode.as_str().to_uppercase());
+    let (bitrate, station, picture) = { let c = state.config.read().await; (q.br.map(|b| b.clamp(8, 128) * 1000).unwrap_or(c.opus_bitrate), c.station.name.clone(), station_picture(c.site_dir.as_deref())) };
+    let title = format!("{} {} · {}", fmt_khz(sp.freq), sp.mode.as_str().to_uppercase(), station);
+    let tags = Tags { title: title.clone(), artist: format!("{} · crabSDR", station), picture };
     let (out_tx, out_rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(16);
     let ctype = match format { Format::Ogg => "audio/ogg", Format::Wav => "audio/wav" };
     tokio::spawn(async move {
-        let mut enc = match format { Format::Ogg => Some(match Encoder::new(bitrate, 1, tap.id as u32) { Some(e) => e, None => return }), Format::Wav => None };
+        let mut enc = match format { Format::Ogg => Some(match Encoder::new(bitrate, 1, tap.id as u32, tags) { Some(e) => e, None => return }), Format::Wav => None };
         let head = match &mut enc { Some(e) => e.headers(), None => wav_header(1) };
         if out_tx.send(Ok(Bytes::from(head))).await.is_err() { return; }
         let mut buf = VecDeque::with_capacity(MAX_BUFFER);
@@ -321,16 +322,16 @@ pub async fn m3u(headers: HeaderMap, State(state): State<Arc<AppState>>) -> Resp
 }
 
 /// Opus-Kodierer je Stream plus Ogg-Verpackung (RFC 3533 / RFC 7845): Kopfseiten OpusHead + OpusTags, dann Tonseiten
-struct Encoder { enc: opus::Encoder, mux: OggOpus, buf: Vec<u8>, channels: u16 }
+struct Encoder { enc: opus::Encoder, mux: OggOpus, buf: Vec<u8>, channels: u16, tags: Tags }
 
 impl Encoder {
-    fn new(bitrate: u32, channels: u16, serial: u32) -> Option<Self> {
+    fn new(bitrate: u32, channels: u16, serial: u32, tags: Tags) -> Option<Self> {
         let ch = if channels == 2 { opus::Channels::Stereo } else { opus::Channels::Mono };
         let mut enc = opus::Encoder::new(RATE, ch, opus::Application::Audio).ok()?;
         let _ = enc.set_bitrate(opus::Bitrate::Bits(bitrate as i32));
-        Some(Self { enc, mux: OggOpus::new(serial, channels), buf: vec![0u8; 4000], channels })
+        Some(Self { enc, mux: OggOpus::new(serial, channels), buf: vec![0u8; 4000], channels, tags })
     }
-    fn headers(&mut self) -> Vec<u8> { self.mux.headers() }
+    fn headers(&mut self) -> Vec<u8> { self.mux.headers(&self.tags) }
     /// ein 20-ms-Rahmen (mono: FRAME Werte, stereo: 2·FRAME verschränkt)
     fn push(&mut self, pcm: &[i16]) {
         debug_assert_eq!(pcm.len(), FRAME * self.channels as usize);
@@ -339,12 +340,37 @@ impl Encoder {
     fn flush(&mut self) -> Vec<u8> { self.mux.flush() }
 }
 
+/// Metadaten für die OpusTags-Seite
+#[derive(Clone, Default)]
+struct Tags { title: String, artist: String, picture: Option<(String, Vec<u8>)> }
+
+/// Stationsbild für VLC & Co.: `logo.png` oder `logo.jpg` im Stationsordner (site_dir), höchstens 512 kB
+fn station_picture(site_dir: Option<&std::path::Path>) -> Option<(String, Vec<u8>)> {
+    let dir = site_dir?;
+    for (name, mime) in [("logo.png", "image/png"), ("logo.jpg", "image/jpeg"), ("logo.jpeg", "image/jpeg")] {
+        if let Ok(data) = std::fs::read(dir.join(name)) { if !data.is_empty() && data.len() <= 512 * 1024 { return Some((mime.to_string(), data)); } }
+    }
+    None
+}
+
+fn base64(data: &[u8]) -> String {
+    const T: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
+    for c in data.chunks(3) {
+        let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+        out.push(T[(n >> 18) as usize & 63] as char); out.push(T[(n >> 12) as usize & 63] as char);
+        out.push(if c.len() > 1 { T[(n >> 6) as usize & 63] as char } else { '=' });
+        out.push(if c.len() > 2 { T[n as usize & 63] as char } else { '=' });
+    }
+    out
+}
+
 struct OggOpus { serial: u32, seq: u32, granule: u64, channels: u16, pending: Vec<Vec<u8>> }
 
 impl OggOpus {
     fn new(serial: u32, channels: u16) -> Self { Self { serial, seq: 0, granule: 0, channels, pending: Vec::new() } }
 
-    fn headers(&mut self) -> Vec<u8> {
+    fn headers(&mut self, t: &Tags) -> Vec<u8> {
         let mut head = Vec::new();
         head.extend_from_slice(b"OpusHead");
         head.push(1);                                              // Version
@@ -353,12 +379,25 @@ impl OggOpus {
         head.extend_from_slice(&RATE.to_le_bytes());
         head.extend_from_slice(&0i16.to_le_bytes());               // Verstärkung
         head.push(0);                                              // Kanalabbildung (1–2 Kanäle)
+        // OpusTags: Vorbis-Kommentare TITLE/ARTIST (zeigt VLC in der Wiedergabeliste) und optional das Stationsbild als
+        // METADATA_BLOCK_PICTURE (FLAC-Bildblock, base64), das VLC als Cover einblendet
         let mut tags = Vec::new();
         tags.extend_from_slice(b"OpusTags");
         let vendor = b"crabSDR";
         tags.extend_from_slice(&(vendor.len() as u32).to_le_bytes());
         tags.extend_from_slice(vendor);
-        tags.extend_from_slice(&0u32.to_le_bytes());
+        let mut comments: Vec<String> = vec![format!("TITLE={}", t.title), format!("ARTIST={}", t.artist), "ENCODER=crabSDR".into()];
+        if let Some((mime, data)) = &t.picture {
+            let mut pic = Vec::with_capacity(32 + mime.len() + data.len());
+            pic.extend_from_slice(&3u32.to_be_bytes());                       // Typ 3 = Titelbild
+            pic.extend_from_slice(&(mime.len() as u32).to_be_bytes()); pic.extend_from_slice(mime.as_bytes());
+            pic.extend_from_slice(&0u32.to_be_bytes());                       // Beschreibung leer
+            for _ in 0..4 { pic.extend_from_slice(&0u32.to_be_bytes()); }     // Breite, Höhe, Farbtiefe, Farben: unbekannt
+            pic.extend_from_slice(&(data.len() as u32).to_be_bytes()); pic.extend_from_slice(data);
+            comments.push(format!("METADATA_BLOCK_PICTURE={}", base64(&pic)));
+        }
+        tags.extend_from_slice(&(comments.len() as u32).to_le_bytes());
+        for c in &comments { tags.extend_from_slice(&(c.len() as u32).to_le_bytes()); tags.extend_from_slice(c.as_bytes()); }
         let mut out = self.page(0x02, 0, &[head]);
         out.extend(self.page(0x00, 0, &[tags]));
         out
@@ -440,7 +479,7 @@ mod tests {
     #[test]
     fn ogg_seiten_aufbau() {
         let mut m = OggOpus::new(7, 1);
-        let h = m.headers();
+        let h = m.headers(&Tags::default());
         assert_eq!(&h[0..4], b"OggS");
         assert_eq!(h[5], 0x02);                                   // erste Seite = Beginn des Stroms
         assert_eq!(h[26], 1);                                     // ein Segment
@@ -466,7 +505,7 @@ mod tests {
     /// Kodierer: Stille und ein Ton ergeben gültige Opus-Pakete und Seiten mit wachsender Granule
     #[test]
     fn opus_kodierer_laeuft() {
-        let mut e = Encoder::new(32_000, 1, 1).expect("Opus-Kodierer");
+        let mut e = Encoder::new(32_000, 1, 1, Tags { title: "Test".into(), artist: "crabSDR".into(), picture: Some(("image/png".into(), vec![1, 2, 3])) }).expect("Opus-Kodierer");
         let h = e.headers(); assert!(h.len() > 60);
         let silence = vec![0i16; FRAME];
         let tone: Vec<i16> = (0..FRAME).map(|i| ((i as f32 * 0.1).sin() * 8000.0) as i16).collect();
@@ -476,6 +515,11 @@ mod tests {
         let p2 = e.flush();
         assert_eq!(u64::from_le_bytes(p2[6..14].try_into().unwrap()), 10 * FRAME as u64);
         assert!(p2.len() > p1.len(), "Ton braucht mehr Bytes als Stille");
+    }
+
+    #[test]
+    fn base64_bekannt() {
+        assert_eq!(base64(b"Man"), "TWFu"); assert_eq!(base64(b"Ma"), "TWE="); assert_eq!(base64(b"M"), "TQ==");
     }
 
     #[test]
