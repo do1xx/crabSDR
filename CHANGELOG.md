@@ -2,7 +2,7 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## Unveröffentlicht
+## 1.3.0 – 2026-10-07
 
 Zwei neue Decoder: FreeDV und Pager.
 
