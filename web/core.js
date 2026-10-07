@@ -1052,7 +1052,7 @@ function _crabListenDecoder(id, bandName, hz) {
   _crab.decAudio = id; _crabAudioInit(); _crabAudioFlush();
   var B = _crab.bands[band]; if (B && B.ws && B.ws.readyState === 1) B.ws.send(JSON.stringify({ type: 'listen_decoder', id: id }));
   _crabMarkDec();
-  _crabStatus('🔊 FreeDV dekodiert – zum Zurückschalten einfach abstimmen oder USB wählen');
+  _crabStatus('🔊 DV: FreeDV dekodiert – zum Zurückschalten abstimmen oder USB wählen');
 }
 /* Betriebsarten-Knöpfe für Decoder mit Ton (FreeDV) im aktuellen Band: neben FM/AM/USB, springen auf die Decoder-Frequenz */
 function _crabDecButtons() {
@@ -1062,7 +1062,7 @@ function _crabDecButtons() {
   (_crab.audioDecs || []).forEach(function (d) {
     if (d.band !== name) return;
     var b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.dataset.mode = 'FREEDV'; b.dataset.dec = d.id;
-    b.textContent = d.plugin === 'freedv' ? 'FreeDV' : d.label; b.title = d.label + ' · ' + (d.freq / 1e6).toFixed(3).replace('.', ',') + ' MHz · dekodierte Sprache';
+    b.textContent = d.plugin === 'freedv' ? 'DV' : d.label; b.title = 'FreeDV (Codec 2) · ' + d.label + ' · ' + (d.freq / 1e6).toFixed(3).replace('.', ',') + ' MHz · dekodierte Sprache';
     b.onclick = function () { _crabListenDecoder(d.id, d.band, d.freq); };
     row.appendChild(b);
   });
