@@ -1090,6 +1090,7 @@ function _crabDv() {
 }
 function _crabMarkDec() {
   var mine = _crab.decAudio, lock = !!(mine && _crab.decLock && _crab.decLock[mine]);
+  document.body.classList.toggle('dvmode', !!mine);
   Array.prototype.forEach.call(document.querySelectorAll('#modes .btn'), function (b) {
     if (b.dataset.dec) { b.classList.toggle('active', !!mine); b.classList.toggle('lock', lock); }
     else if (mine) b.classList.remove('active');
