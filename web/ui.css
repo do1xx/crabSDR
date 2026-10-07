@@ -463,7 +463,7 @@ body.min.hoeren .main { flex: 0 0 auto; }
 body.min.hoeren .panel { box-shadow: none; }
 
 /* Decoder-Betriebsarten (DV = FreeDV): Akzentrand; bei Lock pulsiert der Knopf wie eine Empfangsanzeige */
-.modes .btn[data-dec] { border-color: var(--accent); position: relative; }
+.modes .btn[data-dec] { position: relative; }   /* sieht aus wie FM/AM/USB; leuchtet nur aktiv oder bei Lock */
 .modes .btn[data-dec].lock { animation: dvlock 1.1s ease-in-out infinite; color: var(--accent); }
 .modes .btn[data-dec].lock::after { content: ''; position: absolute; top: 3px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 @keyframes dvlock { 0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); } 50% { box-shadow: 0 0 10px 2px rgba(52, 211, 153, .6); } }
