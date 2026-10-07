@@ -2,6 +2,11 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Stream
+- I/Q-Stream `…/stream/<kHz>/iq.wav` (links I, rechts Q, 48 oder 32 kHz, 16 oder 8 bit) und als Experiment `iq.ogg` (Opus auf I/Q): komplexes Basisband eines Kanals für externe Decoder (TETRA, DMR). Freigabe über `iq_stream` (Vorgabe nur Sysop), höchstens `max_iq` (1) gleichzeitig. Siehe docs/STREAM.md.
+
 ## 1.1.2 – 2026-10-07
 
 ### Oberfläche

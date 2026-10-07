@@ -57,6 +57,8 @@ Station unangetastet.
 | `max_per_ip` | `10` | Verbindungen je Band und Absenderadresse (mehrere Tabs/Bänder einer Person zählen einzeln) |
 | `max_channels` | `16` | verschiedene Kanäle je Band: jede andere Frequenz, Betriebsart oder Bandbreite kostet einen DSP-Kanal, Hörer auf demselben Kanal teilen ihn. Darüber: „Station voll“ |
 | `max_streams` | `6` | gleichzeitige Streams (`/stream/…`) je Band |
+| `iq_stream` | `admin` | I/Q-Stream (`iq.wav`/`iq.ogg`, komplexes Basisband für externe Decoder): `off`, `admin` (nur Sysop), `users` (angemeldete Hörer), `all` |
+| `max_iq` | `1` | gleichzeitige I/Q-Streams je Band (ab 0,5 Mbit/s je Hörer) |
 | `chat_keep_hours` | `3` | Zusätzlich Chat-Zeilen nach so vielen Stunden löschen, `0` = aus |
 | `chat_verbund` | `false` | Verbund-Chat: Chatzeilen (Name, Text, Uhrzeit, Stationskürzel) über crabsdr.de mit allen teilnehmenden Stationen teilen. Die Station reicht weiter, Hörer-IPs verlassen sie nicht; dort 24 h. Braucht `[directory] enabled` |
 | `opus_bitrate` | `32000` | bit/s je belegter Frequenz (Opus, 24 kHz mono); 32 k reicht für Sprache, 48 k für Rundfunk |

@@ -10,6 +10,8 @@ fn default_max_listeners() -> u32 { 50 }
 fn default_max_per_ip() -> u32 { 10 }
 fn default_max_channels() -> u32 { 16 }
 fn default_max_streams() -> u32 { 6 }
+fn default_iq_stream() -> String { "admin".into() }
+fn default_max_iq() -> u32 { 1 }
 
 /// Ein Band (`[[bands]]`, früher `[[sdrs]]`) = ein Empfänger. Neue Schlüsselnamen (driver, device, host, port, mode),
 /// die alten (sdr_driver, sdr_device, sdr_tcp_host, sdr_tcp_port, default_mode) gelten weiter.
@@ -280,6 +282,12 @@ pub struct ServerConfig {
     pub max_channels: u32,
     #[serde(default = "default_max_streams")]
     pub max_streams: u32,
+    /// I/Q-Stream (`/stream/<kHz>/iq.wav`, komplexes Basisband für externe Decoder, ab 0,5 Mbit/s je Hörer):
+    /// `off`, `admin` (nur Sysop), `users` (angemeldete Hörer), `all` (auch Gäste); dazu die Zahl gleichzeitiger I/Q-Streams
+    #[serde(default = "default_iq_stream")]
+    pub iq_stream: String,
+    #[serde(default = "default_max_iq")]
+    pub max_iq: u32,
     /// Stationsangaben für die neutrale Oberfläche (Platzhalter in index.html)
     #[serde(default)]
     pub station: StationConfig,
@@ -499,6 +507,8 @@ impl Config {
             max_per_ip: 10,
             max_channels: 16,
             max_streams: 6,
+            iq_stream: "admin".into(),
+            max_iq: 1,
             station: StationConfig::default(),
             source: None,
         }

@@ -401,6 +401,7 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
                 .and_then(|v| v.as_str())
                 .unwrap_or("wfm");
             let mode = DemodMode::from_str(mode_str).unwrap_or(DemodMode::Wfm);
+            if mode == DemodMode::Iq { return Some("I/Q gibt es nur als Stream (/stream/<kHz>/iq.wav)".into()); }
             let bandwidth = msg
                 .get("bandwidth")
                 .and_then(|v| v.as_u64())

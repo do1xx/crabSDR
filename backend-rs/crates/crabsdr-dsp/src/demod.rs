@@ -747,7 +747,7 @@ impl ClientState {
         let cutoff = match mode {
             // SSB: das Seitenbandfilter (SsbFilter) begrenzt schon exakt auf [lo, hi]; ein zusätzlicher Tiefpass bei hi
             // nähme nur Höhen weg (dumpf). Deshalb keiner.
-            DemodMode::Usb | DemodMode::Lsb => return (None, None),
+            DemodMode::Usb | DemodMode::Lsb | DemodMode::Iq => return (None, None),
             // AM/SAM: RF bandwidth is double the audio bandwidth
             DemodMode::Am | DemodMode::Sam => (bandwidth as f32 * 0.5).min(ch_rate * 0.45),
             // CW: narrow around the 700 Hz BFO tone
@@ -1024,6 +1024,7 @@ impl Demodulator {
             DemodMode::Sam => demod_sam(demod_iq, channel_rate, state),
             DemodMode::Usb | DemodMode::Lsb => state.ssb.as_mut().map(|f| f.process(demod_iq)).unwrap_or_default(),
             DemodMode::Cw => demod_cw(demod_iq, channel_rate, state),
+            DemodMode::Iq => Vec::new(),   // I/Q geht am Demodulator vorbei (dsp_thread), hier nie
         };
 
         if audio.is_empty() {

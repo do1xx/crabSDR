@@ -40,6 +40,7 @@ auch für 4FSK (DMR) – Opus rundet die Flanken ab, PCM nicht.
 | `br` | Opus-Bitrate in kbit/s, 8–128 (nur `.ogg`) | Bitrate der Station (32) |
 | `name` | Anzeigename in der Hörerliste | `Stream` |
 | `band` | Band-ID, nur wenn zwei Bänder die Frequenz abdecken | – |
+| `rate`, `bits` | nur `iq.wav`: 32000/48000 Hz, 8/16 bit | 48000, 16 |
 | `token` | Zugang (Gast-Token oder Anmeldung), falls das Band nicht für Gäste frei ist | – |
 
 Bei `pair.wav` gelten `bw`, `sq` und `agc` für beide Kanäle. Bei geschlossener Rauschsperre wird Stille gesendet,
@@ -54,6 +55,24 @@ Damit niemand eine Station leersaugt, gelten je Band die Grenzen aus der Konfigu
 `max_streams` (Vorgabe 6), `max_per_ip` (10 Verbindungen je Adresse), `max_listeners` (50) und `max_channels`
 (16 verschiedene Frequenz/Betriebsart/Bandbreite-Kombinationen; Hörer auf demselben Kanal teilen ihn). Darüber
 antwortet der Server mit 503 bzw. 429 und einem Satz, was los ist.
+
+### I/Q-Stream (komplexes Basisband, für TETRA, DMR und alles, was einen SDR-Decoder braucht)
+
+```
+https://<station>/stream/<kHz>/iq.wav                 links I, rechts Q, 48 kHz 16 bit (1,5 Mbit/s)
+https://<station>/stream/<kHz>/iq.wav?rate=32000&bits=8   32 kHz, 8 bit (0,5 Mbit/s), reicht für einen 25-kHz-Kanal
+https://<station>/stream/<kHz>/iq.ogg?br=192          Opus auf I/Q, Experiment (0,2 Mbit/s): Opus ist für Ohren gebaut,
+                                                      ob ein Decoder damit klarkommt, muss der Versuch zeigen
+```
+
+Kein Demodulator: der Kanalausschnitt wird zur Mitte gemischt (Gleichanteil bleibt), auf die Abtastrate umgerechnet und
+auf Spitze −6 dBFS geregelt. `bw` ist die Breite des Ausschnitts (Vorgabe 30000 Hz; TETRA braucht 25 kHz, DMR 12,5 kHz).
+Weil ein I/Q-Hörer so viel Upload braucht wie 50 Ton-Hörer, gibt es ihn nur nach Freigabe: `iq_stream = "admin"` (Vorgabe,
+nur der Sysop mit seinem Token), `"users"`, `"all"` oder `"off"`, und höchstens `max_iq` (Vorgabe 1) gleichzeitig.
+
+```
+curl -sN "https://<station>/stream/395000/iq.wav?bw=30000&token=…" | sox -t wav - -t raw -r 36000 -e float -b 32 -c 2 - | <tetra-decoder>
+```
 
 ### Decoder anschließen
 

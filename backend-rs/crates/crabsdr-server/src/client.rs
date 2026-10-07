@@ -177,6 +177,7 @@ impl ClientManager {
     }
     pub fn count_ip(&self, ip: &str) -> usize { self.clients.values().filter(|c| c.ip == ip).count() }
     pub fn count_streams(&self) -> usize { self.clients.values().filter(|c| c.stream).count() }
+    pub fn count_iq(&self) -> usize { self.clients.values().filter(|c| c.stream && c.mode == DemodMode::Iq && c.tune_freq.is_some()).count() }
 
     /// Abstimmung aufheben (Hörer hört nur noch Wasserfall / wechselt das Band)
     pub fn untune(&mut self, id: u64) {

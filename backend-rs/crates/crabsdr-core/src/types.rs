@@ -11,6 +11,8 @@ pub enum DemodMode {
     Fm,
     /// FM mit flachem Diskriminator-Ausgang (kein 300-Hz-Hochpass, keine Sprachfilterung) für Decoder: POCSAG, AFSK, DTMF
     Data,
+    /// Kein Demodulator: komplexes Basisband des Kanals (nur Stream, I/Q für externe Decoder wie TETRA)
+    Iq,
     Am,
     Sam,
     Usb,
@@ -46,6 +48,7 @@ impl DemodMode {
             DemodMode::Wfm => 150_000,
             DemodMode::Fm => 12_500,
             DemodMode::Data => 12_500,
+            DemodMode::Iq => 30_000,
             DemodMode::Am => 9_000,
             DemodMode::Sam => 9_000,
             DemodMode::Usb => 2_700,
@@ -59,6 +62,7 @@ impl DemodMode {
             DemodMode::Wfm => "wfm",
             DemodMode::Fm => "fm",
             DemodMode::Data => "data",
+            DemodMode::Iq => "iq",
             DemodMode::Am => "am",
             DemodMode::Sam => "sam",
             DemodMode::Usb => "usb",
@@ -73,6 +77,7 @@ impl DemodMode {
             "wfm" => Some(DemodMode::Wfm),
             "fm" => Some(DemodMode::Fm),
             "data" => Some(DemodMode::Data),
+            "iq" => Some(DemodMode::Iq),
             "am" => Some(DemodMode::Am),
             "sam" => Some(DemodMode::Sam),
             "usb" => Some(DemodMode::Usb),

@@ -96,6 +96,10 @@ struct Channel {
     opus: Option<OpusEnc>,
     /// 24 kHz → out_rate für PCM-Abnehmer (Browser ohne Opus)
     pcm_up: Option<Resampler>,
+    /// I/Q-Ausgabe (DemodMode::Iq): Umrechner für I und Q auf out_rate, Restversatz-Phase, Spitzenwert für den Pegel
+    iq_res: Option<(Resampler, Resampler)>,
+    iq_phase: f64,
+    iq_peak: f32,
     level_db: f32,
     floor_db: f32,
     last_used: u64,
@@ -113,7 +117,7 @@ struct ChannelOut {
 
 impl Channel {
     fn new(key: ChannelKey, plan: ChannelPlan) -> Self {
-        Self { key, plan, demod: Demodulator::new(), opus: None, pcm_up: None, level_db: -200.0, floor_db: f32::NAN, last_used: 0 }
+        Self { key, plan, demod: Demodulator::new(), opus: None, pcm_up: None, iq_res: None, iq_phase: 0.0, iq_peak: 0.0, level_db: -200.0, floor_db: f32::NAN, last_used: 0 }
     }
 
     /// Breite des Ausschnitts: SSB/CW doppelt (einseitig), NFM mindestens 24 kHz (Überabtastung für den Diskriminator).
@@ -121,6 +125,7 @@ impl Channel {
         match key.mode {
             DemodMode::Usb | DemodMode::Lsb | DemodMode::Cw => key.bandwidth * 2,
             DemodMode::Fm | DemodMode::Data => key.bandwidth.max(24000),
+            DemodMode::Iq => key.bandwidth.max(12000),
             _ => key.bandwidth,
         }
     }
@@ -139,6 +144,10 @@ impl Channel {
         let fl = floor_bin + 10.0 * bins_in_bw.log10() + 5.5;
         self.floor_db = if self.floor_db.is_nan() { fl } else { 0.9 * self.floor_db + 0.1 * fl };
         let mut out = ChannelOut { level_db: self.level_db, level_inst_db: level, floor_db: self.floor_db, opus: Vec::new(), pcm: None };
+        if self.key.mode == DemodMode::Iq {
+            if want_pcm { out.pcm = Some(self.iq_out(&iq)); }
+            return out;
+        }
         let out_rate = if self.key.raw { self.key.out_rate } else { OPUS_RATE };
         let audio = self.demod.demodulate(
             &iq, self.plan.channel_rate, self.key.mode, 1, self.key.freq, self.key.bandwidth,
@@ -163,6 +172,35 @@ impl Channel {
             }
         }
         out
+    }
+}
+
+impl Channel {
+    /// Komplexes Basisband des Kanals als verschränktes I/Q-PCM (16 bit) mit out_rate: Restversatz herausmischen,
+    /// auf out_rate umrechnen, Pegel langsam auf Spitze 0,5 regeln (Decoder vertragen jede Lautstärke, nur kein Clipping).
+    fn iq_out(&mut self, iq: &[Complex32]) -> Vec<u8> {
+        let rate = self.plan.channel_rate as f64;
+        let step = -2.0 * std::f64::consts::PI * self.plan.residual_hz / rate;
+        let (mut i_s, mut q_s) = (Vec::with_capacity(iq.len()), Vec::with_capacity(iq.len()));
+        for s in iq {
+            let (sn, cs) = self.iq_phase.sin_cos();
+            let m = *s * Complex32::new(cs as f32, sn as f32);
+            i_s.push(m.re); q_s.push(m.im);
+            self.iq_phase += step;
+            if self.iq_phase > std::f64::consts::TAU { self.iq_phase -= std::f64::consts::TAU; } else if self.iq_phase < -std::f64::consts::TAU { self.iq_phase += std::f64::consts::TAU; }
+        }
+        let out_rate = self.key.out_rate;
+        let (ri, rq) = self.iq_res.get_or_insert_with(|| (Resampler::new(rate.round() as u32, out_rate), Resampler::new(rate.round() as u32, out_rate)));
+        let (i_o, q_o) = (ri.process(&i_s), rq.process(&q_s));
+        let peak = i_o.iter().chain(q_o.iter()).fold(0.0f32, |m, v| m.max(v.abs()));
+        self.iq_peak = peak.max(self.iq_peak * 0.995);          // schnell hoch, langsam runter (≈ 1 s)
+        let gain = if self.iq_peak > 1e-9 { 0.5 / self.iq_peak } else { 1.0 };
+        let mut pcm = Vec::with_capacity(i_o.len() * 2);
+        for (a, b) in i_o.iter().zip(&q_o) {
+            pcm.push(((a * gain).clamp(-1.0, 1.0) * 32767.0) as i16);
+            pcm.push(((b * gain).clamp(-1.0, 1.0) * 32767.0) as i16);
+        }
+        protocol::encode_audio(&pcm)
     }
 }
 

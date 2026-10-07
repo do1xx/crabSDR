@@ -45,6 +45,9 @@ pub struct StreamQuery {
     pub sq: Option<String>,
     pub agc: Option<String>,
     pub br: Option<u32>,
+    /// nur I/Q: Abtastrate 32000 oder 48000 (.wav), Bittiefe 8 oder 16 (.wav)
+    pub rate: Option<u32>,
+    pub bits: Option<u16>,
     pub name: Option<String>,
     pub band: Option<String>,
     pub l: Option<String>,
@@ -94,7 +97,7 @@ fn parse_squelch(s: Option<&str>, mode: DemodMode) -> Squelch {
 
 /// Ein abgestimmter Kanal: Frequenz, Betriebsart und die Hörer-Einstellungen aus der URL
 #[derive(Clone)]
-struct Spec { freq: u64, mode: DemodMode, bandwidth: u32, pass_lo: u32, squelch: Squelch, agc: AgcMode }
+struct Spec { freq: u64, mode: DemodMode, bandwidth: u32, pass_lo: u32, squelch: Squelch, agc: AgcMode, rate: u32 }
 
 fn spec(freq_s: &str, mode_s: &str, q: &StreamQuery) -> Result<Spec, Fail> {
     let Some(mode) = DemodMode::from_str(mode_s) else { return Err(err(StatusCode::BAD_REQUEST, "Betriebsart unbekannt (fm, data, am, sam, usb, lsb, cw, wfm)")) };
@@ -105,7 +108,8 @@ fn spec(freq_s: &str, mode_s: &str, q: &StreamQuery) -> Result<Spec, Fail> {
             if hi > lo { pass_lo = lo.min(5000); bandwidth = (hi - lo).clamp(100, 20_000); }
         }
     }
-    Ok(Spec { freq, mode, bandwidth, pass_lo, squelch: parse_squelch(q.sq.as_deref(), mode), agc: q.agc.as_deref().and_then(AgcMode::from_str).unwrap_or(AgcMode::Medium) })
+    let rate = if mode == DemodMode::Iq && q.rate == Some(32_000) { 32_000 } else { RATE };
+    Ok(Spec { freq, mode, bandwidth, pass_lo, squelch: parse_squelch(q.sq.as_deref(), mode), agc: q.agc.as_deref().and_then(AgcMode::from_str).unwrap_or(AgcMode::Medium), rate })
 }
 
 /// Ein laufender Kanal: beim Band angemeldet, PCM kommt über `rx`; beim Fallenlassen wird abgemeldet
@@ -130,7 +134,12 @@ async fn attach(state: &AppState, headers: &HeaderMap, peer: SocketAddr, q: &Str
         return Err(err(StatusCode::FORBIDDEN, "Band nur für angemeldete Hörer (?token=…)"));
     }
     let ip = access::client_ip(headers, Some(peer));
-    let (max_l, max_ip, max_ch, max_st) = { let c = state.config.read().await; (c.max_listeners, c.max_per_ip, c.max_channels, c.max_streams) };
+    let (max_l, max_ip, max_ch, max_st, iq_mode, max_iq) = { let c = state.config.read().await; (c.max_listeners, c.max_per_ip, c.max_channels, c.max_streams, c.iq_stream.clone(), c.max_iq) };
+    if sp.mode == DemodMode::Iq {
+        let ok = match iq_mode.as_str() { "all" => true, "users" => !p.is_guest(), "admin" => p.is_admin(), _ => false };
+        if iq_mode == "off" { return Err(err(StatusCode::NOT_FOUND, "I/Q-Stream ist auf dieser Station aus (iq_stream)")); }
+        if !ok { return Err(err(StatusCode::FORBIDDEN, "I/Q-Stream nur mit Anmeldung (?token=…)")); }
+    }
     let id = crate::NEXT_CLIENT_ID.fetch_add(1, Ordering::Relaxed);
     let (tx, rx) = mpsc::channel::<Vec<u8>>(32);
     {
@@ -138,10 +147,11 @@ async fn attach(state: &AppState, headers: &HeaderMap, peer: SocketAddr, q: &Str
         if max_st > 0 && clients.count_streams() >= max_st as usize { return Err(err(StatusCode::SERVICE_UNAVAILABLE, "Zu viele Streams auf dieser Station, bitte später")); }
         if max_l > 0 && clients.count_real() >= max_l as usize { return Err(err(StatusCode::SERVICE_UNAVAILABLE, "Station voll, bitte später")); }
         if max_ip > 0 && clients.count_ip(&ip) >= max_ip as usize { return Err(err(StatusCode::TOO_MANY_REQUESTS, "Zu viele Verbindungen von deiner Adresse")); }
+        if sp.mode == DemodMode::Iq && max_iq > 0 && clients.count_iq() >= max_iq as usize { return Err(err(StatusCode::SERVICE_UNAVAILABLE, "Schon ein I/Q-Stream aktiv (max_iq)")); }
         clients.add(id, tx);
         clients.set_origin(id, &ip, true);
         clients.set_opus(id, false);
-        clients.set_output_rate(id, RATE, false);
+        clients.set_output_rate(id, sp.rate, false);
         clients.set_name(id, name);
         clients.set_session(id, &format!("stream{id}"));
         clients.set_agc_mode(id, sp.agc);
@@ -156,10 +166,10 @@ async fn attach(state: &AppState, headers: &HeaderMap, peer: SocketAddr, q: &Str
 }
 
 /// PCM-Rahmen (Tag 0x02, s16le) in den Puffer; zu viel Rückstand wird verworfen
-fn push_pcm(buf: &mut VecDeque<i16>, frame: &[u8]) {
+fn push_pcm(buf: &mut VecDeque<i16>, frame: &[u8], max: usize) {
     if frame.first() != Some(&protocol::TAG_AUDIO) || frame.len() < 3 { return; }
     for c in frame[1..].chunks_exact(2) { buf.push_back(i16::from_le_bytes([c[0], c[1]])); }
-    while buf.len() > MAX_BUFFER { buf.pop_front(); }
+    while buf.len() > max { buf.pop_front(); }
 }
 
 /// 20 ms aus dem Puffer, sonst Stille
@@ -184,33 +194,41 @@ pub async fn ogg(
     State(state): State<Arc<AppState>>,
 ) -> Response {
     let Some((stem, format)) = format_of(&file) else { return err(StatusCode::NOT_FOUND, "nur .ogg oder .wav").into_response() };
-    let sp = match spec(&freq_s, stem, &q) { Ok(s) => s, Err(r) => return r.into_response() };
+    let mut sp = match spec(&freq_s, stem, &q) { Ok(s) => s, Err(r) => return r.into_response() };
+    let iq = sp.mode == DemodMode::Iq;
+    if iq && matches!(format, Format::Ogg) { sp.rate = RATE; }                          // Opus kann kein 32 kHz
+    let channels: u16 = if iq { 2 } else { 1 };
+    let bits: u16 = if iq && matches!(format, Format::Wav) && q.bits == Some(8) { 8 } else { 16 };
+    let rate = sp.rate;
     let name = q.name.clone().unwrap_or_else(|| "Stream".into());
     let mut tap = match attach(&state, &headers, peer, &q, &sp, &name).await { Ok(t) => t, Err(r) => return r.into_response() };
-    let (bitrate, station, picture) = { let c = state.config.read().await; (q.br.map(|b| b.clamp(8, 128) * 1000).unwrap_or(c.opus_bitrate), c.station.name.clone(), station_picture(c.site_dir.as_deref())) };
-    let title = format!("{} {} · {}", fmt_khz(sp.freq), sp.mode.as_str().to_uppercase(), station);
+    let (bitrate, station, picture) = { let c = state.config.read().await; (q.br.map(|b| b.clamp(8, if iq { 256 } else { 128 }) * 1000).unwrap_or(if iq { 160_000 } else { c.opus_bitrate }), c.station.name.clone(), station_picture(c.site_dir.as_deref())) };
+    let title = format!("{} {}{} · {}", fmt_khz(sp.freq), sp.mode.as_str().to_uppercase(), if iq { format!(" {} kHz", rate / 1000) } else { String::new() }, station);
     let tags = Tags { title: title.clone(), artist: format!("{} · crabSDR", station), picture };
     let (out_tx, out_rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(16);
     let ctype = match format { Format::Ogg => "audio/ogg", Format::Wav => "audio/wav" };
     tokio::spawn(async move {
-        let mut enc = match format { Format::Ogg => Some(match Encoder::new(bitrate, 1, tap.id as u32, tags) { Some(e) => e, None => return }), Format::Wav => None };
-        let head = match &mut enc { Some(e) => e.headers(), None => wav_header(1) };
+        let mut enc = match format { Format::Ogg => Some(match Encoder::new(bitrate, channels, tap.id as u32, tags) { Some(e) => e, None => return }), Format::Wav => None };
+        let head = match &mut enc { Some(e) => e.headers(), None => wav_header(channels, rate, bits) };
         if out_tx.send(Ok(Bytes::from(head))).await.is_err() { return; }
-        let mut buf = VecDeque::with_capacity(MAX_BUFFER);
-        let mut frame = vec![0i16; FRAME];
-        let mut block = Vec::with_capacity(FRAME * 2 * PER_PAGE);
+        let per_tick = (rate / 50) as usize * channels as usize;                          // Abtastwerte je 20 ms (verschränkt)
+        let max_buf = (rate / 2) as usize * channels as usize;
+        let mut buf = VecDeque::with_capacity(max_buf);
+        let mut frame = vec![0i16; per_tick];
+        let mut block = Vec::with_capacity(per_tick * 2 * PER_PAGE);
         let mut tick = tokio::time::interval(Duration::from_millis(20));
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Burst);
         let (mut started, start, mut n) = (false, tokio::time::Instant::now(), 0usize);
         loop {
             tokio::select! {
-                f = tap.rx.recv() => match f { Some(f) => push_pcm(&mut buf, &f), None => break },
+                f = tap.rx.recv() => match f { Some(f) => push_pcm(&mut buf, &f, max_buf), None => break },
                 _ = tick.tick() => {
                     // Anlauf mit 100 ms Vorrat, damit die DSP-Stöße (ein Rahmen je 50–60 ms) nicht lückeln
-                    if !started { if buf.len() >= FRAME * 5 || start.elapsed() > Duration::from_millis(300) { started = true; } else { continue; } }
+                    if !started { if buf.len() >= per_tick * 5 || start.elapsed() > Duration::from_millis(300) { started = true; } else { continue; } }
                     take_frame(&mut buf, &mut frame);
                     match &mut enc {
                         Some(e) => { e.push(&frame); }
+                        None if bits == 8 => for s in &frame { block.push(((*s >> 8) + 128) as u8); },
                         None => for s in &frame { block.extend_from_slice(&s.to_le_bytes()); },
                     }
                     n += 1;
@@ -243,7 +261,7 @@ pub async fn pair(
     let title = format!("crabSDR {} {} | {} {}", fmt_khz(sl.freq), sl.mode.as_str().to_uppercase(), fmt_khz(sr.freq), sr.mode.as_str().to_uppercase());
     let (out_tx, out_rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(16);
     tokio::spawn(async move {
-        if out_tx.send(Ok(Bytes::from(wav_header(2)))).await.is_err() { return; }
+        if out_tx.send(Ok(Bytes::from(wav_header(2, RATE, 16)))).await.is_err() { return; }
         let (mut bl, mut br) = (VecDeque::with_capacity(MAX_BUFFER), VecDeque::with_capacity(MAX_BUFFER));
         let (mut fl, mut fr) = (vec![0i16; FRAME], vec![0i16; FRAME]);
         let mut block = Vec::with_capacity(FRAME * 4 * PER_PAGE);
@@ -252,8 +270,8 @@ pub async fn pair(
         let (mut started, start, mut n) = (false, tokio::time::Instant::now(), 0usize);
         loop {
             tokio::select! {
-                f = tl.rx.recv() => match f { Some(f) => push_pcm(&mut bl, &f), None => break },
-                f = tr.rx.recv() => match f { Some(f) => push_pcm(&mut br, &f), None => break },
+                f = tl.rx.recv() => match f { Some(f) => push_pcm(&mut bl, &f, MAX_BUFFER), None => break },
+                f = tr.rx.recv() => match f { Some(f) => push_pcm(&mut br, &f, MAX_BUFFER), None => break },
                 _ = tick.tick() => {
                     if !started { if (bl.len() >= FRAME * 5 && br.len() >= FRAME * 5) || start.elapsed() > Duration::from_millis(300) { started = true; } else { continue; } }
                     take_frame(&mut bl, &mut fl); take_frame(&mut br, &mut fr);
@@ -284,16 +302,17 @@ fn fmt_khz(hz: u64) -> String {
 }
 
 /// WAV-Kopf für einen endlosen Strom (Längen 0xFFFFFFFF; VLC, ffmpeg und sox spielen so lange, wie Daten kommen)
-fn wav_header(channels: u16) -> Vec<u8> {
+fn wav_header(channels: u16, rate: u32, bits: u16) -> Vec<u8> {
+    let bytes = bits / 8;
     let mut h = Vec::with_capacity(44);
     h.extend_from_slice(b"RIFF"); h.extend_from_slice(&0xFFFF_FFFFu32.to_le_bytes()); h.extend_from_slice(b"WAVE");
     h.extend_from_slice(b"fmt "); h.extend_from_slice(&16u32.to_le_bytes());
-    h.extend_from_slice(&1u16.to_le_bytes());                                  // PCM
+    h.extend_from_slice(&1u16.to_le_bytes());                                  // PCM (8 bit vorzeichenlos, 16 bit vorzeichenbehaftet)
     h.extend_from_slice(&channels.to_le_bytes());
-    h.extend_from_slice(&RATE.to_le_bytes());
-    h.extend_from_slice(&(RATE * channels as u32 * 2).to_le_bytes());          // Bytes je Sekunde
-    h.extend_from_slice(&(channels * 2).to_le_bytes());                        // Blockgröße
-    h.extend_from_slice(&16u16.to_le_bytes());                                 // Bit je Abtastwert
+    h.extend_from_slice(&rate.to_le_bytes());
+    h.extend_from_slice(&(rate * channels as u32 * bytes as u32).to_le_bytes()); // Bytes je Sekunde
+    h.extend_from_slice(&(channels * bytes).to_le_bytes());                    // Blockgröße
+    h.extend_from_slice(&bits.to_le_bytes());                                  // Bit je Abtastwert
     h.extend_from_slice(b"data"); h.extend_from_slice(&0xFFFF_FFFFu32.to_le_bytes());
     h
 }
@@ -335,6 +354,7 @@ impl Encoder {
     /// ein 20-ms-Rahmen (mono: FRAME Werte, stereo: 2·FRAME verschränkt)
     fn push(&mut self, pcm: &[i16]) {
         debug_assert_eq!(pcm.len(), FRAME * self.channels as usize);
+        let _ = self.channels;
         if let Ok(n) = self.enc.encode(pcm, &mut self.buf) { self.mux.add(self.buf[..n].to_vec()); }
     }
     fn flush(&mut self) -> Vec<u8> { self.mux.flush() }
@@ -524,7 +544,7 @@ mod tests {
 
     #[test]
     fn wav_kopf() {
-        let h = wav_header(2);
+        let h = wav_header(2, 48_000, 16);
         assert_eq!(h.len(), 44);
         assert_eq!(&h[0..4], b"RIFF"); assert_eq!(&h[8..12], b"WAVE");
         assert_eq!(u16::from_le_bytes([h[22], h[23]]), 2);
