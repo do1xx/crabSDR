@@ -2,6 +2,17 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## 1.3.2 – 2026-10-07
+
+Betriebsart DV: FreeDV auf der Frequenz des Hörers.
+
+### Oberfläche
+- **DV** neben FM/AM/USB/LSB/CW: abstimmen wie gewohnt, DV drücken, die Station startet dort einen FreeDV-Decoder (Hörer auf derselben Frequenz teilen ihn) und spielt die dekodierte Sprache. DV bleibt beim Abstimmen an und folgt der Frequenz (kurze Verzögerung beim Drehen); erst ein anderer Betriebsarten-Knopf schaltet zurück. In DV leuchtet nur DV, Bandbreite und AGC sind ausgegraut; der Knopf pulsiert bei Lock.
+- Flüchtige DV-Decoder erscheinen nicht im Decoder-Fenster; FreeDV-Text nur bei stabilem Lock.
+
+### Server
+- Decoder können zur Laufzeit entstehen (`dv_max`, Vorgabe 3 gleichzeitig je Station) und enden, wenn niemand mehr hört (sofort beim Weiterdrehen, sonst nach 90 s). Sync und Text von Ton-Decodern gehen live an alle Hörer des Bandes.
+
 ## 1.3.1 – 2026-10-07
 
 ### Oberfläche
