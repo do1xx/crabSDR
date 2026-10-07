@@ -2,6 +2,22 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Freier VFO (Labor)
+- `free_vfo = true` (Station oder Band, `free_vfo_min`/`free_vfo_max` als Grenzen): Hörer verschieben die Mitte des
+  Wasserfalls im Betrieb – Zeile **Mitte** mit Eingabe in MHz und Schritten ±½ Band, ±1, ±10 MHz. Gilt für alle Hörer
+  des Bandes, deshalb nur für private Stationen; Bänder ohne die Option lassen sich weiter nicht umstimmen
+  (bisher ging das nur für Admins auf Admin-Bändern, ohne Bedienelement).
+- Skala, Bandleiste, Bereiche und Schnellwahl folgen sofort, der Wasserfall beginnt neu; die eigene Frequenz bleibt
+  stehen oder rutscht an den Rand des neuen Fensters. Link „Teilen“ enthält die Mitte (`&band=…&vfo=`).
+- Grenzen nach Empfänger (RTL-Stick 24–1766 MHz, HackRF, Airspy) oder aus der Konfiguration; Konverter-Bänder ohne
+  Treibergrenze. Feste Decoder auf einem Band mit freiem VFO bleiben aus (`--check` meldet es), DV-Decoder außerhalb
+  des neuen Fensters enden sofort. Die neue Mitte gilt bis zum Neustart.
+
+### Oberfläche
+- DV-Knopf ohne dauerhaften Akzentrand.
+
 ## 1.3.2 – 2026-10-07
 
 Betriebsart DV: FreeDV auf der Frequenz des Hörers.

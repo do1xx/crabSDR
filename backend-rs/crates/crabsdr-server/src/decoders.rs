@@ -316,12 +316,14 @@ impl DecoderHub {
         let band = self.band_for(c.freq, bw, c.band.as_deref());
         let label = c.label.clone().or_else(|| manifest.as_ref().map(|m| if m.label.is_empty() { m.name.clone() } else { m.label.clone() })).unwrap_or_else(|| c.plugin.clone());
         let mode = manifest.as_ref().map(|m| m.input.mode.clone()).unwrap_or_default();
-        let state = if !c.enabled { "aus".to_string() } else if manifest.is_none() { "Plugin fehlt".into() } else if band.is_none() { "kein Band".into() } else { "startet".into() };
+        // Band mit freiem VFO: ein fester Decoder würde beim Umstimmen ins Leere hören – bleibt aus (--check meldet es)
+        let free = !dynamic && band.as_ref().is_some_and(|b| b.free_vfo);
+        let state = if !c.enabled { "aus".to_string() } else if manifest.is_none() { "Plugin fehlt".into() } else if band.is_none() { "kein Band".into() } else if free { "freier VFO".into() } else { "startet".into() };
         let mut g = self.inner.lock().await;
         let idx = g.status.len();
         g.status.push(Status { id, plugin: c.plugin.clone(), label, band: band.as_ref().map(|b| b.id.clone()).unwrap_or_default(),
             freq: c.freq, mode, public: c.public, state, since: now_s(), restarts: 0, events: 0, last_event: None, audio_s: 0.0, audio: false, stderr: VecDeque::new(),
-            bcast: band.as_ref().map(|b| b.spectrum_tx.clone()), dynamic, idle: 0, client_id: DECODER_CLIENT_BASE + idx as u64, opts: c.options.clone(), enabled: c.enabled });
+            bcast: band.as_ref().map(|b| b.spectrum_tx.clone()), dynamic, idle: 0, client_id: DECODER_CLIENT_BASE + idx as u64, opts: c.options.clone(), enabled: c.enabled && !free });
         idx
     }
 
@@ -411,6 +413,18 @@ impl DecoderHub {
     }
 
     /// Alle 30 s: dynamische Decoder ohne Hörer nach drei Runden (≈ 90 s) beenden
+    /// Band umgestimmt (freier VFO): flüchtige Decoder, deren Frequenz nicht mehr im Fenster liegt, sofort beenden –
+    /// ihre Hörer stimmen gleich neu ab und bekommen dann einen frischen Decoder
+    pub async fn band_retuned(&self, band: &str) {
+        let Some(p) = self.pipelines.lock().unwrap().get(band).cloned() else { return };
+        let cf = crate::sdr_pipeline::corrected_center(p.center_freq.load(std::sync::atomic::Ordering::Relaxed), p.corr_ppm);
+        let half = p.sample_rate.load(std::sync::atomic::Ordering::Relaxed) as u64 / 2;
+        let gone: Vec<usize> = self.inner.lock().await.status.iter().enumerate()
+            .filter(|(_, s)| s.dynamic && s.band == band && s.state != "beendet" && (s.freq < cf.saturating_sub(half) + 10_000 || s.freq + 10_000 > cf + half))
+            .map(|(i, _)| i).collect();
+        for idx in gone { self.stop_instance(idx).await; }
+    }
+
     fn spawn_janitor(self: &Arc<Self>) {
         let hub = self.clone();
         tokio::spawn(async move {

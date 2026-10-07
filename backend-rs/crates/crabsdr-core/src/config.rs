@@ -55,6 +55,16 @@ pub struct SdrInstanceConfig {
     /// ohne Anmeldung hörbar (Voreinstellung: ja; nur bei eingerichteter Benutzerverwaltung von Bedeutung)
     #[serde(default = "default_true")]
     pub guest: bool,
+    /// Freier VFO: wer dieses Band hören darf, verschiebt im Betrieb die Mitte des Wasserfalls (Labor, eine Person, ein Stick
+    /// je Band). Ohne Angabe gilt der Stationswert `free_vfo` oben in der Datei; `false` hier schaltet ihn für dieses Band ab.
+    /// Für öffentliche Stationen nicht gedacht: jeder Hörer würde allen anderen das Band verstellen
+    #[serde(default)]
+    pub free_vfo: Option<bool>,
+    /// Grenzen des freien VFO (Mittenfrequenz in Hz); ohne Angabe der Bereich des Empfängers (siehe `vfo_limits`)
+    #[serde(default)]
+    pub free_vfo_min: Option<u64>,
+    #[serde(default)]
+    pub free_vfo_max: Option<u64>,
     #[serde(default)]
     pub bias_tee: bool,
     /// Betriebsart beim Start (fm, am, usb, lsb, cw)
@@ -77,6 +87,30 @@ pub struct SdrInstanceConfig {
     /// statt isochron) oder "biastee=true"
     #[serde(default)]
     pub settings: Option<String>,
+}
+
+impl SdrInstanceConfig {
+    /// Abstimmbereich des Empfängers (Mittenfrequenz in Hz) nach Treiber; None, wenn unbekannt – oder wenn die
+    /// eingestellte Mitte schon außerhalb liegt (Konverter/Transverter davor, Anzeige = Eingangsfrequenz)
+    pub fn tuner_range(&self) -> Option<(u64, u64)> {
+        let r = match self.sdr_driver.as_str() {
+            "rtl_sdr" | "rtl_tcp" => (24_000_000, 1_766_000_000),   // R820T/R828D; E4000 reicht weiter (52–2200 MHz, Lücke um 1,1–1,25 GHz) → Grenzen setzen
+            "hackrf" => (1_000_000, 6_000_000_000),
+            "airspy" => (24_000_000, 1_800_000_000),
+            "airspyhf" => (9_000, 260_000_000),
+            _ => return None,
+        };
+        if self.center_freq < r.0 || self.center_freq > r.1 { None } else { Some(r) }
+    }
+
+    /// Grenzen des freien VFO in Hz: `free_vfo_min`/`free_vfo_max`, sonst der Empfängerbereich, sonst alles ab halber
+    /// Abtastrate bis 100 GHz. Die Untergrenze liegt nie unter der halben Abtastrate (Fenster darf nicht unter 0 Hz reichen)
+    pub fn vfo_limits(&self) -> (u64, u64) {
+        let r = self.tuner_range().unwrap_or((0, 100_000_000_000));
+        let lo = self.free_vfo_min.unwrap_or(r.0).max(self.sample_rate as u64 / 2);
+        let hi = self.free_vfo_max.unwrap_or(r.1);
+        (lo, hi)
+    }
 }
 
 /// Stationsangaben (Name, Untertitel, Adresse, Locator) für die Oberfläche.
@@ -297,6 +331,9 @@ pub struct ServerConfig {
     /// Decoder laufen höchstens gleichzeitig (je einer pro Frequenz, Hörer teilen ihn; endet nach 90 s ohne Hörer). 0 = aus
     #[serde(default = "default_dv_max")]
     pub dv_max: u32,
+    /// Freier VFO für alle Bänder (jedes Band kann mit `free_vfo = false` abweichen). Nur für private Stationen
+    #[serde(default)]
+    pub free_vfo: bool,
     /// Stationsangaben für die neutrale Oberfläche (Platzhalter in index.html)
     #[serde(default)]
     pub station: StationConfig,
@@ -483,6 +520,9 @@ impl Config {
             fft_fps: self.fft_fps,
             enabled: true,
             admin_only: false,
+            free_vfo: None,
+            free_vfo_min: None,
+            free_vfo_max: None,
             guest: false,
             bias_tee: false,
             default_mode: None,
@@ -520,6 +560,7 @@ impl Config {
             max_iq: 1,
             stream_key: String::new(),
             dv_max: 3,
+            free_vfo: false,
             station: StationConfig::default(),
             source: None,
         }
@@ -666,10 +707,22 @@ impl ServerConfig {
     }
 
     /// Plausibilität (ohne Dateisystem/Programme; das prüft `crabsdr-server --check` zusätzlich): (Fehler, Hinweise)
+    /// Freier VFO für dieses Band: Bandwert, sonst Stationswert
+    pub fn free_vfo_for(&self, b: &SdrInstanceConfig) -> bool { b.free_vfo.unwrap_or(self.free_vfo) }
+
     pub fn validate(&self) -> (Vec<String>, Vec<String>) {
         let (mut err, mut warn) = (Vec::new(), Vec::new());
         let mut ids = std::collections::HashSet::new();
         for b in &self.sdrs {
+            if self.free_vfo_for(b) {
+                let (lo, hi) = b.vfo_limits();
+                if lo >= hi { err.push(format!("Band „{}“: free_vfo_min muss unter free_vfo_max liegen ({} ≥ {})", b.id, lo, hi)); }
+                else if b.center_freq < lo || b.center_freq > hi { err.push(format!("Band „{}“: center_freq {:.3} MHz liegt außerhalb der VFO-Grenzen {:.3}–{:.3} MHz", b.id, b.center_freq as f64 / 1e6, lo as f64 / 1e6, hi as f64 / 1e6)); }
+                if b.guest && !b.admin_only && b.enabled { warn.push(format!("Band „{}“: free_vfo auf einem öffentlichen Band – jeder Hörer kann allen anderen die Mitte verstellen; nur für private Stationen", b.id)); }
+                if b.free_vfo_min.is_none() && b.free_vfo_max.is_none() && b.tuner_range().is_none() {
+                    warn.push(format!("Band „{}“: free_vfo ohne Grenzen (Empfängerbereich unbekannt oder Konverter) – free_vfo_min/free_vfo_max setzen", b.id));
+                }
+            }
             if b.id.is_empty() || b.id.contains('/') || b.id.contains(' ') { err.push(format!("Band „{}“: id darf nicht leer sein und keine Leerzeichen oder / enthalten", b.id)); }
             if !ids.insert(b.id.clone()) { err.push(format!("Band „{}“ doppelt", b.id)); }
             if b.center_freq == 0 { err.push(format!("Band „{}“: center_freq fehlt", b.id)); }
@@ -696,9 +749,13 @@ impl ServerConfig {
                 Some(bid) => match self.sdrs.iter().find(|b| &b.id == bid) {
                     None => err.push(format!("Decoder „{}“: band „{}“ gibt es nicht", id, bid)),
                     Some(b) if !inside(b) => err.push(format!("Decoder „{}“: {:.4} MHz liegt nicht im Band „{}“", id, d.freq as f64 / 1e6, bid)),
+                    Some(b) if d.enabled && self.free_vfo_for(b) => err.push(format!("Decoder „{}“: Band „{}“ hat free_vfo – ein Decoder braucht eine feste Mitte (free_vfo = false im Band oder Decoder aus)", id, bid)),
                     _ => {}
                 },
-                None => if d.enabled && !self.sdrs.iter().any(|b| b.enabled && inside(b)) { err.push(format!("Decoder „{}“: {:.4} MHz liegt in keinem Band", id, d.freq as f64 / 1e6)); },
+                None => if d.enabled {
+                    if !self.sdrs.iter().any(|b| b.enabled && inside(b)) { err.push(format!("Decoder „{}“: {:.4} MHz liegt in keinem Band", id, d.freq as f64 / 1e6)); }
+                    else if self.sdrs.iter().filter(|b| b.enabled && inside(b)).all(|b| self.free_vfo_for(b)) { err.push(format!("Decoder „{}“: liegt nur in Bändern mit free_vfo – ein Decoder braucht eine feste Mitte (band = \"…\" ohne free_vfo oder Decoder aus)", id)); }
+                },
             }
         }
         if let Some(m) = &self.mqtt {
@@ -769,6 +826,40 @@ mod tests {
         assert!(neu.warnings.iter().all(|w| !w.contains("alte")));
         assert!(alt.warnings.iter().any(|w| w.contains("sdrs → bands") && w.contains("[smeter_cal]")));
         assert!(a.guest && a.fft_size == 4096 && a.sample_rate == 2_048_000);
+    }
+
+    #[test]
+    fn freier_vfo_band_und_station() {
+        // Stationswert gilt für Bänder ohne Angabe, ein Band kann ihn abschalten; Grenzen aus Treiber oder Band
+        let l = load_str("vfo", "free_vfo = true\n[[bands]]\nid = \"a\"\ndriver = \"rtl_sdr\"\ncenter_freq = 145000000\n[[bands]]\nid = \"b\"\ndriver = \"rtl_sdr\"\ncenter_freq = 433000000\nfree_vfo = false\n[[bands]]\nid = \"c\"\ndriver = \"rx_sdr\"\ncenter_freq = 1090000000\nfree_vfo_min = 1000000000\nfree_vfo_max = 1200000000\n").unwrap();
+        let c = &l.config;
+        assert!(c.free_vfo_for(&c.sdrs[0]) && !c.free_vfo_for(&c.sdrs[1]) && c.free_vfo_for(&c.sdrs[2]));
+        assert_eq!(c.sdrs[0].vfo_limits(), (24_000_000, 1_766_000_000));
+        assert_eq!(c.sdrs[2].vfo_limits(), (1_000_000_000, 1_200_000_000));
+        let (e, w) = c.validate();
+        assert!(e.is_empty(), "{:?}", e);
+        assert!(w.iter().any(|x| x.contains("öffentlichen Band")), "{:?}", w);   // Band a ist Gast-Band
+        // ohne Stationswert bleibt alles fest
+        let l2 = load_str("vfo2", "[[bands]]\nid = \"a\"\ndriver = \"rtl_sdr\"\ncenter_freq = 145000000\n").unwrap();
+        assert!(!l2.config.free_vfo_for(&l2.config.sdrs[0]));
+    }
+
+    #[test]
+    fn freier_vfo_grenzen_und_decoder() {
+        // Konverter: Mitte außerhalb des Stick-Bereichs → keine Treibergrenzen, Hinweis; Untergrenze nie unter halber Abtastrate
+        let l = load_str("vfo3", "[[bands]]\nid = \"x\"\ndriver = \"rtl_tcp\"\ncenter_freq = 10368000000\nfree_vfo = true\nadmin_only = true\n").unwrap();
+        let b = &l.config.sdrs[0];
+        assert!(b.tuner_range().is_none());
+        assert_eq!(b.vfo_limits(), (1_024_000, 100_000_000_000));
+        let (e, w) = l.config.validate();
+        assert!(e.is_empty() && w.iter().any(|x| x.contains("ohne Grenzen")), "{:?} {:?}", e, w);
+        // Grenzen verkehrt oder Mitte außerhalb → Fehler
+        let l = load_str("vfo4", "[[bands]]\nid = \"x\"\ndriver = \"rtl_sdr\"\ncenter_freq = 145000000\nfree_vfo = true\nfree_vfo_min = 430000000\nfree_vfo_max = 440000000\n").unwrap();
+        assert!(l.config.validate().0.iter().any(|x| x.contains("außerhalb der VFO-Grenzen")));
+        // Decoder auf einem Band mit freiem VFO → Fehler (mit und ohne band-Angabe)
+        let l = load_str("vfo5", "[[bands]]\nid = \"x\"\ndriver = \"rtl_sdr\"\ncenter_freq = 145000000\nfree_vfo = true\nadmin_only = true\n[[decoders]]\nplugin = \"aprs\"\nfreq = 144800000\nband = \"x\"\n[[decoders]]\nplugin = \"aprs\"\nfreq = 144800000\nid = \"auto\"\n").unwrap();
+        let e = l.config.validate().0;
+        assert_eq!(e.iter().filter(|x| x.contains("free_vfo")).count(), 2, "{:?}", e);
     }
 
     #[test]

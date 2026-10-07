@@ -336,7 +336,7 @@
     var t = $('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
     t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove('show'); }, 1800);
   }
-  function tuneLink() { var u = location.origin + location.pathname + '?tune=' + dialFreq().toFixed(3) + mode.toLowerCase() + '&pb=' + lo.toFixed(2) + ',' + hi.toFixed(2); if (_crab.squelchOn) u += '&sq=auto:' + _crab.sqMargin; else if (mode === 'FM') u += '&sq=off'; if (_crab.agcMode && _crab.agcMode !== 'medium') u += '&agc=' + _crab.agcMode; return u; }   // pb = Durchlassbereich lo,hi in kHz
+  function tuneLink() { var u = location.origin + location.pathname + '?tune=' + dialFreq().toFixed(3) + mode.toLowerCase() + '&pb=' + lo.toFixed(2) + ',' + hi.toFixed(2); if (_crab.squelchOn) u += '&sq=auto:' + _crab.sqMargin; else if (mode === 'FM') u += '&sq=off'; if (_crab.agcMode && _crab.agcMode !== 'medium') u += '&agc=' + _crab.agcMode; if (bi[band] && bi[band].freeVfo) u += '&band=' + encodeURIComponent(bi[band].name) + '&vfo=' + bi[band].centerfreq.toFixed(3); return u; }   // pb = Durchlassbereich lo,hi in kHz; vfo = Mitte beim freien VFO
   // Teilen: auf Handys das System-Menü (WhatsApp, Telegram, …), sonst Link + kurzer Text in die Zwischenablage
   function copyLink() {
     var url = tuneLink(), f = (dialFreq() / 1000).toFixed(4).replace('.', ',') + ' MHz ' + mode;
@@ -447,6 +447,14 @@
       r.appendChild(inp);
     }
   }
+  // Freier VFO: neue Mitte → Bandbeschriftung, Skala, Bereiche, Schnellwahl, Hörermarken
+  window._crabOnCenter = function (b) {
+    var e = bi[b]; if (!e) return;
+    var lo_ = (e.centerfreq - e.samplerate / 2) / 1000, hi_ = (e.centerfreq + e.samplerate / 2) / 1000, g = lo_ >= 1000, m = BANDMETA[e.name];
+    function mhz(v) { return v >= 1000 ? (v / 1000).toFixed(3).replace('.', ',') : v.toFixed(1).replace('.', ','); }
+    if (m) m.range = mhz(lo_) + ' – ' + mhz(hi_) + (g ? ' GHz' : ' MHz');
+    lastSig = ''; buildBandBar(); renderScales(true); buildPresets(); if (b === band) buildSegments(); renderListeners();
+  };
   function gotoBand(n) {
     if (bandOff(bandinfo[n].name)) return;
     setBand(n);

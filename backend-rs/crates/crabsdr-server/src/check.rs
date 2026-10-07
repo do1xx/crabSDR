@@ -45,8 +45,9 @@ pub fn run(path: Option<&Path>) -> i32 {
             if !up && b.enabled { warns.push(format!("Band „{}“: rtl_tcp {} gerade nicht erreichbar", b.id, addr)); }
             format!("rtl_tcp {} {}", addr, if up { "✓" } else { "(nicht erreichbar)" })
         } else { format!("{} {}", b.sdr_driver, b.sdr_device) };
-        println!("  {} {:<12} {:>10.4}–{:<10.4} MHz  gain {:<5} {}{}{}", if b.enabled { "•" } else { "–" }, b.id, lo / 1e6, hi / 1e6, b.gain, src,
-            b.smeter_cal.map_or(String::new(), |v| format!("  S-Meter {:+.1} dB", v)), if b.enabled { "" } else { "  (aus)" });
+        let vfo = if c.free_vfo_for(b) { let (l, h) = b.vfo_limits(); format!("  freier VFO {:.3}–{:.3} MHz", l as f64 / 1e6, h as f64 / 1e6) } else { String::new() };
+        println!("  {} {:<12} {:>10.4}–{:<10.4} MHz  gain {:<5} {}{}{}{}", if b.enabled { "•" } else { "–" }, b.id, lo / 1e6, hi / 1e6, b.gain, src,
+            b.smeter_cal.map_or(String::new(), |v| format!("  S-Meter {:+.1} dB", v)), vfo, if b.enabled { "" } else { "  (aus)" });
     }
 
     // Decoder

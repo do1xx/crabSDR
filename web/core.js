@@ -91,6 +91,53 @@ function _crabRetune() {
   drawPassband();
 }
 
+/* ===== Freier VFO (Band mit free_vfo): Mitte des Wasserfalls verschieben – für alle Hörer des Bandes ===== */
+function _crabVfoRow() {
+  var row = document.getElementById('vforow'), e = bi[band]; if (!row || !e) return;
+  row.hidden = !e.freeVfo; var g = document.getElementById('x1vfo'); if (g) g.hidden = !e.freeVfo;   // im x1-Panel steckt die Zeile in einer Gruppe
+  if (!e.freeVfo) return;
+  var inp = document.getElementById('vfocenter'), rg = document.getElementById('vforange');
+  if (inp && document.activeElement !== inp) inp.value = ((e.vfoWant || e.centerfreq) / 1000).toFixed(4);
+  if (rg) rg.textContent = e.vfoMin && e.vfoMax ? (e.vfoMin / 1000).toFixed(1) + '–' + (e.vfoMax / 1000).toFixed(1) + ' MHz' : '';
+}
+function vfoStep(k) {   // k in kHz; 'half'/'-half' = halbes Band
+  var e = bi[band]; if (!e || !e.freeVfo) return;
+  var d = k === 'half' ? e.samplerate / 2 : k === '-half' ? -e.samplerate / 2 : Number(k) || 0;
+  vfoSet(((e.vfoWant || e.centerfreq) + d) / 1000);
+}
+function vfoSet(mhz) {
+  var e = bi[band], B = _crab.bands[band]; if (!e || !e.freeVfo) return;
+  var f = parseFloat(String(mhz).replace(',', '.')); if (!(f > 0)) { _crabVfoRow(); return; }
+  var khz = Math.round(f * 1e6) / 1000;
+  if (e.vfoMin && khz < e.vfoMin) khz = e.vfoMin;
+  if (e.vfoMax && khz > e.vfoMax) khz = e.vfoMax;
+  if (Math.abs(khz - e.centerfreq) < 0.001 && !e.vfoWant) { _crabVfoRow(); return; }
+  e.vfoWant = khz; _crabVfoRow();
+  clearTimeout(_crab.vfoTimer);   // mehrere Klicks hintereinander → eine Umstimmung
+  _crab.vfoTimer = setTimeout(function () {
+    var W = _crab.bands[band], E = bi[band]; if (!E || !E.vfoWant) return;
+    if (W && W.ws && W.ws.readyState === 1) W.ws.send(JSON.stringify({ type: 'set_center_freq', freq: Math.round(E.vfoWant * 1000) }));
+    E.vfoWant = null;
+  }, 250);
+}
+/* Server meldet eine neue Mitte (freier VFO, auch von anderen Hörern): Geometrie, Wasserfall, Skala, eigene Frequenz nachziehen */
+function _crabCenterChanged(b, cf, sr) {
+  var e = bi[b], B = _crab.bands[b]; if (!e) return;
+  var same = Math.abs(e.centerfreq - cf) < 0.001 && Math.abs(e.samplerate - sr) < 0.001;
+  e.centerfreq = cf; e.samplerate = sr; e.vfoWant = null;
+  if (same) { _crabVfoRow(); return; }
+  _crabGeom(b);
+  if (B) { B.prev = null; B.liveSinceHist = 0; B.clearOnNext = true; _crabSendWf(b); }   // alte Zeilen gehören zum alten Fenster
+  var r = _crabBandRange(b), m = 10;   // Frequenzen ins neue Fenster klemmen (10 kHz vom Rand)
+  if (e.lastfreq != null && (e.lastfreq < r.lo - lo + m || e.lastfreq > r.hi - hi - m)) { e.lastfreq = Math.max(r.lo - lo + m, Math.min(r.hi - hi - m, e.lastfreq)); e.vfo = e.lastfreq + (isCw() ? (lo + hi) / 2 : 0); }
+  if (b === band) {
+    if (freq < r.lo - lo + m || freq > r.hi - hi - m) { var nf = Math.max(r.lo - lo + m, Math.min(r.hi - hi - m, freq)); if (typeof setFreqExact === 'function') setFreqExact(nf); else setFreq(nf); }
+    _crabTextFreq(); _crabVfoRow();
+  }
+  showMarks(b);
+  if (typeof window._crabOnCenter === 'function') window._crabOnCenter(b);
+}
+
 function setFreq(f) {
   var r = _crabBandRange(band);
   f = Math.max(r.lo - lo, Math.min(r.hi - hi, Number(f) || 0));
@@ -218,6 +265,7 @@ function setBand(n) {
   showMarks(n);
   if (typeof showListeners === 'function') showListeners();
   _crabDecButtons();
+  _crabVfoRow();
 }
 /* Betriebsart eines Bandes (config.toml: mode im Band), wenn sie von der aktuellen abweicht */
 function _crabBandMode(n) {
@@ -773,6 +821,7 @@ function _crabConnect(b) {
       if (_crab.squelchOn) ws.send(JSON.stringify(_crabSqMsg()));
       if (_crab.agcMode && _crab.agcMode !== 'medium') ws.send(JSON.stringify({ type: 'set_agc', mode: _crab.agcMode }));
       B.prev = null; B.clearOnNext = true; _crabSendWf(b);
+      if (bi[b].pendingVfo) { ws.send(JSON.stringify({ type: 'set_center_freq', freq: bi[b].pendingVfo })); bi[b].pendingVfo = null; }   // Link mit &vfo=
       if (b === band) { _crabAudioFlush(); ws.send(JSON.stringify(_crabDecMsg() || _crabTuneMsg())); }
     };
     ws.onmessage = function (ev) {
@@ -783,7 +832,7 @@ function _crabConnect(b) {
           if (_crab.decAudio && /^dv/.test(_crab.decAudio)) { _crab.decAudio = null; _crabMarkDec(); if (b === band && ws.readyState === 1) ws.send(JSON.stringify(_crabTuneMsg())); }
           return;
         }
-        if (m.type === 'config') { bi[b].centerfreq = m.center_freq / 1000; bi[b].samplerate = m.sample_rate / 1000; if (m.fft_size && m.fft_size !== bi[b].fft) { bi[b].fft = m.fft_size; bi[b].zoom = Math.min(bi[b].zoom, _crabMaxZoom(bi[b])); } _crabGeom(b); B.myId = m.client_id; }
+        if (m.type === 'config') { if (!bi[b].pendingVfo) bi[b].centerfreq = m.center_freq / 1000; bi[b].samplerate = m.sample_rate / 1000; if (m.fft_size && m.fft_size !== bi[b].fft) { bi[b].fft = m.fft_size; bi[b].zoom = Math.min(bi[b].zoom, _crabMaxZoom(bi[b])); } _crabGeom(b); B.myId = m.client_id; }
         return;
       }
       var u8 = new Uint8Array(ev.data), tag = u8[0];
@@ -798,6 +847,7 @@ function _crabConnect(b) {
         else if (j.type === 'listeners') { _crabListenersFromWs(b, j.list || []); }
         else if (j.type === 'decoder') { if (j.kind === 'sync') { _crab.decLock = _crab.decLock || {}; _crab.decLock[j.id] = !!(j.data && j.data.on); _crabMarkDec(); } }   // FreeDV-Lock → Knopf „DV“ leuchtet
         else if (j.type === 'dv') { if (_crab.decAudio) _crab.decAudio = j.id; _crabMarkDec(); }
+        else if (j.type === 'center_freq_update') { _crabCenterChanged(b, j.center_freq / 1000, j.sample_rate ? j.sample_rate / 1000 : bi[b].samplerate); }   // freier VFO: neue Mitte (Rundsendung an alle Hörer des Bandes)
         else if (j.type === 'system_stats') { if (b === band) { _crab.sysPct = (j.sys_pct != null) ? j.sys_pct : null; _crabStatus('Past 10 seconds: CPUload=' + (j.cpu_pct != null ? j.cpu_pct.toFixed(1) : '0.0') + '%, ' + j.clients + ' users; ' + j.channels + ' channels'); } }
       }
     };
@@ -999,6 +1049,7 @@ function _crabPanelBuild() {
   put(r2, segsel, 'x1range', 'Bereich des Bandplans: Frequenz, Betriebsart und Ausschnitt', 'Bereich');
   var sn = q('label.snap'); if (sn) { var snSel = sn.querySelector('select'); put(r2, snSel || sn, 'x1snap', 'Klicks im Wasserfall rasten in diesem Raster ein', 'Raster'); if (snSel) sn.remove(); }
   if (share) put(r2, share, 'x1share', 'Link zu dieser Frequenz kopieren');
+  var vr = document.getElementById('vforow'); if (vr) { var vg = put(r2, vr, 'x1vfo', 'Freier VFO (Labor): Mitte des Wasserfalls verschieben – gilt für alle Hörer dieses Bandes'); vg.id = 'x1vfo'; vg.hidden = vr.hidden; }
   // Zeile 3: Ton und Anzeige
   var tg = q('.toggles');
   put(r3, tg, 'x1audio', null, 'Ton');
@@ -1158,11 +1209,15 @@ function crabStart() {
   if (typeof bandinfo === 'undefined' || !bandinfo.length) { _crabStatus('Keine Bänder (bandinfo.js fehlt)'); return; }
   _crab.fft = bandinfo[0].fft_size || 4096;
   bi = bandinfo.map(function (x, i) { return { name: x.name, centerfreq: Number(x.centerfreq), samplerate: Number(x.samplerate), tuningstep: 0.03125, maxlinbw: 8,
-    vfo: Number(x.vfo || x.centerfreq), fft: Number(x.fft_size) || _crab.fft, minzoom: 0, realband: i, zoom: 0, start: 0, effcenterfreq: Number(x.centerfreq), effsamplerate: Number(x.samplerate), lastfreq: null, mode: x.mode || null }; });
+    vfo: Number(x.vfo || x.centerfreq), fft: Number(x.fft_size) || _crab.fft, minzoom: 0, realband: i, zoom: 0, start: 0, effcenterfreq: Number(x.centerfreq), effsamplerate: Number(x.samplerate), lastfreq: null, mode: x.mode || null,
+    freeVfo: !!x.free_vfo, vfoMin: Number(x.vfo_min) || 0, vfoMax: Number(x.vfo_max) || 0 }; });   // freier VFO: Mitte verschiebbar (kHz-Grenzen)
   _crab.bands = bi.map(function () { return { ws: null }; });
   for (var b = 0; b < bi.length; b++) _crabGeom(b);
   var cv = readCookie('view'); view = (cv === null || cv === '') ? Views.oneband : Number(cv);
   var un = readCookie('username'); if (document.usernameform) document.usernameform.username.value = (un && decodeURIComponent(un) !== 'Hörer') ? decodeURIComponent(un) : _crabGuestName();
+  // Deep-Link &band=<id>&vfo=<kHz>: freier VFO – Mitte des Bandes gleich beim Verbinden setzen (nur wenn das Band es erlaubt)
+  var mv = /[?&]vfo=([\d.]+)/.exec(location.search), mb = /[?&]band=([^&]+)/.exec(location.search);
+  if (mv && mb) { for (var kv = 0; kv < bi.length; kv++) if (bi[kv].name === decodeURIComponent(mb[1]) && bi[kv].freeVfo) { var cv0 = parseFloat(mv[1]); if (cv0 > 0) { bi[kv].centerfreq = cv0; bi[kv].pendingVfo = Math.round(cv0 * 1000); _crabGeom(kv); } } }
   // Deep-Link ?tune=<kHz><modus>
   var start = { b: 0, f: null, m: null };
   var mt = /[?&]tune=([\d.]+)(fm|am|usb|lsb|cw|data)?/i.exec(location.search);

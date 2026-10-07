@@ -34,6 +34,8 @@ pub struct PipelineStatus {
 /// A complete SDR processing pipeline.
 /// Software-Frequenzkorrektur: Mitte des Bandes, wie Anzeige und Abstimmung sie sehen
 pub fn corrected_center(hw_center: u64, ppm: f64) -> u64 { (hw_center as f64 * (1.0 + ppm / 1e6)).round() as u64 }
+/// Umkehrung: angezeigte Frequenz → Hardware-Frequenz (für den freien VFO: die Oberfläche schickt die Anzeige)
+pub fn uncorrected_center(shown: u64, ppm: f64) -> u64 { (shown as f64 / (1.0 + ppm / 1e6)).round() as u64 }
 
 pub struct SdrPipeline {
     pub id: String,
@@ -55,6 +57,10 @@ pub struct SdrPipeline {
     pub admin_only: AtomicBool,
     pub guest: AtomicBool,
     pub sample_rate: Arc<AtomicU32>,
+    /// Freier VFO (Band- oder Stationswert, fest nach dem Start): Hörer dürfen die Mitte verschieben
+    pub free_vfo: bool,
+    /// Grenzen des freien VFO, Hardware-Frequenz in Hz
+    pub vfo_limits: (u64, u64),
 }
 
 impl SdrPipeline {
@@ -113,6 +119,8 @@ impl SdrPipeline {
         let pipeline = Arc::new(Self {
             admin_only: AtomicBool::new(config.admin_only),
             guest: AtomicBool::new(config.guest),
+            free_vfo: config.free_vfo.unwrap_or(false),   // der Stationswert ist hier schon eingerechnet (main)
+            vfo_limits: config.vfo_limits(),
             id,
             label,
             fft_size,
@@ -175,6 +183,7 @@ impl SdrPipeline {
             "enabled": config.enabled,
             "admin_only": self.admin_only.load(std::sync::atomic::Ordering::Relaxed),
             "guest": self.guest.load(std::sync::atomic::Ordering::Relaxed),
+            "free_vfo": self.free_vfo,
             "capabilities": self.capabilities,
             "default_mode": config.default_mode,
         })

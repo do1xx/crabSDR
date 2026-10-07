@@ -103,7 +103,7 @@ async fn main() {
     // Start all SDR pipelines
     let mut manager = SdrManager::new();
     manager
-        .start_all(config.sdrs.clone(), config.opus_bitrate, config.opus_complexity)
+        .start_all(config.sdrs.iter().cloned().map(|mut b| { b.free_vfo = Some(config.free_vfo_for(&b)); b }).collect(), config.opus_bitrate, config.opus_complexity)
         .await;
 
     // Decoder-Einsätze ([[decoders]]) an die laufenden Bänder hängen
@@ -455,25 +455,34 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
             }
         }
         "set_center_freq" => {
-            if !is_admin || !pipeline.admin_only.load(std::sync::atomic::Ordering::Relaxed) {
-                warn!("[{}] Client {} tried set_center_freq (admin={}, admin_only={})",
-                    pipeline.id, client_id, is_admin, pipeline.admin_only.load(std::sync::atomic::Ordering::Relaxed));
-                return None;
+            // Freier VFO: wer das Band hören darf, verschiebt die Mitte (Labor); sonst nur der Admin auf einem Admin-Band
+            let admin_only = pipeline.admin_only.load(std::sync::atomic::Ordering::Relaxed);
+            if !(pipeline.free_vfo || (is_admin && admin_only)) {
+                warn!("[{}] Client {} tried set_center_freq (admin={}, admin_only={}, free_vfo={})", pipeline.id, client_id, is_admin, admin_only, pipeline.free_vfo);
+                return err("Dieses Band lässt sich nicht umstimmen".into());
             }
-            if let Some(freq) = msg.get("freq").and_then(|v| v.as_u64()) {
-                pipeline.center_freq.store(freq, std::sync::atomic::Ordering::Relaxed);
-                let _ = pipeline
-                    .sdr_cmd_tx
-                    .send(crabsdr_sdr::DriverCommand::SetFrequency(freq))
-                    .await;
-                // Broadcast update to all clients
-                let shown = crate::sdr_pipeline::corrected_center(freq, pipeline.corr_ppm);
-                pipeline.broadcast_json(&json!({
-                    "type": "center_freq_update",
-                    "center_freq": shown,
-                }));
-                info!("[{}] Admin set center_freq to {} Hz", pipeline.id, freq);
+            let Some(shown) = msg.get("freq").and_then(|v| v.as_u64()) else { return err("freq fehlt".into()) };
+            let hw = crate::sdr_pipeline::uncorrected_center(shown, pipeline.corr_ppm);
+            let half = pipeline.sample_rate.load(std::sync::atomic::Ordering::Relaxed) as u64 / 2;
+            let (lo, hi) = (pipeline.vfo_limits.0.max(half), pipeline.vfo_limits.1);
+            if hw < lo || hw > hi {
+                let (slo, shi) = (crate::sdr_pipeline::corrected_center(lo, pipeline.corr_ppm), crate::sdr_pipeline::corrected_center(hi, pipeline.corr_ppm));
+                return err(format!("Mitte {:.3} MHz außerhalb des Bereichs {:.3}–{:.3} MHz", shown as f64 / 1e6, slo as f64 / 1e6, shi as f64 / 1e6));
             }
+            if hw == pipeline.center_freq.load(std::sync::atomic::Ordering::Relaxed) { return None; }
+            pipeline.center_freq.store(hw, std::sync::atomic::Ordering::Relaxed);
+            let _ = pipeline
+                .sdr_cmd_tx
+                .send(crabsdr_sdr::DriverCommand::SetFrequency(hw))
+                .await;
+            hub.band_retuned(&pipeline.id).await;   // flüchtige Decoder (DV) außerhalb des neuen Fensters beenden
+            let shown = crate::sdr_pipeline::corrected_center(hw, pipeline.corr_ppm);
+            pipeline.broadcast_json(&json!({
+                "type": "center_freq_update",
+                "center_freq": shown,
+                "sample_rate": pipeline.sample_rate.load(std::sync::atomic::Ordering::Relaxed),
+            }));
+            info!("[{}] Client {} set center_freq to {} Hz (shown {})", pipeline.id, client_id, hw, shown);
         }
         "set_codec" => {
             let audio = msg.get("audio").and_then(|v| v.as_str()).unwrap_or("raw");
@@ -610,10 +619,19 @@ async fn bandinfo_js(State(state): State<Arc<AppState>>, Query(q): Query<TokenQu
             None => (sdr.center_freq, sdr.sample_rate),
         };
         let center = crate::sdr_pipeline::corrected_center(center, sdr.freq_correction_ppm);
-        entries.push(json!({"name": sdr.id, "label": sdr.label, "centerfreq": center as f64 / 1000.0,
+        let mut e = json!({"name": sdr.id, "label": sdr.label, "centerfreq": center as f64 / 1000.0,
                             "samplerate": rate as f64 / 1000.0, "fft_size": sdr.fft_size, "note": sdr.note,
                             "access": admin::access_name(sdr.guest, sdr.admin_only),
-                            "mode": sdr.default_mode.as_ref().map(|m| m.to_lowercase())}));
+                            "mode": sdr.default_mode.as_ref().map(|m| m.to_lowercase())});
+        // Freier VFO: Bedienelement in der Oberfläche; Grenzen als Anzeigefrequenz in kHz
+        if config.free_vfo_for(sdr) || (p.is_admin() && sdr.admin_only) {
+            let (lo, hi) = sdr.vfo_limits();
+            let lo = lo.max(rate as u64 / 2);
+            e["free_vfo"] = json!(true);
+            e["vfo_min"] = json!(crate::sdr_pipeline::corrected_center(lo, sdr.freq_correction_ppm) as f64 / 1000.0);
+            e["vfo_max"] = json!(crate::sdr_pipeline::corrected_center(hi, sdr.freq_correction_ppm) as f64 / 1000.0);
+        }
+        entries.push(e);
     }
     let n = entries.len();
     let body = format!("var bandinfo = {};\nvar nbands = {};\n", serde_json::Value::Array(entries), n);

@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="{{STATION_NAME}}">
-<link rel="stylesheet" href="ui.css?v=57">
+<link rel="stylesheet" href="ui.css?v=58">
 <link rel="stylesheet" href="account.css?v=1">
 <script>
 // Einstellungen der Vorversion übernehmen (Schlüssel gartow_… und 1xx_… werden zu crab_…)
@@ -28,7 +28,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </script>
 <script>(function(){var t=null;try{t=localStorage.getItem('crab_token')}catch(e){}document.write('<script src="bandinfo.js?_=' + Date.now() + (t ? '&token=' + encodeURIComponent(t) : '') + '"><\/script>');})();</script>
 <script>window.STATION_NAME = '{{STATION_NAME_JS}}';</script>
-<script src="core.js?v=89"></script>
+<script src="core.js?v=90"></script>
 </head>
 <body class="hoeren">
 
@@ -102,6 +102,18 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
         <button class="btn adv" type="button" onclick="freqStep(2)">++</button>
         <button class="btn adv" type="button" onclick="freqStep(3)" title="großer Schritt hoch">+++</button>
         <button class="btn btn-ghost sharebtn" id="linkbtn" type="button" title="Link zu dieser Frequenz teilen">🔗 <span data-de="Teilen" data-en="Share">Teilen</span></button>
+      </div>
+      <!-- Freier VFO: nur auf Bändern mit free_vfo (Labor) – verschiebt die Mitte des Wasserfalls für alle Hörer des Bandes -->
+      <div class="vforow" id="vforow" hidden>
+        <span class="x1lbl" data-de="Mitte" data-en="Center">Mitte</span>
+        <button class="btn" type="button" onclick="vfoStep(-10000)" title="−10 MHz">−10</button>
+        <button class="btn" type="button" onclick="vfoStep(-1000)" title="−1 MHz">−1</button>
+        <button class="btn" type="button" onclick="vfoStep('-half')" data-de-title="halbes Band runter" title="halbes Band runter">−½</button>
+        <input type="text" id="vfocenter" inputmode="decimal" autocomplete="off" aria-label="Mittenfrequenz in MHz" onkeydown="if (event.key === 'Enter') { vfoSet(this.value); this.blur(); return false; }" onblur="vfoSet(this.value)"><span class="unit">MHz</span>
+        <button class="btn" type="button" onclick="vfoStep('half')" title="halbes Band hoch">+½</button>
+        <button class="btn" type="button" onclick="vfoStep(1000)" title="+1 MHz">+1</button>
+        <button class="btn" type="button" onclick="vfoStep(10000)" title="+10 MHz">+10</button>
+        <span class="vforange" id="vforange"></span>
       </div>
       <div class="presetrow"><select id="presets" class="presetsel" aria-label="Schnellwahl"></select><button class="btn" type="button" id="flistbtn" title="Relais und Frequenzen, die hier zu hören sind" data-de="Liste" data-en="List">Liste</button><select id="segsel" class="segsel" title="Bereich des Bandplans: Frequenz, Betriebsart und Ausschnitt einstellen"></select></div>
       <div class="vfo adv">
@@ -292,7 +304,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </div>
 </div>
 
-<script src="ui.js?v=75"></script>
+<script src="ui.js?v=76"></script>
 <script src="account.js?v=1"></script>
 </body>
 </html>

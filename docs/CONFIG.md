@@ -60,6 +60,7 @@ Station unangetastet.
 | `iq_stream` | `admin` | I/Q-Stream (`iq.wav`/`iq.ogg`, komplexes Basisband für externe Decoder): `off`, `admin` (nur Sysop), `users` (angemeldete Hörer), `all` |
 | `max_iq` | `1` | gleichzeitige I/Q-Streams je Band (ab 0,5 Mbit/s je Hörer) |
 | `dv_max` | `3` | Betriebsart DV: so viele FreeDV-Decoder auf Hörer-Frequenzen laufen höchstens gleichzeitig (Hörer auf derselben Frequenz teilen einen; Ende nach 90 s ohne Hörer), `0` = DV aus |
+| `free_vfo` | `false` | Freier VFO für alle Bänder: Hörer verschieben die Mitte des Wasserfalls im Betrieb (siehe unten). Nur für private Stationen |
 | `stream_key` | leer | fester Schlüssel für Streams: `?token=<stream_key>` zählt wie der Sysop, nur für `/stream/…`, läuft nicht ab. Lang und zufällig, bei Verlust ändern |
 | `chat_keep_hours` | `3` | Zusätzlich Chat-Zeilen nach so vielen Stunden löschen, `0` = aus |
 | `chat_verbund` | `false` | Verbund-Chat: Chatzeilen (Name, Text, Uhrzeit, Stationskürzel) über crabsdr.de mit allen teilnehmenden Stationen teilen. Die Station reicht weiter, Hörer-IPs verlassen sie nicht; dort 24 h. Braucht `[directory] enabled` |
@@ -102,6 +103,8 @@ nichts; jede weitere belegte Frequenz etwa 0,4 % CPU (x86), jedes Band mit 2,048
 | `enabled` | `true` | `false` = Band aus, ohne den Eintrag zu löschen |
 | `guest` | `true` | Zugang: `true` = öffentlich (ohne Anmeldung), `false` = nur für angemeldete Benutzer, denen das Band zugeteilt ist |
 | `admin_only` | `false` | nur für Admins (hat Vorrang vor `guest`) |
+| `free_vfo` | Stationswert | Freier VFO: `true` = wer das Band hören darf, verschiebt die Mitte des Wasserfalls im Betrieb; `false` = fest, auch wenn oben `free_vfo = true` steht (siehe unten) |
+| `free_vfo_min`, `free_vfo_max` | Empfängerbereich | Grenzen des freien VFO (Mittenfrequenz in Hz). Ohne Angabe: RTL-Stick 24–1766 MHz, HackRF 1–6000 MHz, Airspy 24–1800 MHz; `rx_sdr` und Konverter ohne Grenze |
 | `fft_size` | automatisch | Punkte der FFT; automatisch so, dass ein Bin etwa 500 Hz breit ist (2,048 MS/s → 4096, 8 MS/s → 16384). Deutlich kleiner bei hoher Abtastrate lässt FM pfeifen |
 | `fft_fps` | `50` | Wasserfall-Zeilen pro Sekunde |
 | `gain_elements` | – | Verstärkerstufen einzeln, z. B. `{ LNA = 24, Baseband = 30 }` (SoapySDR-Geräte) |
@@ -112,6 +115,28 @@ nichts; jede weitere belegte Frequenz etwa 0,4 % CPU (x86), jedes Band mit 2,048
 Alte Schlüsselnamen gelten weiter, `--check` weist darauf hin: `[[sdrs]]` → `[[bands]]`, `sdr_driver` → `driver`,
 `sdr_device` → `device`, `sdr_tcp_host` → `host`, `sdr_tcp_port` → `port`, `default_mode` → `mode`, die Tabelle
 `[smeter_cal]` → `smeter_cal` im Band.
+
+### Freier VFO (Labor, eine Person)
+
+Normalerweise steht die Mitte eines Bandes fest (`center_freq`), und alle Hörer sehen denselben Ausschnitt. Mit
+`free_vfo = true` (oben in der Datei für alle Bänder, oder im Band) erscheint auf der Hören-Seite eine Zeile
+**Mitte** mit Eingabefeld (MHz) und Schritten ±½ Band, ±1 MHz, ±10 MHz. Wer das Band hören darf, stimmt damit den
+Empfänger um – **für alle Hörer dieses Bandes zugleich**. Deshalb ist das nur für private Stationen gedacht (ein Stick,
+eine Person, Zugang über LAN oder Tailscale); auf einer öffentlichen Station würde jeder Hörer allen anderen das Band
+verstellen, `--check` warnt davor. Öffentliche Stationen lassen den Schlüssel weg; ohne ihn kann niemand umstimmen,
+auch nicht über die Schnittstelle.
+
+- Ein Band = ein Stick. Umstimmen über `rtl_tcp` geht ohne Unterbrechung, bei `rtl_sdr`/`rx_sdr`/`hackrf` startet das
+  Leseprogramm neu (kurze Lücke).
+- Grenzen: `free_vfo_min`/`free_vfo_max` (Hz), sonst der Bereich des Empfängers; die Untergrenze liegt nie unter der
+  halben Abtastrate. Ein E4000-Stick (52–2200 MHz, Lücke um 1,1–1,25 GHz) braucht eigene Grenzen. Liegt `center_freq`
+  außerhalb des Empfängerbereichs (Konverter oder Transverter davor, Anzeige = Eingangsfrequenz), gelten keine
+  Treibergrenzen – dann `free_vfo_min`/`free_vfo_max` setzen.
+- Die eigene Frequenz bleibt stehen, wenn sie im neuen Fenster liegt, sonst rutscht sie an den Rand. Hörer, die DV
+  hören, bekommen auf der neuen Frequenz einen frischen Decoder; feste `[[decoders]]` sind auf einem Band mit freiem
+  VFO nicht erlaubt (`--check` meldet es, der Decoder bleibt aus) – sie brauchen eine feste Mitte.
+- Die neue Mitte gilt bis zum Neustart; danach gilt wieder `center_freq` aus der Datei. Der Link „Teilen“ enthält auf
+  solchen Bändern die Mitte (`&band=…&vfo=<kHz>`) und stellt sie beim Öffnen wieder her.
 
 ### Empfänger
 
