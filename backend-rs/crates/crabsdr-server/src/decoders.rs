@@ -250,9 +250,10 @@ impl DecoderHub {
         if let Some(tx) = self.mqtt.lock().ok().and_then(|m| m.clone()) { let _ = tx.try_send(ev.clone()); }   // voll = verwerfen, nie blockieren
         g.events.push_back(ev);
         // Live an die Hörer des Bandes (nur Ton-Decoder: Sync und Text), damit die Oberfläche einen Lock anzeigen kann
-        if st.audio && (kind == "sync" || kind == "text") {
-            if let Some(tx) = &st.bcast {
-                let msg = json!({ "type": "decoder", "id": st.id, "kind": kind, "data": g.events.back().map(|e| e.data.clone()).unwrap_or(Value::Null) });
+        let last = g.events.back().map(|e| (e.kind.clone(), e.data.clone()));
+        if let (true, Some((k, data))) = (st.audio, last) {
+            if let (true, Some(tx)) = (k == "sync" || k == "text", &st.bcast) {
+                let msg = json!({ "type": "decoder", "id": st.id, "kind": k, "data": data });
                 let _ = tx.send(crabsdr_core::protocol::encode_json(&msg.to_string()));
             }
         }
