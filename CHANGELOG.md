@@ -2,6 +2,11 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Oberfläche
+- Info-Seite: Abschnitte „Link mit Einstellungen“ und „Stream für VLC, mpv und Decoder“ mit Anleitung und anklickbaren Beispielen aus der Schnellwahl der Station.
+
 ## 1.1.1 – 2026-10-07
 
 ### Stream

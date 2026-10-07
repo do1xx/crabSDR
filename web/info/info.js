@@ -37,4 +37,24 @@ crabReady(function (UI) {
   };
   x.send();
   if (UI.version) $('ver').textContent = 'Version ' + UI.version + (UI.build ? ' (' + UI.build + ')' : '') + '.';
+
+  // Stream-Beispiele aus der Schnellwahl der Station (presets.json), als anklickbare, absolute Adressen
+  (function () {
+    var base = location.origin + location.pathname.replace(/info\/?(index\.html)?$/, '');
+    var m3 = $('m3u'); if (m3) m3.href = base + 'stream/presets.m3u';
+    var ex = $('exlink'); if (ex) { ex.href = base + '?tune=145500.000fm&sq=auto:6&ui=min'; ex.textContent = ex.href; }
+    var x = new XMLHttpRequest(); x.open('GET', '../presets.json?' + Date.now());
+    x.onload = function () {
+      var P = []; try { P = JSON.parse(x.responseText); } catch (e) {}
+      P = P.filter(function (p) { return p && p.freq && p.mode; }).slice(0, 6);
+      var box = $('streamex'); if (!box) return;
+      if (!P.length) { box.innerHTML = '<dt>Beispiel</dt><dd><a href="' + base + 'stream/145500/fm.ogg">' + base + 'stream/145500/fm.ogg</a></dd>'; return; }
+      box.innerHTML = P.map(function (p) {
+        var u = base + 'stream/' + p.freq + '/' + String(p.mode).toLowerCase() + '.ogg';
+        return '<dt>' + esc(p.label || p.freq) + '</dt><dd><a href="' + u + '">' + u + '</a></dd>';
+      }).join('') + '<dt>Senderliste</dt><dd><a href="' + base + 'stream/presets.m3u">' + base + 'stream/presets.m3u</a></dd>';
+    };
+    x.onerror = function () { var box = $('streamex'); if (box) box.innerHTML = '<dt>Beispiel</dt><dd><a href="' + base + 'stream/145500/fm.ogg">' + base + 'stream/145500/fm.ogg</a></dd>'; };
+    x.send();
+  })();
 });

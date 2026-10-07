@@ -76,16 +76,41 @@ sys();window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change
     <dt>?</dt><dd>Tastenhilfe ein/aus · Esc schließt</dd>
   </dl>
 
-  <h2>Link und Stream</h2>
-  <p>Der Teilen-Link trägt Frequenz, Betriebsart, Bandbreite, Rauschsperre und AGC. Zusätzlich im Link möglich:
-    <code>&amp;vol=-10</code> (Lautstärke in dB), <code>&amp;mute=1</code>, <code>&amp;name=…</code> und <code>&amp;ui=min</code>
-    für eine Minimal-Ansicht ohne Wasserfall, z. B. für viele Tabs nebeneinander; der Tab-Titel zeigt die Frequenz.</p>
-  <p>Jeden Kanal gibt es auch als Ton-Stream für VLC, mpv, Home Assistant oder Decoder, ohne Oberfläche:
-    <code>…/stream/145700/fm.ogg</code> (Opus) oder <code>…/stream/145700/data.wav</code> (PCM, verlustfrei; Frequenz in kHz,
-    Betriebsart fm, am, usb, lsb, cw oder data für Decoder), zwei Kanäle auf links und rechts mit
-    <code>…/stream/pair.wav?l=145700/fm&amp;r=145725/fm</code>. Die Schnellwahl als Senderliste:
-    <a href="../stream/presets.m3u">presets.m3u</a>. Parameter und Beispiele in
-    <a href="https://github.com/do1xx/crabSDR/blob/main/docs/STREAM.md">docs/STREAM.md</a>.</p>
+  <h2>Link mit Einstellungen</h2>
+  <p>Das Kettensymbol neben der Frequenz kopiert einen Link, der genau diese Einstellung öffnet: Frequenz, Betriebsart,
+    Bandbreite, Rauschsperre und AGC. Von Hand lässt sich anhängen:</p>
+  <dl class="facts">
+    <dt><code>&amp;vol=-10</code></dt><dd>Lautstärke in dB (−20 bis 6)</dd>
+    <dt><code>&amp;mute=1</code></dt><dd>stumm starten</dd>
+    <dt><code>&amp;name=DO1XX</code></dt><dd>Anzeigename für Hörerliste und Chat</dd>
+    <dt><code>&amp;ui=min</code></dt><dd>Minimal-Ansicht ohne Wasserfall, nur Frequenz, Betriebsart und Pegel – praktisch für mehrere Tabs nebeneinander; der Tab-Titel zeigt die Frequenz</dd>
+    <dt><code>&amp;sq=off</code>, <code>&amp;sq=auto:10</code></dt><dd>Rauschsperre aus bzw. mit eigenem Abstand in dB</dd>
+    <dt><code>&amp;agc=slow</code></dt><dd>AGC schnell, mittel, langsam oder aus (AM/SSB/CW)</dd>
+  </dl>
+  <p>Beispiel: <a id="exlink" href="../?tune=145500.000fm&amp;sq=auto:6&amp;ui=min">../?tune=145500.000fm&amp;sq=auto:6&amp;ui=min</a>.
+    Ton startet in jedem Tab erst nach einem Klick, das ist eine Regel der Browser.</p>
+
+  <h2>Stream für VLC, mpv und Decoder</h2>
+  <p>Jeden Kanal dieser Station gibt es auch ohne Oberfläche als Ton-Stream, wie ein Webradio. Adresse:
+    <code>…/stream/&lt;Frequenz in kHz&gt;/&lt;Betriebsart&gt;.ogg</code>, Betriebsart <code>fm</code>, <code>am</code>, <code>usb</code>,
+    <code>lsb</code>, <code>cw</code> oder <code>data</code> (FM ohne Sprachfilter, für Decoder). Das Band sucht die Station anhand der Frequenz.</p>
+  <dl class="facts" id="streamex"><dt>Beispiele</dt><dd class="muted">lädt…</dd></dl>
+  <dl class="facts">
+    <dt>VLC</dt><dd>Menü <i>Medien → Netzwerkstream öffnen</i> (Mac: <i>Datei → Netzwerk öffnen</i>), Adresse einfügen, <i>Wiedergabe</i>.
+      Titel und Stationsbild erscheinen in der Wiedergabeliste. Alle Frequenzen der Schnellwahl auf einmal: die Senderliste
+      <a id="m3u" href="../stream/presets.m3u">presets.m3u</a> öffnen oder in VLC als Netzwerkstream laden.</dd>
+    <dt>mpv, ffplay</dt><dd><code>mpv "&lt;Adresse&gt;"</code> bzw. <code>ffplay -nodisp "&lt;Adresse&gt;"</code></dd>
+    <dt>Home Assistant</dt><dd>Dienst <code>media_player.play_media</code> mit der Adresse als <code>media_content_id</code> und <code>music</code> als Typ; läuft auf jedem Lautsprecher, der Webradio kann.</dd>
+    <dt>Decoder</dt><dd><code>.wav</code> statt <code>.ogg</code> liefert unkomprimiertes PCM (48 kHz, 16 bit), für Datenbetriebsarten die bessere Wahl;
+      <code>pair.wav?l=145700/fm&amp;r=145725/fm</code> legt zwei Frequenzen auf links und rechts. Ein Spieler gibt den Stream auf ein
+      virtuelles Audiokabel aus, der Decoder hört darauf. Ohne Soundkarte: <code>curl -sN "&lt;Adresse&gt;" | sox … | multimon-ng …</code>.</dd>
+    <dt>Parameter</dt><dd><code>?sq=off</code> oder <code>?sq=auto:10</code> Rauschsperre, <code>&amp;agc=slow</code>, <code>&amp;bw=</code> Bandbreite in Hz,
+      <code>&amp;pb=300,2700</code> SSB-Durchlass, <code>&amp;br=64</code> Opus-Bitrate in kbit/s, <code>&amp;name=</code> Name in der Hörerliste.
+      Bei geschlossener Rauschsperre läuft Stille weiter, der Spieler bricht nicht ab.</dd>
+    <dt>Hinweise</dt><dd>Jeder Stream zählt als Hörer und erscheint in der Hörerliste. Die Station begrenzt Streams und verschiedene
+      Kanäle, damit niemand sie überlastet; ist sie voll, antwortet sie mit einem kurzen Satz statt mit Ton. Alles im Detail:
+      <a href="https://github.com/do1xx/crabSDR/blob/main/docs/STREAM.md">docs/STREAM.md</a>.</dd>
+  </dl>
 
   <h2>Software</h2>
   <p>crabSDR – freie WebSDR-Software: ein Empfänger für viele Hörer gleichzeitig, jeder mit eigener Frequenz und
@@ -129,7 +154,7 @@ sys();window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change
 
 <script>(function(){var t=null;try{t=localStorage.getItem('crab_token')}catch(e){}document.write('<script src="../bandinfo.js?_=' + Date.now() + (t ? '&token=' + encodeURIComponent(t) : '') + '"><\/script>');})();</script>
 <script src="../common.js?v=2"></script>
-<script src="info.js?v=2"></script>
+<script src="info.js?v=3"></script>
 <script src="../account.js?v=1"></script>
 </body>
 </html>
