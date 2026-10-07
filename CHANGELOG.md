@@ -2,7 +2,7 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## Unveröffentlicht
+## 1.2.2 – 2026-10-07
 
 ### Härtung
 - WebSocket-Befehle: Bandbreite auf 100 Hz bis 250 kHz begrenzt (vorher beliebig, ein Megahertz-Kanal hätte den DSP ausgelastet), Frequenz außerhalb des Bandes wird mit Hinweis abgelehnt, Nachrichten höchstens 16 kB.
