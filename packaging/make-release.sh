@@ -6,7 +6,8 @@ cd "$(dirname "$0")/.."
 V=${1:-$(git describe --tags --always 2>/dev/null || date +%Y%m%d)}
 R=dist/crabsdr-$V; rm -rf "$R"; mkdir -p "$R"
 cp -r dist/bin "$R/bin"; cp -r web "$R/web"
-mkdir -p "$R/plugins"; for p in aprs ft8 sstv; do cp -r plugins/$p "$R/plugins/"; done; find "$R/plugins" -name __pycache__ -prune -exec rm -rf {} +
+mkdir -p "$R/plugins"; for p in aprs ft8 sstv rade; do cp -r plugins/$p "$R/plugins/"; done; find "$R/plugins" -name __pycache__ -prune -exec rm -rf {} +
+rm -rf "$R/plugins/rade/build" "$R/plugins/rade/crab_rade"   # das Programm liegt je Architektur unter bin/, install.sh legt es ins Plugin
 cp packaging/install.sh packaging/crabsdr.service packaging/config.example.toml packaging/docker-entrypoint.sh packaging/soapymiri-transfer.patch LICENSE "$R/"
 mkdir -p "$R/docs" && cp docs/CONFIG.md "$R/docs/"
 # Dockerfile und compose mit den flachen Pfaden des Archivs
@@ -23,6 +24,7 @@ Kleines Image (Alpine, nur RTL-SDR, ~20 MB):  docker build -f Dockerfile.lite -t
 Konfiguration prüfen:  crabsdr-server --check <config.toml>   (Erklärung aller Einstellungen: docs/CONFIG.md)
 Admin-Passwort beim ersten Start im Log: journalctl -u crabsdr | grep Passwort (Docker: docker compose logs | grep Passwort).
 Unterstützt: x86-64, ARM64 (Pi 4/5, Odroid N2), ARMv7 (Odroid XU4, Pi 2/3 32 Bit).
+Betriebsart DV (FreeDV RADE): bin/<arch>/crab_rade für x86-64 und ARM64, install.sh legt es ins Plugin plugins/rade.
 Empfänger: RTL-SDR (rtl_sdr), rtl_tcp übers Netz, HackRF (hackrf_transfer); Airspy, Mirics, LimeSDR usw. über
 SoapySDR (rx_sdr) – im vollen Docker-Image enthalten, ohne Docker rx_tools selbst installieren.
 Das Server-Programm ist statisch gebaut und braucht keine weiteren Bibliotheken.

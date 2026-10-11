@@ -10,6 +10,10 @@
 //! - **Treffer**: Ringpuffer im Speicher, `GET /api/decoders` (Status), `GET /api/decoders/events?since=&wait=1`
 //!   (Long-Poll wie der Chat), Dateien der Decoder (z. B. SSTV-Bilder) unter `/api/decoders/files/<id>/<pfad>`.
 //!
+//! Betriebsart DV: auf der Frequenz des Hörers entstehen flüchtige Decoder für alle vorhandenen DV-Plugins (`DV_PLUGINS`:
+//! `rade` für FreeDV ab 2.0, `freedv` für Codec 2). Sie bilden eine **Gruppe** (`dv-<Hz>`), der Hörer abonniert die Gruppe
+//! und hört den Ton des Decoders, der gerade Lock hat; Sync-Meldungen an die Oberfläche tragen die Gruppen-ID.
+//!
 //! Protokoll des Decoders: stdin = s16le mono mit `rate`; stdout = eine Zeile je Treffer, am besten JSON mit
 //! `kind` (z. B. "packet", "position", "decode", "image") und beliebigen Feldern; andere Zeilen werden zu
 //! `{kind:"text", text}`. Umgebung: CRAB_FREQ, CRAB_RATE, CRAB_MODE, CRAB_BAND, CRAB_ID, CRAB_LABEL, CRAB_DATA,
@@ -41,6 +45,9 @@ use crate::AppState;
 /// Virtuelle Hörer der Decoder liegen hinter denen der alten Plugins
 const DECODER_CLIENT_BASE: u64 = PLUGIN_CLIENT_BASE + 0x1_0000;
 const KEEP_EVENTS: usize = 2000;
+/// Plugins der Betriebsart DV in Vorzugsreihenfolge (bei mehreren Locks spielt der erste): FreeDV ab 2.0 ist RADE,
+/// die Codec-2-Modes (700D/700E/1600) sind on air kaum noch zu hören
+pub const DV_PLUGINS: &[&str] = &["rade", "freedv"];
 const STDERR_TAIL: usize = 20;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -143,6 +150,11 @@ pub struct Status {
     pub bcast: Option<tokio::sync::broadcast::Sender<Vec<u8>>>,
     /// zur Laufzeit angelegt (Betriebsart DV: FreeDV auf der Frequenz des Hörers), endet, wenn niemand mehr hört
     pub dynamic: bool,
+    /// Gruppe (Betriebsart DV: `dv-<Hz>`): Hörer abonnieren die Gruppe, nicht den einzelnen Decoder
+    pub group: Option<String>,
+    /// letzter gemeldeter Sync (nur Ton-Decoder; entscheidet in einer Gruppe, wessen Ton spielt)
+    #[serde(skip)]
+    pub lock: bool,
     #[serde(skip)]
     pub idle: u8,
     #[serde(skip)]
@@ -172,9 +184,24 @@ pub struct DecoderHub {
 struct AudioFan {
     /// Decoder-ID → (Umrechner auf 24 kHz, Opus-Kodierer)
     enc: HashMap<String, (crabsdr_dsp::resample::Resampler, crate::dsp_thread::OpusEnc)>,
-    /// Hörer-ID → Sender; welche Decoder-ID er hört
+    /// Hörer-ID → Sender; welche Decoder-ID (oder Gruppe) er hört
     subs: HashMap<u64, (String, mpsc::Sender<Vec<u8>>)>,
+    /// Decoder-ID → Gruppe (DV)
+    groups: HashMap<String, String>,
+    /// Gruppe → Decoder, dessen Ton gerade spielt (der mit Lock)
+    active: HashMap<String, String>,
 }
+
+/// Wer in einer DV-Gruppe spielt: der bisherige, solange er Lock hat, sonst der erste mit Lock in der Reihenfolge
+/// von `DV_PLUGINS`; niemand ohne Lock (`locked`: (Plugin, Decoder-ID) aller Mitglieder mit Lock)
+fn pick_active(current: Option<&str>, locked: &[(String, String)]) -> Option<String> {
+    if let Some(c) = current { if locked.iter().any(|(_, id)| id == c) { return Some(c.to_string()); } }
+    DV_PLUGINS.iter().find_map(|p| locked.iter().find(|(pl, _)| pl == p).map(|(_, id)| id.clone()))
+        .or_else(|| locked.first().map(|(_, id)| id.clone()))
+}
+
+/// Frequenz der Betriebsart DV: auf 100 Hz gerundet, Gruppen-ID `dv-<Hz>`
+fn dv_group(freq: u64) -> (u64, String) { let f = (freq + 50) / 100 * 100; (f, format!("dv-{}", f)) }
 struct Inner {
     seq: u64,
     events: VecDeque<Event>,
@@ -214,19 +241,28 @@ impl DecoderHub {
 
     /// Hörer abonniert den Ton eines Decoders (ersetzt sein Band-Abstimmen); false, wenn der Decoder keinen Ton liefert
     pub async fn subscribe_audio(&self, id: &str, client: u64, tx: mpsc::Sender<Vec<u8>>) -> bool {
-        let ok = self.inner.lock().await.status.iter().any(|s| s.id == id && s.audio);
+        let ok = self.inner.lock().await.status.iter().any(|s| (s.id == id || s.group.as_deref() == Some(id)) && s.audio);
         if ok { self.audio.lock().unwrap().subs.insert(client, (id.to_string(), tx)); }
         ok
     }
     pub fn unsubscribe_audio(&self, client: u64) { self.audio.lock().unwrap().subs.remove(&client); }
     /// Sichtbarkeit eines Decoders: Some(public) oder None, wenn es ihn nicht gibt
-    pub async fn is_public(&self, id: &str) -> Option<bool> { self.inner.lock().await.status.iter().find(|s| s.id == id).map(|s| s.public) }
-    pub fn audio_listeners(&self, id: &str) -> usize { self.audio.lock().unwrap().subs.values().filter(|(d, _)| d == id).count() }
+    pub async fn is_public(&self, id: &str) -> Option<bool> { self.inner.lock().await.status.iter().find(|s| s.id == id || s.group.as_deref() == Some(id)).map(|s| s.public) }
+    /// Hörer eines Decoders – bei DV zählen die Hörer seiner Gruppe mit
+    pub fn audio_listeners(&self, id: &str) -> usize {
+        let g = self.audio.lock().unwrap();
+        let grp = g.groups.get(id).cloned();
+        g.subs.values().filter(|(d, _)| d == id || grp.as_deref() == Some(d.as_str())).count()
+    }
 
     /// PCM (s16le mono, `rate`) vom Plugin: auf 24 kHz, Opus, an alle Abonnenten dieses Decoders
     fn audio_frame(&self, id: &str, rate: u32, bytes: &[u8]) {
         let mut g = self.audio.lock().unwrap();
-        if !g.subs.values().any(|(d, _)| d == id) { g.enc.remove(id); return; }   // niemand hört: nichts kodieren
+        // In einer DV-Gruppe spielt nur der Decoder mit Lock (pick_active); ohne Lock schweigt die Gruppe
+        let grp = g.groups.get(id).cloned();
+        if let Some(gr) = &grp { if g.active.get(gr).map(|a| a.as_str()) != Some(id) { return; } }
+        let wants = |d: &String| d == id || grp.as_deref() == Some(d.as_str());
+        if !g.subs.values().any(|(d, _)| wants(d)) { g.enc.remove(id); return; }   // niemand hört: nichts kodieren
         let (res, enc) = match g.enc.entry(id.to_string()) {
             std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
             std::collections::hash_map::Entry::Vacant(v) => {
@@ -242,7 +278,7 @@ impl DecoderHub {
         let frames: Vec<Vec<u8>> = packets.iter().map(|p| crabsdr_core::protocol::encode_opus_audio(p)).collect();
         let mut dead = Vec::new();
         for (cid, (d, tx)) in g.subs.iter() {
-            if d != id { continue; }
+            if !(d == id || grp.as_deref() == Some(d.as_str())) { continue; }
             for fr in &frames { if tx.try_send(fr.clone()).is_err() && tx.is_closed() { dead.push(*cid); } }
         }
         for c in dead { g.subs.remove(&c); }
@@ -262,11 +298,24 @@ impl DecoderHub {
         let ev = Event { seq: g.seq, t: now_f(), id: st.id.clone(), plugin: st.plugin.clone(), label: st.label.clone(), band: st.band.clone(), freq: st.freq, kind, data, public: st.public };
         if let Some(tx) = self.mqtt.lock().ok().and_then(|m| m.clone()) { let _ = tx.try_send(ev.clone()); }   // voll = verwerfen, nie blockieren
         g.events.push_back(ev);
-        // Live an die Hörer des Bandes (nur Ton-Decoder: Sync und Text), damit die Oberfläche einen Lock anzeigen kann
+        // Live an die Hörer des Bandes (nur Ton-Decoder: Sync und Text), damit die Oberfläche einen Lock anzeigen kann.
+        // In einer DV-Gruppe: Lock des Mitglieds merken, wer spielt neu bestimmen, nach außen zählt der Lock der Gruppe
         let last = g.events.back().map(|e| (e.kind.clone(), e.data.clone()));
-        if let (true, Some((k, data))) = (st.audio, last) {
+        if let (true, Some((k, mut data))) = (st.audio, last) {
+            let mut ui_id = st.id.clone();
+            if let (true, Some(grp)) = (k == "sync", &st.group) {
+                let on = data.get("on").and_then(|v| v.as_bool()).unwrap_or(false);
+                if let Some(s) = g.status.get_mut(idx) { s.lock = on; }
+                let locked: Vec<(String, String)> = g.status.iter().filter(|s| s.group.as_deref() == Some(grp) && s.lock && s.state != "beendet").map(|s| (s.plugin.clone(), s.id.clone())).collect();
+                {
+                    let mut a = self.audio.lock().unwrap();
+                    let cur = a.active.get(grp).cloned();
+                    match pick_active(cur.as_deref(), &locked) { Some(x) => { a.active.insert(grp.clone(), x); } None => { a.active.remove(grp); } }
+                }
+                data["on"] = json!(!locked.is_empty()); data["plugin"] = json!(st.plugin); ui_id = grp.clone();
+            }
             if let (true, Some(tx)) = (k == "sync" || k == "text", &st.bcast) {
-                let msg = json!({ "type": "decoder", "id": st.id, "kind": k, "data": data });
+                let msg = json!({ "type": "decoder", "id": ui_id, "kind": k, "data": data });
                 let _ = tx.send(crabsdr_core::protocol::encode_json(&msg.to_string()));
             }
         }
@@ -281,7 +330,7 @@ impl DecoderHub {
         *self.plugin_dir.lock().unwrap() = std::path::absolute(plugin_dir).unwrap_or(plugin_dir.to_path_buf());
         *self.pipelines.lock().unwrap() = pipelines.clone();
         for c in cfgs {
-            let idx = self.add_status(c, false).await;
+            let idx = self.add_status(c, false, None).await;
             self.launch(idx).await;
         }
         self.spawn_janitor();
@@ -309,7 +358,7 @@ impl DecoderHub {
     }
 
     /// Statuszeile anlegen (noch nicht gestartet); liefert den Index
-    async fn add_status(&self, c: &DecoderInstanceConfig, dynamic: bool) -> usize {
+    async fn add_status(&self, c: &DecoderInstanceConfig, dynamic: bool, group: Option<String>) -> usize {
         let id = c.id.clone().unwrap_or_else(|| format!("{}-{}", c.plugin, c.freq / 1000));
         let (_, manifest) = self.manifest_of(&c.plugin);
         let bw = manifest.as_ref().map(|m| m.input.bandwidth as u64).unwrap_or(12_500);
@@ -323,7 +372,7 @@ impl DecoderHub {
         let idx = g.status.len();
         g.status.push(Status { id, plugin: c.plugin.clone(), label, band: band.as_ref().map(|b| b.id.clone()).unwrap_or_default(),
             freq: c.freq, mode, public: c.public, state, since: now_s(), restarts: 0, events: 0, last_event: None, audio_s: 0.0, audio: false, stderr: VecDeque::new(),
-            bcast: band.as_ref().map(|b| b.spectrum_tx.clone()), dynamic, idle: 0, client_id: DECODER_CLIENT_BASE + idx as u64, opts: c.options.clone(), enabled: c.enabled && !free });
+            bcast: band.as_ref().map(|b| b.spectrum_tx.clone()), dynamic, group, lock: false, idle: 0, client_id: DECODER_CLIENT_BASE + idx as u64, opts: c.options.clone(), enabled: c.enabled && !free });
         idx
     }
 
@@ -343,7 +392,8 @@ impl DecoderHub {
             return;
         }
         // Ton-Fähigkeit sofort eintragen, damit ein Hörer gleich nach dem Start abonnieren kann (DV)
-        { let mut g = self.inner.lock().await; if let Some(s) = g.status.get_mut(idx) { s.audio = m.output.is_some(); } }
+        { let mut g = self.inner.lock().await; if let Some(s) = g.status.get_mut(idx) { s.audio = m.output.is_some(); s.lock = false; } }
+        if let Some(grp) = &st.group { self.audio.lock().unwrap().groups.insert(st.id.clone(), grp.clone()); }
         let data = self.data_dir.join("decoders").join(&st.id);
         let _ = std::fs::create_dir_all(&data);
         // absolut: die Plugins laufen in ihrem eigenen Ordner, ein relativer data_dir zeigte sonst dorthin
@@ -365,40 +415,64 @@ impl DecoderHub {
         tokio::spawn(run_instance(hub, idx, m, pdir, env, rx));
     }
 
-    /// Betriebsart DV: FreeDV-Decoder auf der Frequenz des Hörers (auf 100 Hz gerundet) im Band `band` – vorhandenen
-    /// wiederverwenden, beendeten neu starten, sonst anlegen (höchstens `max` laufende dynamische Decoder je Station)
-    pub async fn ensure_dynamic(self: &Arc<Self>, plugin: &str, freq: u64, band: &str, max: u32) -> Result<String, String> {
-        let freq = (freq + 50) / 100 * 100;
-        let id = format!("dv-{}", freq);
-        let existing = { let g = self.inner.lock().await; g.status.iter().enumerate().find(|(_, s)| s.id == id).map(|(i, s)| (i, s.state.clone())) };
-        match existing {
-            Some((_, state)) if state != "beendet" && !state.starts_with("fehlt") && state != "kein Band" => return Ok(id),
-            Some((idx, _)) => {
-                { let mut g = self.inner.lock().await; if let Some(s) = g.status.get_mut(idx) { s.idle = 0; s.band = band.to_string(); s.enabled = true; s.events = 0; } }
-                self.launch(idx).await;
-                let ok = self.inner.lock().await.status.get(idx).map(|s| s.state == "startet" || s.state == "läuft").unwrap_or(false);
-                return if ok { Ok(id) } else { Err("Decoder konnte nicht starten (Plugin oder Programm fehlt)".into()) };
-            }
-            None => {}
+    /// DV-Plugins, die auf dieser Station laufen können (decoder.json mit Ton-Ausgabe, benötigte Programme vorhanden)
+    pub fn dv_plugins(&self) -> Vec<String> {
+        DV_PLUGINS.iter().filter(|p| {
+            let (pdir, m) = self.manifest_of(p);
+            m.is_some_and(|m| m.output.is_some() && m.requires.iter().all(|r| have_program(r, &pdir)))
+        }).map(|p| p.to_string()).collect()
+    }
+
+    /// Beendeten oder gescheiterten Decoder neu starten (dynamisch: ggf. in anderem Band)
+    async fn relaunch(self: &Arc<Self>, idx: usize, band: &str) {
+        { let mut g = self.inner.lock().await; if let Some(s) = g.status.get_mut(idx) { s.idle = 0; s.band = band.to_string(); s.enabled = true; s.events = 0; s.lock = false; } }
+        self.launch(idx).await;
+    }
+
+    /// Hat gerade ein Mitglied der Gruppe (oder der Decoder selbst) Lock? Für die Antwort auf `dv`, damit ein neu
+    /// dazukommender Hörer den Zustand sofort sieht (Sync-Meldungen kommen sonst nur bei Änderung)
+    pub async fn locked(&self, id: &str) -> bool {
+        self.inner.lock().await.status.iter().any(|s| (s.id == id || s.group.as_deref() == Some(id)) && s.lock && s.state != "beendet")
+    }
+
+    async fn group_alive(&self, group: &str) -> bool {
+        self.inner.lock().await.status.iter().any(|s| s.group.as_deref() == Some(group) && (s.state == "startet" || s.state == "läuft"))
+    }
+
+    /// Betriebsart DV auf der Frequenz des Hörers (auf 100 Hz gerundet) im Band `band`: je vorhandenem DV-Plugin ein
+    /// flüchtiger Decoder, zusammen eine Gruppe `dv-<Hz>` (Rückgabe), die der Hörer abonniert. Vorhandene Gruppe
+    /// wiederverwenden, beendete neu starten, sonst anlegen – höchstens `max` Gruppen (Frequenzen) je Station
+    pub async fn ensure_dv(self: &Arc<Self>, freq: u64, band: &str, max: u32) -> Result<String, String> {
+        let (freq, group) = dv_group(freq);
+        let plugins = self.dv_plugins();
+        if plugins.is_empty() { return Err("Kein DV-Decoder auf dieser Station (Plugin rade oder freedv fehlt)".into()); }
+        let alive = |st: &str| st != "beendet" && !st.starts_with("fehlt") && st != "kein Band" && !st.starts_with("Startfehler");
+        let existing: Vec<(usize, String)> = { let g = self.inner.lock().await; g.status.iter().enumerate().filter(|(_, s)| s.group.as_deref() == Some(&group)).map(|(i, s)| (i, s.state.clone())).collect() };
+        if !existing.is_empty() {
+            let any_alive = existing.iter().any(|(_, st)| alive(st));
+            for (idx, st) in &existing { if !alive(st) { self.relaunch(*idx, band).await; } }
+            return if any_alive || self.group_alive(&group).await { Ok(group) } else { Err("Decoder konnte nicht starten (Plugin oder Programm fehlt)".into()) };
         }
         // Verwaiste dynamische Decoder (niemand hört mehr, z. B. nach dem Weiterdrehen) sofort beenden, nicht erst nach 90 s
         let orphans: Vec<usize> = self.inner.lock().await.status.iter().enumerate()
-            .filter(|(_, s)| s.dynamic && s.state != "beendet" && s.id != id).map(|(i, _)| i).collect();
+            .filter(|(_, s)| s.dynamic && s.state != "beendet" && s.group.as_deref() != Some(&group)).map(|(i, _)| i).collect();
         for idx in orphans {
             let oid = self.inner.lock().await.status.get(idx).map(|s| s.id.clone()).unwrap_or_default();
             if self.audio_listeners(&oid) == 0 { self.stop_instance(idx).await; }
         }
-        let running = self.inner.lock().await.status.iter().filter(|s| s.dynamic && s.state != "beendet").count();
-        if running >= max as usize { return Err(format!("Schon {} DV-Decoder in Betrieb (dv_max), bitte später", max)); }
-        let (_, m) = self.manifest_of(plugin);
-        let bw = m.as_ref().map(|m| m.input.bandwidth as u64).unwrap_or(3000);
+        // dv_max zählt Frequenzen (Gruppen), nicht Prozesse
+        let running: std::collections::HashSet<String> = self.inner.lock().await.status.iter().filter(|s| s.dynamic && s.state != "beendet").map(|s| s.group.clone().unwrap_or_else(|| s.id.clone())).collect();
+        if running.len() >= max as usize { return Err(format!("Schon {} DV-Decoder in Betrieb (dv_max), bitte später", max)); }
+        let bw = plugins.iter().map(|p| self.manifest_of(p).1.map(|m| m.input.bandwidth as u64).unwrap_or(3000)).max().unwrap_or(3000);
         if self.band_for(freq, bw, Some(band)).is_none() { return Err("Band unbekannt".into()); }
-        let c = DecoderInstanceConfig { plugin: plugin.to_string(), freq, id: Some(id.clone()), band: Some(band.to_string()),
-            label: Some(format!("DV {:.3} MHz", freq as f64 / 1e6)), enabled: true, public: true, options: HashMap::new() };
-        let idx = self.add_status(&c, true).await;
-        self.launch(idx).await;
-        let ok = self.inner.lock().await.status.get(idx).map(|s| s.state == "startet" || s.state == "läuft").unwrap_or(false);
-        if ok { Ok(id) } else { Err("Decoder konnte nicht starten (Plugin oder Programm fehlt)".into()) }
+        for p in &plugins {
+            let label = self.manifest_of(p).1.map(|m| if m.label.is_empty() { m.name } else { m.label }).unwrap_or_else(|| p.clone());
+            let c = DecoderInstanceConfig { plugin: p.clone(), freq, id: Some(format!("{}-{}", group, p)), band: Some(band.to_string()),
+                label: Some(format!("DV {:.3} MHz {}", freq as f64 / 1e6, label)), enabled: true, public: true, options: HashMap::new() };
+            let idx = self.add_status(&c, true, Some(group.clone())).await;
+            self.launch(idx).await;
+        }
+        if self.group_alive(&group).await { Ok(group) } else { Err("Decoder konnte nicht starten (Plugin oder Programm fehlt)".into()) }
     }
 
     /// Dynamischen Decoder beenden: virtuellen Hörer abmelden → run_instance endet, Prozess wird beendet
@@ -407,7 +481,8 @@ impl DecoderHub {
         let Some(st) = st else { return };
         let pipe = self.pipelines.lock().unwrap().get(&st.band).cloned();
         if let Some(p) = pipe { p.clients.lock().await.remove(st.client_id); }
-        self.audio.lock().unwrap().enc.remove(&st.id);
+        { let mut a = self.audio.lock().unwrap(); a.enc.remove(&st.id); if let Some(grp) = &st.group { if a.active.get(grp) == Some(&st.id) { a.active.remove(grp); } } }
+        { let mut g = self.inner.lock().await; if let Some(s) = g.status.get_mut(idx) { s.lock = false; } }
         self.set_state(idx, "beendet").await;
         info!("Decoder '{}' beendet (niemand hört mehr)", st.id);
     }
@@ -638,8 +713,8 @@ pub async fn api_list(State(state): State<Arc<AppState>>, headers: axum::http::H
     let g = state.decoders.inner.lock().await;
     let list: Vec<Value> = g.status.iter().filter(|s| p.may_decoder(&s.id, s.public) && !(s.dynamic && s.state == "beendet")).map(|s| serde_json::to_value(s).unwrap_or(Value::Null)).collect();
     drop(g);
-    // Betriebsart DV (FreeDV auf beliebiger Frequenz) verfügbar? Plugin vorhanden und dv_max > 0
-    let dv = state.config.read().await.dv_max > 0 && state.decoders.plugin_dir.lock().unwrap().join("freedv").join("decoder.json").exists();
+    // Betriebsart DV (FreeDV auf beliebiger Frequenz) verfügbar? dv_max > 0 und mindestens ein DV-Plugin lauffähig
+    let dv = state.config.read().await.dv_max > 0 && !state.decoders.dv_plugins().is_empty();
     ([(header::CACHE_CONTROL, "no-store")], Json(json!({ "decoders": list, "dv": dv, "t": now_s() })))
 }
 
@@ -688,5 +763,49 @@ pub async fn api_file(State(state): State<Arc<AppState>>, headers: axum::http::H
             ([(header::CONTENT_TYPE, ct), (header::CACHE_CONTROL, "public, max-age=60")], Body::from(b)).into_response()
         }
         Err(_) => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dv_gruppe_rundet_auf_100_hz() {
+        assert_eq!(dv_group(144_280_049), (144_280_000, "dv-144280000".to_string()));
+        assert_eq!(dv_group(144_280_050).0, 144_280_100);
+        assert_eq!(dv_group(7_177_000).1, "dv-7177000");
+    }
+
+    #[test]
+    fn aktiver_decoder_der_gruppe() {
+        let both = vec![("freedv".to_string(), "dv-1-freedv".to_string()), ("rade".to_string(), "dv-1-rade".to_string())];
+        // ohne Lock spielt niemand
+        assert_eq!(pick_active(None, &[]), None);
+        assert_eq!(pick_active(Some("dv-1-rade"), &[]), None);
+        // beide mit Lock: Vorzug nach DV_PLUGINS (rade zuerst)
+        assert_eq!(pick_active(None, &both).as_deref(), Some("dv-1-rade"));
+        // der bisherige bleibt, solange er Lock hat (kein Hin und Her)
+        assert_eq!(pick_active(Some("dv-1-freedv"), &both).as_deref(), Some("dv-1-freedv"));
+        // bisheriger ohne Lock → der andere
+        let only_rade = vec![both[1].clone()];
+        assert_eq!(pick_active(Some("dv-1-freedv"), &only_rade).as_deref(), Some("dv-1-rade"));
+        // unbekanntes Plugin mit Lock spielt notfalls auch
+        let other = vec![("x".to_string(), "dv-1-x".to_string())];
+        assert_eq!(pick_active(None, &other).as_deref(), Some("dv-1-x"));
+    }
+
+    #[test]
+    fn dv_plugins_im_repo_sind_ton_decoder() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../plugins");
+        for p in DV_PLUGINS {
+            let txt = std::fs::read_to_string(root.join(p).join("decoder.json")).unwrap_or_else(|e| panic!("plugins/{}/decoder.json: {}", p, e));
+            let m: Manifest = serde_json::from_str(&txt).unwrap_or_else(|e| panic!("plugins/{}/decoder.json: {}", p, e));
+            assert_eq!(m.name, *p);
+            assert_eq!(m.input.mode, "usb"); assert_eq!(m.input.rate, 8000);
+            let out = m.output.unwrap_or_else(|| panic!("{} liefert keinen Ton", p));
+            assert!(out.rate == 8000 || out.rate == 16000, "{}: Ausgaberate {}", p, out.rate);
+            assert!(!m.requires.is_empty(), "{}: requires fehlt", p);
+        }
     }
 }

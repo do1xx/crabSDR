@@ -496,17 +496,17 @@ async fn handle_client_message(client_id: u64, text: &str, pipeline: &SdrPipelin
             clients.untune(client_id);
         }
         "dv" => {
-            // Betriebsart DV: FreeDV auf der Frequenz des Hörers – Decoder entsteht bei Bedarf, Hörer teilen ihn
+            // Betriebsart DV: FreeDV (RADE und Codec 2) auf der Frequenz des Hörers – Decoder-Gruppe entsteht bei Bedarf, Hörer teilen sie
             if dv_max == 0 { return err("DV ist auf dieser Station aus".into()); }
             let freq = msg.get("freq").and_then(|v| v.as_u64()).unwrap_or(0);
             let center = crate::sdr_pipeline::corrected_center(pipeline.center_freq.load(std::sync::atomic::Ordering::Relaxed), pipeline.corr_ppm) as i64;
             let half = pipeline.sample_rate.load(std::sync::atomic::Ordering::Relaxed) as i64 / 2;
             if freq == 0 || (freq as i64 - center).abs() > half - 10_000 { return err("Frequenz liegt nicht in diesem Band".into()); }
-            let id = match hub.ensure_dynamic("freedv", freq, &pipeline.id, dv_max).await { Ok(id) => id, Err(e) => return err(e) };
+            let id = match hub.ensure_dv(freq, &pipeline.id, dv_max).await { Ok(id) => id, Err(e) => return err(e) };
             { let mut clients = pipeline.clients.lock().await; clients.untune(client_id); }
             if !hub.subscribe_audio(&id, client_id, dec_tx.clone()).await { return err("DV-Decoder liefert keinen Ton".into()); }
             info!("[{}] Client {} hört DV {}", pipeline.id, client_id, id);
-            return Some(json!({ "type": "dv", "id": id, "freq": (freq + 50) / 100 * 100 }));
+            return Some(json!({ "type": "dv", "id": id, "freq": (freq + 50) / 100 * 100, "lock": hub.locked(&id).await }));
         }
         "listen_decoder" => {
             // Ton eines Decoders hören (z. B. FreeDV dekodiert) statt eines Kanals: {"type":"listen_decoder","id":"freedv-144..."}

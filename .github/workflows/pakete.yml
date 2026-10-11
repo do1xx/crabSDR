@@ -1,5 +1,5 @@
-# Pakete bauen: statische musl-Binaries (amd64, arm64, armv7), Debian-Pakete (amd64, arm64, armhf = Raspberry Pi OS
-# 32 Bit ab Pi 2), Release-Archiv und Prüfsummen.
+# Pakete bauen: statische musl-Binaries (amd64, arm64, armv7), RADE-Decoder crab_rade (amd64, arm64), Debian-Pakete
+# (amd64, arm64, armhf = Raspberry Pi OS 32 Bit ab Pi 2), Release-Archiv und Prüfsummen.
 #   Push auf main  → Vorabversion „Entwicklungsstand“ (Tag entwicklung) mit den neuesten Dateien
 #   Tag v*         → Release-Entwurf mit denselben Dateien (wird von Hand veröffentlicht) + Docker-Images (nur gebaut)
 name: pakete
@@ -29,6 +29,8 @@ jobs:
           echo "V=$V" >> "$GITHUB_ENV"; echo "Version $V"
       - name: Statische Binaries (musl, drei Architekturen)
         run: CRABSDR_GIT=$(git describe --tags --always) sh packaging/build-binaries.sh amd64 arm64 armv7
+      - name: RADE-Decoder für die Betriebsart DV (musl, amd64 und arm64)
+        run: sh packaging/build-rade.sh amd64 arm64
       - name: Release-Archiv und Debian-Pakete
         run: |
           sh packaging/make-release.sh "$V"

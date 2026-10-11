@@ -93,8 +93,9 @@ Vor dem Neustart prüfen: `crabsdr-server --check /etc/crabsdr/config.toml`. All
 
 Ein Decoder ist ein Ordner in `plugins/` mit einer `decoder.json` und einem Programm, das Ton von stdin liest und
 JSON-Zeilen ausgibt ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). Mitgeliefert: APRS (direwolf), FT8 (jt9), SSTV,
-Pager/POCSAG (multimon-ng, z. B. DAPNET) und FreeDV (libcodec2; liefert dekodierte Sprache zurück, hörbar im Browser und
-als `/stream/decoder/<id>.ogg`).
+Pager/POCSAG (multimon-ng, z. B. DAPNET) und FreeDV – `rade` (RADE, die Wellenform der FreeDV-App ab 2.0, eigenes
+C-Programm aus rade_c) und `freedv` (Codec 2, libcodec2); beide liefern dekodierte Sprache zurück, hörbar im Browser
+(Betriebsart **DV** auf jeder Frequenz) und als `/stream/decoder/<id>.ogg`.
 
 ## Entwicklung
 

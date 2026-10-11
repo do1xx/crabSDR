@@ -15,8 +15,25 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
   Treibergrenze. Feste Decoder auf einem Band mit freiem VFO bleiben aus (`--check` meldet es), DV-Decoder außerhalb
   des neuen Fensters enden sofort. Die neue Mitte gilt bis zum Neustart.
 
+### Betriebsart DV: RADE (FreeDV ab 2.0)
+- Neues Plugin **`rade`**: dekodiert RADE V1, die Wellenform der FreeDV-App ab Version 2.0 (neuronaler Sprachcodec,
+  OFDM mit 30 Trägern) – das, was heute auf 144,280 MHz und auf Kurzwelle tatsächlich gefahren wird; die Codec-2-Modes
+  des Plugins `freedv` sind on air kaum noch zu hören. Programm `crab_rade` (C, gegen die Bibliothek
+  [rade_c](https://github.com/freedv/rade_c), BSD-2-Clause, Sprachsynthese FARGAN aus Opus): USB-Ton 8 kHz rein,
+  Sprache 16 kHz raus, Sync- und EOO-Ereignisse mit SNR; braucht auf einem Pi 4 etwa 20 % eines Kerns je Hörerfrequenz.
+  Bauen: `plugins/rade/build.sh` (holt rade_c und Opus in festen Ständen), statisch für amd64/arm64:
+  `packaging/build-rade.sh`; Release-Archiv, Debian-Pakete und Docker-Image enthalten das Programm (nicht für ARMv7).
+- **DV** startet auf der Hörerfrequenz jetzt alle vorhandenen DV-Plugins (`rade` und `freedv`) als Gruppe `dv-<Hz>`;
+  der Hörer hört den Decoder, der gerade Lock hat (bei beiden: RADE), der Knopf leuchtet beim Lock eines der beiden.
+  `dv_max` zählt weiter Frequenzen, nicht Prozesse. Fehlt `freedv` (kein libcodec2), läuft DV mit `rade` allein und
+  umgekehrt; der DV-Knopf erscheint nur, wenn ein DV-Plugin wirklich lauffähig ist (Programm vorhanden).
+- Sync-Ereignisse der Gruppe tragen die Gruppen-ID und das Plugin (`data.plugin`), Hörer-Kennungen `dv-<Hz>` bleiben
+  gültig; Decoder-IDs der Mitglieder heißen `dv-<Hz>-rade` / `dv-<Hz>-freedv`.
+
 ### Oberfläche
 - DV-Knopf ohne dauerhaften Akzentrand.
+- DV-Knopf leuchtet jetzt wirklich bei Lock: die Antwort der Station auf `dv` (Kennung des Decoders) kam als Textnachricht
+  und wurde nur als Binärrahmen ausgewertet, der Lock blieb deshalb unsichtbar.
 
 ## 1.3.2 – 2026-10-07
 

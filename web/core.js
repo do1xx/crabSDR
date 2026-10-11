@@ -832,6 +832,7 @@ function _crabConnect(b) {
           if (_crab.decAudio && /^dv/.test(_crab.decAudio)) { _crab.decAudio = null; _crabMarkDec(); if (b === band && ws.readyState === 1) ws.send(JSON.stringify(_crabTuneMsg())); }
           return;
         }
+        if (m.type === 'dv') { if (_crab.decAudio) { _crab.decAudio = m.id; _crab.decLock = _crab.decLock || {}; if (m.lock != null) _crab.decLock[m.id] = !!m.lock; } _crabMarkDec(); return; }   // Antwort auf {type:'dv'}: Gruppen-ID (darunter kommen die Sync-Meldungen) und aktueller Lock → Knopf leuchtet
         if (m.type === 'config') { if (!bi[b].pendingVfo) bi[b].centerfreq = m.center_freq / 1000; bi[b].samplerate = m.sample_rate / 1000; if (m.fft_size && m.fft_size !== bi[b].fft) { bi[b].fft = m.fft_size; bi[b].zoom = Math.min(bi[b].zoom, _crabMaxZoom(bi[b])); } _crabGeom(b); B.myId = m.client_id; }
         return;
       }
@@ -1126,12 +1127,13 @@ function _crabDecButtons() {
   Array.prototype.forEach.call(row.querySelectorAll('.btn[data-dec]'), function (b) { b.remove(); });
   if (!_crab.dvAvail) { _crabMarkDec(); return; }
   var b = document.createElement('button'); b.type = 'button'; b.className = 'btn'; b.dataset.mode = 'DV'; b.dataset.dec = 'dv';
-  b.textContent = 'DV'; b.title = 'FreeDV (Codec 2): digitale Sprache auf der eingestellten Frequenz dekodieren';
+  b.textContent = 'DV'; b.title = 'FreeDV (RADE ab 2.0 und Codec 2): digitale Sprache auf der eingestellten Frequenz dekodieren';
   b.onclick = function () { _crabDv(); };
   row.appendChild(b);
   _crabMarkDec();
 }
-/* Betriebsart DV: FreeDV auf der aktuellen Frequenz. Die Station startet dort bei Bedarf einen Decoder; Antwort {type:'dv', id}. */
+/* Betriebsart DV: FreeDV auf der aktuellen Frequenz. Die Station startet dort bei Bedarf eine Decoder-Gruppe (RADE und
+   Codec 2, Antwort {type:'dv', id:'dv-<Hz>'}) und spielt den Ton des Decoders mit Lock; Sync-Meldungen kommen mit der Gruppen-ID. */
 function _crabDv() {
   _crab._dvSetting = true;
   if (mode !== 'USB') setMode('usb', 0.3, 2.7);                       // Anzeige USB; der Decoder hört ohnehin das SSB-Signal

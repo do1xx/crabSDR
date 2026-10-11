@@ -18,6 +18,8 @@ install -m 755 "bin/$A/crabsdr-server" /opt/crabsdr/bin/crabsdr-server
 rm -rf /opt/crabsdr/web && cp -r web /opt/crabsdr/web
 # Decoder-Plugins (APRS, FT8, SSTV …); eingeschaltet werden sie mit [[decoders]] in /etc/crabsdr/config.toml
 if [ -d plugins ]; then rm -rf /opt/crabsdr/plugins && cp -r plugins /opt/crabsdr/plugins; fi
+# Betriebsart DV: RADE-Decoder je Architektur (statisch gebaut, packaging/build-rade.sh)
+if [ -f "bin/$A/crab_rade" ] && [ -d /opt/crabsdr/plugins/rade ]; then install -m 755 "bin/$A/crab_rade" /opt/crabsdr/plugins/rade/crab_rade; fi
 if [ ! -f /etc/crabsdr/config.toml ]; then
   install -m 660 -g crabsdr config.example.toml /etc/crabsdr/config.toml
   echo "Konfiguration angelegt: /etc/crabsdr/config.toml (Station, Frequenz, Gain anpassen; Erklärung: docs/CONFIG.md)"

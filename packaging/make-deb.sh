@@ -1,7 +1,8 @@
 #!/bin/sh
 # make-deb.sh — Debian-Pakete (Raspberry Pi OS, Debian, Ubuntu) aus den fertigen Binaries bauen:
 #   packaging/make-deb.sh [version] [amd64 arm64 armhf]   →  dist/crabsdr_<version>_<arch>.deb
-# Braucht dpkg-deb (Debian/Ubuntu, GitHub-Runner) und dist/bin/<amd64|arm64|armv7>/crabsdr-server (build-binaries.sh).
+# Braucht dpkg-deb (Debian/Ubuntu, GitHub-Runner) und dist/bin/<amd64|arm64|armv7>/crabsdr-server (build-binaries.sh);
+# dist/bin/<amd64|arm64>/crab_rade (build-rade.sh) kommt als plugins/rade/crab_rade mit, wenn vorhanden.
 # armhf nutzt das ARMv7-Binary: Pi 2 und neuer mit 32-Bit-System (nicht Pi Zero/1, die sind ARMv6).
 # Aufbau wie install.sh: /opt/crabsdr/{bin,web,plugins}, Dienst crabsdr (Benutzer crabsdr), /etc/crabsdr/config.toml
 # (wird nur beim ersten Mal aus /usr/share/crabsdr/config.example.toml angelegt – Änderungen über die Admin-Seite
@@ -20,7 +21,10 @@ for a in $ARCHS; do
   install -m 755 dist/bin/$B/crabsdr-server "$R/opt/crabsdr/bin/crabsdr-server"
   ln -s /opt/crabsdr/bin/crabsdr-server "$R/usr/bin/crabsdr-server"
   cp -r web "$R/opt/crabsdr/web"
-  install -d "$R/opt/crabsdr/plugins"; for p in aprs ft8 sstv; do cp -r plugins/$p "$R/opt/crabsdr/plugins/"; done
+  install -d "$R/opt/crabsdr/plugins"; for p in aprs ft8 sstv rade; do cp -r plugins/$p "$R/opt/crabsdr/plugins/"; done
+  # Betriebsart DV: RADE-Decoder (statisch, aus packaging/build-rade.sh) – nur Quelltext und Bauskript, wenn er nicht gebaut wurde
+  rm -rf "$R/opt/crabsdr/plugins/rade/build" "$R/opt/crabsdr/plugins/rade/crab_rade"
+  [ -f dist/bin/$B/crab_rade ] && install -m 755 dist/bin/$B/crab_rade "$R/opt/crabsdr/plugins/rade/crab_rade" || echo "Hinweis: dist/bin/$B/crab_rade fehlt, Paket ohne RADE-Decoder (packaging/build-rade.sh)"
   find "$R/opt/crabsdr" -name __pycache__ -prune -exec rm -rf {} + ; find "$R/opt/crabsdr" -name .DS_Store -delete
   install -m 644 packaging/crabsdr.service "$R/usr/lib/systemd/system/crabsdr.service"
   install -m 644 packaging/config.example.toml "$R/usr/share/crabsdr/config.example.toml"
@@ -41,7 +45,7 @@ Suggests: wsjtx
 Homepage: https://crabsdr.de
 Description: modernes, minimalistisches WebSDR
  crabSDR zeigt einen oder mehrere SDR-Empfänger (RTL-SDR, rtl_tcp, HackRF,
- SoapySDR) im Browser: Wasserfall, Ton, Decoder für APRS, FT8 und SSTV,
+ SoapySDR) im Browser: Wasserfall, Ton, Decoder für APRS, FT8, SSTV und FreeDV (RADE),
  Chat, Logbuch und eine Admin-Seite. Nach der Installation: http://<rechner>:8080
 CTL
   cat > "$R/DEBIAN/postinst" <<'SH'

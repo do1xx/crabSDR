@@ -97,6 +97,21 @@ mit dieser Rate und die Meldungen kommen als JSON-Zeilen auf stderr (Zeilen, die
 den Ton auf 24 kHz um, kodiert ihn als Opus und gibt ihn an Hörer weiter, die per `listen_decoder` statt eines Kanals den
 Decoder gewählt haben, sowie unter `/stream/decoder/<id>.ogg`. Kodiert wird nur, solange jemand zuhört.
 
+**Audio-Plugins mitgeliefert:** `freedv` (Python, libcodec2 per ctypes: Codec-2-Modes 700D/700E/1600, Ton 8 kHz) und
+`rade` (C-Programm `crab_rade` gegen rade_c: RADE V1, die Wellenform der FreeDV-App ab 2.0, Ton 16 kHz). Beide hören
+USB mit 8 kHz, 3 kHz breit, mit Pegelregler (`level: norm`), und melden `{"kind":"sync","mode":…,"on":…,"snr":…}` beim
+Kommen und Gehen des Signals (entprellt: `snr_min`, `hold`), `freedv` außerdem `text` aus dem Textkanal, `rade` ein `eoo`
+am Ende einer Durchgabe. `crab_rade` wird aus `plugins/rade/crab_rade.c` gebaut (`plugins/rade/build.sh`, statisch für
+Linux `packaging/build-rade.sh`) und enthält die Modellgewichte; das Programm liegt nicht im Repo.
+
+**Betriebsart DV** (`DecoderHub::ensure_dv`): auf der Hörerfrequenz (100-Hz-Raster) entsteht je lauffähigem DV-Plugin
+(`DV_PLUGINS` = `rade`, `freedv`; lauffähig = decoder.json mit `output` und alle `requires` vorhanden) ein flüchtiger
+Decoder; zusammen bilden sie die Gruppe `dv-<Hz>`, die der Hörer abonniert (`{"type":"dv","freq":…}` →
+`{"type":"dv","id":"dv-<Hz>"}`). Von der Gruppe spielt nur das Mitglied mit Lock (`pick_active`: bisheriges bleibt,
+solange es Lock hat, sonst das erste in `DV_PLUGINS`); Sync-Meldungen an die Hörer des Bandes tragen die Gruppen-ID und
+den Lock der Gruppe (`data.on`), dazu `data.plugin`. `dv_max` begrenzt die Gruppen (Frequenzen), nicht die Prozesse;
+ohne Hörer enden alle Mitglieder (sofort beim Weiterdrehen, sonst nach ≈ 90 s).
+
 ```json
 {
   "name": "aprs",

@@ -20,3 +20,5 @@ testdata/*.cu8
 testdata/*.rec.log
 testdata/site-*/
 !testdata/site-demo/
+plugins/rade/build/
+plugins/rade/crab_rade

@@ -25,6 +25,10 @@ COPY web/ /opt/crabsdr/web/
 COPY plugins/aprs/ /opt/crabsdr/plugins/aprs/
 COPY plugins/ft8/ /opt/crabsdr/plugins/ft8/
 COPY plugins/sstv/ /opt/crabsdr/plugins/sstv/
+# Betriebsart DV: RADE-Decoder (statisch, dist/bin/<arch>/crab_rade aus packaging/build-rade.sh; für armv7 nicht gebaut)
+COPY plugins/rade/decoder.json /opt/crabsdr/plugins/rade/
+COPY dist/bin/ /tmp/bin/
+RUN A="$TARGETARCH"; [ "$A" = arm ] && A=armv7; if [ -f /tmp/bin/$A/crab_rade ]; then install -m 755 /tmp/bin/$A/crab_rade /opt/crabsdr/plugins/rade/crab_rade; fi; rm -rf /tmp/bin
 COPY packaging/config.example.toml /opt/crabsdr/config.example.toml
 COPY packaging/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 COPY LICENSE /opt/crabsdr/LICENSE

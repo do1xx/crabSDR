@@ -327,8 +327,9 @@ pub struct ServerConfig {
     /// ab, wird auf der Admin-Seite gesetzt. Leer = aus. Lang und zufällig wählen; bei Verlust einfach ändern.
     #[serde(default)]
     pub stream_key: String,
-    /// Betriebsart DV: Hörer können FreeDV (Plugin `freedv`) auf ihrer Frequenz dekodieren lassen; so viele solcher
-    /// Decoder laufen höchstens gleichzeitig (je einer pro Frequenz, Hörer teilen ihn; endet nach 90 s ohne Hörer). 0 = aus
+    /// Betriebsart DV: Hörer können FreeDV (Plugins `rade` = RADE ab FreeDV 2.0 und `freedv` = Codec 2, beide zusammen als
+    /// Gruppe) auf ihrer Frequenz dekodieren lassen; auf so vielen Frequenzen höchstens gleichzeitig (Hörer teilen die
+    /// Gruppe; endet nach 90 s ohne Hörer). 0 = aus
     #[serde(default = "default_dv_max")]
     pub dv_max: u32,
     /// Freier VFO für alle Bänder (jedes Band kann mit `free_vfo = false` abweichen). Nur für private Stationen

@@ -59,7 +59,7 @@ Station unangetastet.
 | `max_streams` | `6` | gleichzeitige Streams (`/stream/…`) je Band |
 | `iq_stream` | `admin` | I/Q-Stream (`iq.wav`/`iq.ogg`, komplexes Basisband für externe Decoder): `off`, `admin` (nur Sysop), `users` (angemeldete Hörer), `all` |
 | `max_iq` | `1` | gleichzeitige I/Q-Streams je Band (ab 0,5 Mbit/s je Hörer) |
-| `dv_max` | `3` | Betriebsart DV: so viele FreeDV-Decoder auf Hörer-Frequenzen laufen höchstens gleichzeitig (Hörer auf derselben Frequenz teilen einen; Ende nach 90 s ohne Hörer), `0` = DV aus |
+| `dv_max` | `3` | Betriebsart DV (FreeDV): auf so vielen Hörer-Frequenzen laufen höchstens gleichzeitig DV-Decoder. Je Frequenz startet die Station alle vorhandenen DV-Plugins – `rade` (FreeDV ab 2.0, RADE V1, Programm `plugins/rade/crab_rade`) und `freedv` (Codec 2, libcodec2) – als Gruppe; Hörer auf derselben Frequenz teilen sie und hören den Decoder mit Lock; Ende nach 90 s ohne Hörer. Jede Frequenz kostet auf einem Pi 4 etwa 20 % eines Kerns (RADE) plus den Codec-2-Decoder. `0` = DV aus; der Knopf erscheint nur, wenn mindestens ein DV-Plugin lauffähig ist |
 | `free_vfo` | `false` | Freier VFO für alle Bänder: Hörer verschieben die Mitte des Wasserfalls im Betrieb (siehe unten). Nur für private Stationen |
 | `stream_key` | leer | fester Schlüssel für Streams: `?token=<stream_key>` zählt wie der Sysop, nur für `/stream/…`, läuft nicht ab. Lang und zufällig, bei Verlust ändern |
 | `chat_keep_hours` | `3` | Zusätzlich Chat-Zeilen nach so vielen Stunden löschen, `0` = aus |
@@ -162,7 +162,7 @@ erscheinen auf der Seite **Digital** und unter `/api/decoders`.
 
 | Schlüssel | Voreinstellung | Bedeutung |
 |---|---|---|
-| `plugin` | – (Pflicht) | `aprs`, `ft8`, `sstv` (mitgeliefert) |
+| `plugin` | – (Pflicht) | `aprs`, `ft8`, `sstv`, `pocsag`, `freedv`, `rade` (mitgeliefert; `freedv` und `rade` liefern Ton zurück, sie laufen auch ohne Eintrag flüchtig über die Betriebsart DV) |
 | `freq` | – (Pflicht) | Frequenz in Hz; das Band ergibt sich daraus |
 | `band` | automatisch | Band-`id`, falls sich Bänder überlappen |
 | `id` | `<plugin>-<kHz>` | Kennung, zugleich Datenordner `data_dir/decoders/<id>` |

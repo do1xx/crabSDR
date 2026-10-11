@@ -1,0 +1,9 @@
+{
+  "name": "rade",
+  "label": "FreeDV RADE",
+  "description": "FreeDV ab Version 2.0 (RADE V1, Radio Autoencoder) aus SSB: neuronaler Sprachcodec, dekodierte Sprache ist als Kanal hörbar; Programm crab_rade aus rade_c (plugins/rade/build.sh)",
+  "input": { "kind": "audio", "mode": "usb", "rate": 8000, "bandwidth": 3000, "level": "norm" },
+  "output": { "kind": "audio", "rate": 16000 },
+  "command": ["./crab_rade"],
+  "requires": ["crab_rade"]
+}

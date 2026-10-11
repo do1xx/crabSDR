@@ -8,6 +8,7 @@ crabSDR steht unter der GNU AGPL 3.0 oder neuer (siehe LICENSE). Folgende Teile 
 | `web/fonts/jetbrains-mono.woff2` | SIL Open Font License 1.1 | JetBrains |
 | `web/digi/vendor/maplibre-gl.js` | BSD-3-Clause | MapLibre |
 | Rust-Abhängigkeiten (`backend-rs/Cargo.lock`) | MIT, Apache-2.0, ISC, BSD, Unicode u. a. | crates.io, alle permissiv |
+| `plugins/rade/crab_rade` (gebaut aus `plugins/rade/crab_rade.c` + rade_c) | BSD-2-Clause (rade_c, David Rowe und FreeDV-Team) · BSD-3-Clause (Opus mit FARGAN, Xiph.Org) | github.com/freedv/rade_c, github.com/xiph/opus – Stände in `plugins/rade/build.sh`; das Programm enthält die Modellgewichte beider Projekte |
 
 Externe Programme, die crabSDR als eigene Prozesse aufruft (rtl_sdr, rx_sdr, direwolf, der FT8-Decoder aus WSJT-X, SoapyMiri,
 libmirisdr), sind nicht Teil dieses Repos und stehen unter ihren eigenen Lizenzen (überwiegend GPL).
