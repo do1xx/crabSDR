@@ -2,7 +2,9 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## Unveröffentlicht
+## 1.4.0 – 2026-10-11
+
+Betriebsart DV versteht RADE (FreeDV ab 2.0); freier VFO für private Stationen.
 
 ### Freier VFO (Labor)
 - `free_vfo = true` (Station oder Band, `free_vfo_min`/`free_vfo_max` als Grenzen): Hörer verschieben die Mitte des
