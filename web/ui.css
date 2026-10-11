@@ -195,6 +195,7 @@ details.card > :last-child { margin-bottom: 10px; }
 .freqform .unit { color: var(--faint); font-size: 11px; }
 .steps { display: flex; gap: 4px; flex-wrap: wrap; }
 .vforow { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; grid-column: 1 / -1; }   /* freier VFO (Labor) */
+.vforow[hidden], #x1vfo[hidden] { display: none !important; }   /* hidden-Attribut schlägt das display:flex (sonst Zeile auf jedem Band sichtbar) */
 .vforow .btn { min-width: 34px; }
 .vforow input { width: 96px; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .vforow .unit, .vforow .vforange { color: var(--faint); font-size: 11px; }
