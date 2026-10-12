@@ -2,6 +2,13 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Ton
+- **FM klingt wie im Funkgerät:** De-Emphasis −6 dB/Oktave ab 300 Hz (530 µs, TIA-603) und Tiefpass 3,2 kHz statt 4 kHz.
+  Funkgeräte senden mit Pre-Emphasis; ohne die Umkehr klang Sprache dünn und das Diskriminatorrauschen zischte.
+  Lautstärke bleibt gleich (Ausgleich ×2,2). Betriebsart „Daten“ bleibt flach.
+
 ## 1.4.0 – 2026-10-11
 
 Betriebsart DV versteht RADE (FreeDV ab 2.0); freier VFO für private Stationen.

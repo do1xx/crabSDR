@@ -752,8 +752,8 @@ impl ClientState {
             DemodMode::Am | DemodMode::Sam => (bandwidth as f32 * 0.5).min(ch_rate * 0.45),
             // CW: narrow around the 700 Hz BFO tone
             DemodMode::Cw => 1200.0f32.min(ch_rate * 0.45),
-            // NFM: voice audio up to ~4 kHz, cut discriminator noise above
-            DemodMode::Fm => 4000.0f32.min(ch_rate * 0.45),
+            // NFM: Sprache bis ~3,2 kHz wie im Funkgerät (300–3000 Hz); darüber ist nur Diskriminatorrauschen
+            DemodMode::Fm => 3200.0f32.min(ch_rate * 0.45),
             // Daten: flach bis 8 kHz, damit Flanken von POCSAG/AFSK erhalten bleiben
             DemodMode::Data => 8000.0f32.min(ch_rate * 0.45),
             // WFM: broadcast FM audio up to ~15 kHz
@@ -771,11 +771,14 @@ impl ClientState {
         )
     }
 
-    /// Create FM de-emphasis filter. Returns None for non-FM modes.
+    /// FM-De-Emphasis. NFM: Funkgeräte senden mit Pre-Emphasis (+6 dB/Oktave ab 300 Hz, praktisch Phasenmodulation),
+    /// das Funkgerät am anderen Ende nimmt das mit −6 dB/Oktave wieder heraus. Ohne diesen Schritt klingt Sprache dünn
+    /// und das Dreieckrauschen des Diskriminators (steigt mit der Tonfrequenz) zischt – so war es bis 1.4.0.
+    /// Zeitkonstante 530 µs = Knick bei 300 Hz (TIA-603); Ausgleich ×2,2, damit die Lautstärke bleibt (am Mitschnitt
+    /// gemessen: Sprache gleich laut, Spitzen bleiben unter Vollaussteuerung). Nicht bei „Daten“: Decoder brauchen es flach.
     fn make_deemphasis(mode: DemodMode, channel_rate: u32) -> Option<Biquad> {
         match mode {
-            // NFM: no de-emphasis. Amateur radio / scanner signals don't use pre-emphasis.
-            DemodMode::Fm => None,
+            DemodMode::Fm => { let mut d = Biquad::deemphasis(530.0, channel_rate as f32); d.b0 *= 2.2; Some(d) }
             // WFM: 50µs (Europe/worldwide) — broadcast FM uses pre-emphasis
             DemodMode::Wfm => Some(Biquad::deemphasis(50.0, channel_rate as f32)),
             _ => None,
@@ -1435,6 +1438,25 @@ mod tests {
 
     /// AGC-Schwelle: reines Rauschen darf in Sprechpausen nicht pumpen – Pegel über 200-ms-Fenster höchstens 2 dB auseinander
     /// und deutlich unter dem Zielpegel, Sprache danach trotzdem auf Zielpegel
+    #[test]
+    fn nfm_deemphasis_wie_funkgeraet() {
+        // 300 Hz Knick: 3 kHz liegt etwa 17 dB unter 300 Hz (−6 dB/Oktave); „Daten“ bleibt flach (kein Filter)
+        let rate = 48_000u32;
+        let rms = |f: f32| {
+            let mut d = ClientState::make_deemphasis(DemodMode::Fm, rate).unwrap();
+            let mut acc = 0.0f64; let n = 48_000;
+            for i in 0..n * 2 {
+                let y = d.process((2.0 * std::f32::consts::PI * f * i as f32 / rate as f32).sin());
+                if i >= n { acc += (y as f64) * (y as f64); }
+            }
+            (acc / n as f64).sqrt()
+        };
+        let att = 20.0 * (rms(300.0) / rms(3000.0)).log10();
+        assert!(att > 14.0 && att < 20.0, "Dämpfung 3 kHz gegen 300 Hz: {att:.1} dB");
+        assert!(ClientState::make_deemphasis(DemodMode::Data, rate).is_none());
+        assert!(ClientState::make_deemphasis(DemodMode::Usb, rate).is_none());
+    }
+
     #[test]
     fn agc_rauschen_pumpt_nicht() {
         let mut demod = Demodulator::new();
