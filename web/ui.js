@@ -362,7 +362,7 @@
     var lo_ = e.effcenterfreq - e.effsamplerate / 2, hi_ = e.effcenterfreq + e.effsamplerate / 2;
     marks = markers.filter(function (m) { return m.freq >= lo_ && m.freq <= hi_; })
                  .sort(function (a, c) { return a.freq - c.freq; })
-                 .map(function (m) { return { freq: m.freq, mode: (m.mode || 'fm').toUpperCase(), text: m.text }; });
+                 .map(function (m) { return { freq: m.freq, mode: (m.mode || 'fm').toUpperCase(), text: m.text, minor: !!m.minor }; });
     showMarks(b);
   };
   // Logbuch

@@ -217,7 +217,7 @@ Ein Ordner mit Dateien, die Vorrang vor der Oberfläche haben. Alles ist optiona
 |---|---|
 | `logo.svg` | eigenes Logo (die crabSDR-Krabbe erscheint dann klein daneben) |
 | `presets.json` | Schnellwahl: `[{band, label, freq (kHz), mode}]` |
-| `markers.json` | Marker im Wasserfall |
+| `markers.json` | Marker im Wasserfall: `[{freq (kHz), text, mode, minor}]`; `minor: true` für dichte Kanalraster (LPD, Freenet) – Linie immer, Beschriftung nur, wo neben den wichtigen Marken Platz ist |
 | `relais.json` | Frequenzliste (Knopf „Liste“): `[{freq (kHz), call, info, shift, tone, mode}]` |
 | `positionen.json` | feste Standorte für APRS-Stationen ohne Positionsbake: `{"CALL": {lat, lon, info, ungefaehr}}` |
 | `info/index.html` | eigene Info-Seite statt der automatischen |

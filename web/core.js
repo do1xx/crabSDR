@@ -425,15 +425,17 @@ function _crabEsc(t) { return String(t).replace(/[&<>"]/g, function (c) { return
 function showMarks(b) {
   var id = band2id(b), B = _crab.bands[b]; if (id < 0 || !B || !B.bar) return;
   var e = bi[b], lo_ = e.effcenterfreq - e.effsamplerate / 2, hi_ = e.effcenterfreq + e.effsamplerate / 2, html = '';
-  var lastLabelX = -1e9, lastLabelText = '';
-  if (!hideMarks) for (var i = 0; i < marks.length; i++) {
+  // Linien für alle Marken; Beschriftungen nur, wo Platz ist (44 px): erst die wichtigen, dann Kanalraster wie LPD 1–69
+  // (markers.json: "minor": true) in die Lücken – so verdeckt „LPD 5“ nicht „MeshCom“
+  var placed = [];
+  var free = function (x) { for (var k = 0; k < placed.length; k++) if (Math.abs(x - placed[k]) < 44) return false; return true; };
+  if (!hideMarks) for (var pass = 0; pass < 2; pass++) for (var i = 0; i < marks.length; i++) {
     var m = marks[i]; if (m.freq < lo_ || m.freq > hi_) continue;
+    if ((pass === 0) === !!m.minor) continue;
     var x = freq2x(m.freq, b), md = String(m.mode || 'FM').toUpperCase(), txt = m.text || '';
     html += '<div class="dxl" style="left:' + x.toFixed(1) + 'px"></div>';
-    // Beschriftungen dicht nebeneinander (z. B. Freenet 1–6 im 12,5-kHz-Raster) nur einmal zeichnen, Linien bleiben
-    if (Math.abs(x - lastLabelX) < 44) continue;
-    if (txt === lastLabelText && Math.abs(x - lastLabelX) < 40) continue;
-    lastLabelText = txt; lastLabelX = x;
+    if (!free(x)) continue;
+    placed.push(x);
     html += '<div class="dxm" style="left:' + (x - 6).toFixed(1) + 'px" title="' + _crabEsc(txt) + ' ' + (m.freq / 1000).toFixed(4) + ' MHz ' + md + '" onclick="setFreqMark(' + b + ',' + m.freq + ',\'' + md + '\')">' + _crabEsc(txt) + '</div>';
   }
   B.bar.innerHTML = html;
