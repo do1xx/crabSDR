@@ -3,6 +3,8 @@
 # Band dazu: driver = "rtl_tcp", host = "127.0.0.1", port = 6999
 import socket, struct, sys, threading, time, math, random
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 6999
+# Zweites Argument: Tastung "<an>,<aus>" in Sekunden, z. B. "3,2" – der Träger kommt und geht (Rauschsperren-Test)
+KEY = tuple(float(v) for v in sys.argv[2].split(",")) if len(sys.argv) > 2 else None
 state = {"freq": 145_000_000, "rate": 2_048_000}
 def client(c):
     c.sendall(b"RTL0" + struct.pack(">II", 5, 29))   # Tuner R820T, 29 Gain-Stufen
@@ -20,10 +22,13 @@ def client(c):
         while True:
             # Träger 300 kHz über der Mitte + Rauschen, u8 I/Q
             buf = bytearray(chunk * 2)
+            on = True
+            if KEY: on = ((n / state["rate"]) % (KEY[0] + KEY[1])) < KEY[0]
+            amp = 40 if on else 0
             for i in range(chunk):
                 ph = 2 * math.pi * 300_000 * (n + i) / state["rate"]
-                buf[2*i] = max(0, min(255, int(127.5 + 40 * math.cos(ph) + random.gauss(0, 8))))
-                buf[2*i+1] = max(0, min(255, int(127.5 + 40 * math.sin(ph) + random.gauss(0, 8))))
+                buf[2*i] = max(0, min(255, int(127.5 + amp * math.cos(ph) + random.gauss(0, 8))))
+                buf[2*i+1] = max(0, min(255, int(127.5 + amp * math.sin(ph) + random.gauss(0, 8))))
             n += chunk
             c.sendall(buf)
             time.sleep(chunk / state["rate"])

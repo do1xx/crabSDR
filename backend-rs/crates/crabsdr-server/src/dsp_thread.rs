@@ -208,6 +208,10 @@ impl Channel {
 struct ClientRt {
     open_until: u64,
     was_open: bool,
+    /// Rauschsperre an: der letzte Rahmen wartet einen Rahmen (20 ms) und geht erst raus, wenn die Sperre auch im nächsten
+    /// noch offen ist – so bleibt das Rauschen des Rahmens, in dem der Träger abfällt, weg (Funkgeräte schließen über
+    /// Rauschdetektor oder CTCSS-Abschaltton ebenfalls vor dem Trägerende). Kostet 20 ms Laufzeit, nur mit Sperre.
+    pending: Option<Vec<Vec<u8>>>,
 }
 
 /// Wasserfall-Zustand je Zoom-Ausschnitt.
@@ -462,25 +466,31 @@ impl DspThread {
                 let hang_frames = |ms: u32| (ms as u64 * fps as u64 / 1000).max(1);
                 for (key, o) in &results {
                     for v in &groups[key] {
-                        let rt_c = client_rt.entry(v.id).or_insert(ClientRt { open_until: 0, was_open: true });
-                        let open_now = match v.squelch.mode {
-                            SquelchMode::Off => true,
-                            SquelchMode::Manual => o.level_db > v.squelch.db,
-                            SquelchMode::Auto => o.level_db > o.floor_db + v.squelch.margin_db,
-                        };
-                        if open_now { rt_c.open_until = frame + hang_frames(v.squelch.hang_ms); }
-                        // Zu: sofort, wenn der ungeglättete Pegel unter die Schwelle fällt (Trägerende) – die Haltezeit
-                        // überbrückt nur kurze Einbrüche, in denen der Pegel knapp bleibt. Sonst rauscht es nach jedem
-                        // Durchgang so lange wie Glättung + Haltezeit (vorher ≈ 0,5 s).
+                        let rt_c = client_rt.entry(v.id).or_insert(ClientRt { open_until: 0, was_open: true, pending: None });
                         let thr = match v.squelch.mode { SquelchMode::Manual => v.squelch.db, SquelchMode::Auto => o.floor_db + v.squelch.margin_db, SquelchMode::Off => f32::MIN };
-                        let still_near = o.level_inst_db > thr - 3.0;
+                        // Zu: sofort, wenn der ungeglättete Pegel unter die Schwelle fällt (Trägerende). Der geglättete Pegel
+                        // allein hielt die Sperre nach dem Trägerende noch 100–150 ms offen (Rauschfahne); die Haltezeit
+                        // überbrückt nur kurze Einbrüche, in denen der Pegel knapp bleibt.
+                        let still_near = o.level_inst_db > thr - 6.0;   // 6 dB Luft: Flattern schwacher Signale hält die Haltezeit, ein Trägerende (10–20 dB Sturz) nicht
+                        let open_now = v.squelch.mode == SquelchMode::Off || (o.level_db > thr && still_near);
+                        if open_now { rt_c.open_until = frame + hang_frames(v.squelch.hang_ms); }
                         let send = open_now || (frame <= rt_c.open_until && still_near);
-                        if send {
-                            if v.use_opus && !key.raw {
-                                for p in &o.opus { let _ = v.tx.try_send(protocol::encode_opus_audio(p)); }
-                            } else if let Some(pcm) = &o.pcm {
-                                let _ = v.tx.try_send(pcm.clone());
-                            }
+                        let packets = |o: &ChannelOut| -> Vec<Vec<u8>> {
+                            if v.use_opus && !key.raw { o.opus.iter().map(|p| protocol::encode_opus_audio(p)).collect() }
+                            else { o.pcm.iter().cloned().collect() }
+                        };
+                        if v.squelch.mode == SquelchMode::Off {
+                            // ohne Sperre sofort; ein noch wartender Rahmen (Sperre gerade abgeschaltet) geht voraus
+                            if let Some(prev) = rt_c.pending.take() { for f in prev { let _ = v.tx.try_send(f); } }
+                            if send { for f in packets(o) { let _ = v.tx.try_send(f); } }
+                        } else {
+                            // Vorschau um einen Rahmen: der vorige Rahmen geht nur raus, wenn die Sperre jetzt noch offen ist;
+                            // fällt sie zu, war er der Rahmen mit dem Trägerende und verschwindet samt Rauschfahne
+                            let prev = rt_c.pending.take();
+                            if send && rt_c.was_open { if let Some(prev) = prev { for f in prev { let _ = v.tx.try_send(f); } } }
+                            // Öffnen: der erste Rahmen enthält noch Rauschen von vor dem Träger – weglassen (Funkgeräte
+                            // verschlucken beim Öffnen ebenfalls die ersten Millisekunden)
+                            rt_c.pending = if send && rt_c.was_open { Some(packets(o)) } else { None };
                         }
                         if frame.is_multiple_of(level_every) || send != rt_c.was_open {
                             let msg = json!({"type": "level", "db": (o.level_db * 10.0).round() / 10.0,

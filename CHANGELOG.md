@@ -5,6 +5,11 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 ## Unveröffentlicht
 
 ### Ton
+- **Rauschsperre ohne Rauschfahne:** die Sperre schließt jetzt am ungeglätteten Pegel (bisher hielt der geglättete Pegel
+  sie nach dem Trägerende noch 100–150 ms offen), und mit eingeschalteter Sperre läuft der Ton einen Rahmen (20 ms)
+  verzögert – der Rahmen mit dem Trägerende und der erste Rahmen beim Öffnen werden verworfen, wie es Funkgeräte über
+  Rauschdetektor und Abschaltton auch tun. Im Messaufbau (`tools/fake_rtl_tcp.py 6999 3,2`, getasteter Träger) bleibt
+  nach fünf Trägerenden kein Rauschstoß mehr. Ohne Sperre keine Verzögerung.
 - **FM klingt wie im Funkgerät:** De-Emphasis −6 dB/Oktave ab 300 Hz (530 µs, TIA-603) und Tiefpass 3,2 kHz statt 4 kHz.
   Funkgeräte senden mit Pre-Emphasis; ohne die Umkehr klang Sprache dünn und das Diskriminatorrauschen zischte.
   Lautstärke bleibt gleich (Ausgleich ×2,2). Betriebsart „Daten“ bleibt flach.
