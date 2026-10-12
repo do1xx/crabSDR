@@ -208,6 +208,8 @@ async fn main() {
         .route("/digi/relais.json", get(digi::relais))
         .route("/digi/ft8.json", get(digi::ft8))
         .route("/digi/sstv.json", get(digi::sstv))
+        .route("/digi/sstv/latest.png", get(digi::sstv_latest_png))
+        .route("/digi/sstv/latest.json", get(digi::sstv_latest_json))
         .route("/digi/pocsag.json", get(digi::pocsag))
         .route("/digi/freedv.json", get(digi::freedv))
         .merge(auth_api)

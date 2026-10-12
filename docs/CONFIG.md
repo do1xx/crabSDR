@@ -187,6 +187,13 @@ Robot 36/72, PD 50–290 (ISS: PD 120).
 Plugins bekommen Umgebung: `CRAB_FREQ`, `CRAB_RATE`, `CRAB_MODE`, `CRAB_BAND`, `CRAB_ID`, `CRAB_LABEL`, `CRAB_DATA`,
 `CRAB_STATION_NAME`, `CRAB_STATION_LOCATOR`, `CRAB_STATION_LAT`, `CRAB_STATION_LON` und `CRAB_OPT_<OPTION>`.
 
+## Neuestes SSTV-Bild für Monitore
+
+`/digi/sstv/latest.png` liefert immer das jüngste SSTV-Bild der Station (nie gecacht, Kopfzeilen `X-SSTV-Mode` und
+`X-SSTV-Time`), `/digi/sstv/latest.json` seinen Eintrag, `/digi/latest.html` eine schwarze Vollbildseite, die sich
+selbst aktualisiert (für Spiegel, Monitore, MagicMirror als iframe). Zusätze: `?decoder=<id>` nur dieser Decoder,
+`?max_age=<s>` nichts, wenn das Bild älter ist, bei der Seite außerdem `?caption=0` und `?every=<s>`.
+
 ## `[ui]` – was die Hörer sehen
 
 Alles ist an, solange es etwas zu zeigen gibt. Nur eintragen, was abweichen soll.

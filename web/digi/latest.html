@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>SSTV · neuestes Bild</title>
+<!-- Vollbild-Anzeige des neuesten SSTV-Bilds für Monitore und Spiegel (MagicMirror: iframe oder das Bild selbst unter
+     ../sstv/latest.png). Fragt alle 20 s sstv.json ab und tauscht das Bild nur, wenn ein neues da ist.
+     ?decoder=<id> nur dieser Decoder · ?caption=0 ohne Unterzeile · ?max_age=<s> nur Bilder jünger als so viele Sekunden
+     (sonst schwarz) · ?every=<s> Abfragetakt -->
+<style>
+  html, body { margin: 0; height: 100%; background: #000; color: #9aa; font: 14px/1.4 ui-monospace, Menlo, monospace; }
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  img { max-width: 100vw; max-height: 100vh; object-fit: contain; image-rendering: auto; display: none; }
+  img.on { display: block; }
+  .cap { position: fixed; left: 0; right: 0; bottom: 0; padding: 6px 12px; background: rgba(0,0,0,.55); color: #cfd; text-align: center; letter-spacing: .05em; }
+  .cap b { color: #3ec9a7; }
+  .none { color: #566; letter-spacing: .1em; }
+</style>
+</head>
+<body>
+<img id="im" alt="SSTV">
+<div id="none" class="none">kein Bild</div>
+<div id="cap" class="cap"></div>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search), dec = q.get('decoder'), cap = q.get('caption') !== '0', every = Math.max(5, Number(q.get('every')) || 20) * 1000;
+  var maxAge = Number(q.get('max_age')) || 0, cur = null;
+  if (!cap) document.getElementById('cap').style.display = 'none';
+  function show(im) {
+    var img = document.getElementById('im'), none = document.getElementById('none');
+    if (!im) { img.classList.remove('on'); none.style.display = ''; document.getElementById('cap').textContent = ''; return; }
+    if (cur === im.file) return;
+    cur = im.file; img.src = im.file; img.classList.add('on'); none.style.display = 'none';
+    var d = new Date(im.t * 1000), ts = d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ', ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('cap').innerHTML = '<b>' + im.mode + '</b> \u00b7 ' + (im.freq / 1e6).toFixed(3) + ' MHz \u00b7 ' + ts + (im.lines < im.of ? ' \u00b7 ' + im.lines + '/' + im.of + ' Zeilen' : '');
+  }
+  function poll() {
+    var x = new XMLHttpRequest(); x.open('GET', 'sstv.json?' + Date.now());
+    x.onload = function () {
+      try {
+        var J = JSON.parse(x.responseText), list = (J.images || []).filter(function (i) { return !dec || i.decoder === dec; });
+        var im = list[0] || null;
+        if (im && maxAge && Date.now() / 1000 - im.t > maxAge) im = null;
+        show(im);
+      } catch (e) {}
+    };
+    x.send();
+  }
+  poll(); setInterval(poll, every);
+})();
+</script>
+</body>
+</html>

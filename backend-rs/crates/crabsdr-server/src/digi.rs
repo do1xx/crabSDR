@@ -37,6 +37,54 @@ pub async fn ft8(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response { fir
 pub async fn pocsag(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response { first(&s, &h, "pocsag", "pocsag.json").await }
 pub async fn freedv(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response { first(&s, &h, "freedv", "freedv.json").await }
 
+/// Neuestes SSTV-Bild für Monitore, Spiegel und Skripte: /digi/sstv/latest.png (immer das jüngste Bild, nie gecacht)
+/// und /digi/sstv/latest.json (sein Eintrag). `?decoder=<id>` nur dieser Decoder, `?max_age=<s>` 404, wenn älter.
+#[derive(serde::Deserialize)]
+pub struct LatestQuery { pub decoder: Option<String>, pub max_age: Option<u64> }
+
+async fn latest_entry(s: &AppState, h: &HeaderMap, q: &LatestQuery) -> Option<Value> {
+    let mut best: Option<Value> = None;
+    for id in ids(s, h, "sstv").await {
+        if q.decoder.as_deref().is_some_and(|d| d != id) { continue; }
+        let Some(b) = read(s, &id, "sstv.json").await else { continue };
+        let Ok(v) = serde_json::from_slice::<Value>(&b) else { continue };
+        for mut im in v["images"].as_array().cloned().unwrap_or_default() {
+            im["decoder"] = json!(id);
+            if best.as_ref().is_none_or(|b| im["t"].as_i64().unwrap_or(0) > b["t"].as_i64().unwrap_or(0)) { best = Some(im); }
+        }
+    }
+    let best = best?;
+    if let Some(max) = q.max_age {
+        let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0);
+        if now - best["t"].as_i64().unwrap_or(0) > max as i64 { return None; }
+    }
+    Some(best)
+}
+
+pub async fn sstv_latest_json(State(s): State<Arc<AppState>>, h: HeaderMap, axum::extract::Query(q): axum::extract::Query<LatestQuery>) -> Response {
+    match latest_entry(&s, &h, &q).await {
+        Some(mut im) => {
+            if let (Some(id), Some(f)) = (im["decoder"].as_str().map(str::to_string), im["file"].as_str().map(str::to_string)) {
+                im["url"] = json!(format!("/api/decoders/files/{}/{}", id, f.trim_start_matches('/')));
+            }
+            ([(header::CONTENT_TYPE, "application/json"), (header::CACHE_CONTROL, "no-store")], im.to_string().into_bytes()).into_response()
+        }
+        None => (StatusCode::NOT_FOUND, "kein Bild").into_response(),
+    }
+}
+
+pub async fn sstv_latest_png(State(s): State<Arc<AppState>>, h: HeaderMap, axum::extract::Query(q): axum::extract::Query<LatestQuery>) -> Response {
+    let Some(im) = latest_entry(&s, &h, &q).await else { return (StatusCode::NOT_FOUND, "kein Bild").into_response() };
+    let (Some(id), Some(f)) = (im["decoder"].as_str(), im["file"].as_str()) else { return (StatusCode::NOT_FOUND, "kein Bild").into_response() };
+    let f = f.trim_start_matches('/');
+    if f.contains("..") || !f.ends_with(".png") { return (StatusCode::NOT_FOUND, "kein Bild").into_response(); }
+    let Some(b) = read(&s, id, f).await else { return (StatusCode::NOT_FOUND, "Bilddatei fehlt").into_response() };
+    let mode = im["mode"].as_str().unwrap_or("").to_string();
+    let t = im["t"].as_i64().unwrap_or(0).to_string();
+    ([(header::CONTENT_TYPE, "image/png".to_string()), (header::CACHE_CONTROL, "no-store".to_string()),
+      (header::HeaderName::from_static("x-sstv-mode"), mode), (header::HeaderName::from_static("x-sstv-time"), t)], b).into_response()
+}
+
 pub async fn sstv(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response {
     let list = ids(&s, &h, "sstv").await;
     if list.is_empty() { return (StatusCode::NOT_FOUND, "kein Decoder").into_response(); }

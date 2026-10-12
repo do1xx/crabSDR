@@ -5,6 +5,8 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 ## Unveröffentlicht
 
 ### Decoder
+- **Neuestes SSTV-Bild als feste Adresse:** `/digi/sstv/latest.png` (immer das jüngste Bild, nie gecacht), `/digi/sstv/latest.json`
+  und die Vollbildseite `/digi/latest.html` für Monitore und Spiegel (`?decoder=`, `?max_age=`, `?caption=0`, `?every=`).
 - **SSTV: Farben und Zeilen stimmen wieder.** Der Decoder bekam vom Lauscher den Puffer ohne die Lage des VIS-Kopfs
   und nahm den Stoppbit als ersten Zeilensync; alle Zeilen rutschten eine nach oben – bei Robot 36 vertauscht das
   R-Y/B-Y (grün/magenta), bei Martin verschiebt es die Farben. Jetzt wird das VIS-Ende mitgegeben.
