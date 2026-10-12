@@ -40,9 +40,9 @@ def add_index(entry):
         tmp = INDEX + ".tmp"; json.dump(idx, open(tmp, "w"), ensure_ascii=False); os.replace(tmp, INDEX)
 
 
-def decode_job(samples, vis, t_start):
+def decode_job(samples, vis, t_start, t0):
     try:
-        r = sstvdec.decode(samples, FS, vis=vis)
+        r = sstvdec.decode(samples, FS, vis=vis, t0=t0)   # t0 = VIS-Ende im Puffer, sonst gilt der Stoppbit als erster Sync
     except Exception as e:
         log(f"Decoder-Fehler: {e}"); return
     if not r:
@@ -75,7 +75,7 @@ def main():
             recording["buf"].append(x); recording["have"] += len(x)
             if recording["have"] >= recording["need"]:
                 samples = np.concatenate(recording["buf"]).astype(np.float32) / 32768
-                th = threading.Thread(target=decode_job, args=(samples, recording["vis"], recording["t"]), daemon=True); th.start(); jobs.append(th)
+                th = threading.Thread(target=decode_job, args=(samples, recording["vis"], recording["t"], recording["t0"]), daemon=True); th.start(); jobs.append(th)
                 recording = None; ring = np.zeros(0, dtype=np.int16)
             continue
         ring = np.concatenate((ring, x))[-RING:]
@@ -88,12 +88,12 @@ def main():
             # Aufnahme beginnt 1,0 s vor dem VIS-Ende (Kopf muss mit rein), Bild dauert dur Sekunden
             start = max(0, end - int(FS * 1.0))
             pre = ring[start:]
-            recording = {"buf": [pre], "have": len(pre), "need": len(pre) + int(dur * FS), "vis": vis, "t": time.time() - (len(ring) - end) / FS}
+            recording = {"buf": [pre], "have": len(pre), "need": len(pre) + int(dur * FS), "vis": vis, "t": time.time() - (len(ring) - end) / FS, "t0": end - start}
             log(f"VIS {vis} = {name}, nehme {dur:.0f} s auf")
             emit({"kind": "vis", "t": int(time.time()), "freq": int(a.freq), "mode": name, "seconds": round(dur)})
     if recording is not None and recording["have"] > FS * 5:      # Rest bei Stream-Ende noch decodieren
         samples = np.concatenate(recording["buf"]).astype(np.float32) / 32768
-        th = threading.Thread(target=decode_job, args=(samples, recording["vis"], recording["t"]), daemon=True); th.start(); jobs.append(th)
+        th = threading.Thread(target=decode_job, args=(samples, recording["vis"], recording["t"], recording["t0"]), daemon=True); th.start(); jobs.append(th)
     for th in jobs: th.join(120)
     log("Eingabe zu Ende")
 

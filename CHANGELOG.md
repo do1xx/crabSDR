@@ -4,6 +4,12 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 
 ## Unveröffentlicht
 
+### Decoder
+- **SSTV: Farben und Zeilen stimmen wieder.** Der Decoder bekam vom Lauscher den Puffer ohne die Lage des VIS-Kopfs
+  und nahm den Stoppbit als ersten Zeilensync; alle Zeilen rutschten eine nach oben – bei Robot 36 vertauscht das
+  R-Y/B-Y (grün/magenta), bei Martin verschiebt es die Farben. Jetzt wird das VIS-Ende mitgegeben.
+  Prüfung gegen den Referenz-Encoder pysstv: `plugins/sstv/test_sstv.py` (Robot 36, Martin 1/2, Scottie 1, PD 120).
+
 ### Ton
 - **Rauschsperre ohne Rauschfahne:** die Sperre schließt jetzt am ungeglätteten Pegel (bisher hielt der geglättete Pegel
   sie nach dem Trägerende noch 100–150 ms offen), und mit eingeschalteter Sperre läuft der Ton einen Rahmen (20 ms)

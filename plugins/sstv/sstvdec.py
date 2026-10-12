@@ -152,14 +152,17 @@ def _ycc(y, cr, cb):
     return np.clip(np.stack([r, g, bl], axis=-1), 0, 255)
 
 
-def decode(x, fs, vis=None, f=None):
+def decode(x, fs, vis=None, f=None, t0=None):
+    """t0 = Index des VIS-Endes im Puffer. Ohne t0 wird der VIS-Kopf gesucht (auch bei bekanntem vis): mit t0 = 0 am
+    Pufferanfang griff die Zeilensuche sonst den Stoppbit des VIS-Kopfs als ersten Sync, alle Zeilen rutschten um
+    eine nach oben – bei Robot 36 vertauscht das R-Y/B-Y (grün/magenta), bei Martin die Farbreihenfolge (12.10.)."""
     from PIL import Image
     if f is None: f = freq_track(x, fs)
-    t0 = 0
-    if vis is None:
+    if vis is None or t0 is None:
         r = find_vis(x, fs, f)
-        if not r: return None
-        vis, t0 = r
+        if r and (vis is None or r[0] == vis): vis, t0 = r
+        elif vis is None: return None
+        else: t0 = 0
     m = MODES.get(vis)
     if not m: return None
     ms = fs / 1000.0
