@@ -499,7 +499,7 @@
       if (code !== 200) { v.appendChild(h('p', { cls: 'bad', text: r.error || ('Fehler ' + code) })); return; }
       var list; try { list = JSON.parse(r.text); } catch (e) { list = []; } if (!Array.isArray(list)) list = [];
       var hash = r.hash;
-      var COLS = [['call', 'Rufzeichen', 8], ['freq', 'Ausgabe kHz', 9], ['shift', 'Ablage kHz', 8], ['mode', 'Mode', 4], ['tone', 'Ton', 8], ['locator', 'Locator', 6], ['qth', 'QTH', 16], ['info', 'Info', 36]];
+      var COLS = [['call', 'Rufzeichen', 8], ['freq', 'Ausgabe kHz', 9], ['shift', 'Ablage kHz', 8], ['system', 'System', 6], ['mode', 'Mode', 4], ['tone', 'Ton', 8], ['locator', 'Locator', 6], ['qth', 'QTH', 16], ['info', 'Info', 36]];
       var tb = h('tbody');
       function row(e) {
         var tr = h('tr');
@@ -528,7 +528,7 @@
       }
       v.appendChild(h('div', { cls: 'adm-card' },
         h('div', { cls: 'adm-cardhead' }, h('h3', { text: 'Relais und Frequenzen' }), h('small', { cls: 'muted', text: r.path })),
-        h('p', { cls: 'muted small', text: 'Aus dieser Liste entstehen die Marker im Wasserfall (Rufzeichen an der Ausgabe, „↑“ an der Eingabe), die Hover-Tafel und die Liste hinter dem Knopf „Liste“. Ausgabe = die Frequenz, die hier zu hören ist (kHz, z. B. 438700). Ablage = Eingabe − Ausgabe in kHz (z. B. −7600; leer = kein Relais). Entfernung und Richtung rechnet die Oberfläche aus dem Locator (4 oder 6 Stellen) und dem Standort der Station. Wird es im Wasserfall eng, behalten die nahen Relais ihre Beschriftung, die fernen nur die Linie.' }),
+        h('p', { cls: 'muted small', text: 'Aus dieser Liste entstehen die Marker im Wasserfall (Rufzeichen an der Ausgabe, „↑“ an der Eingabe), die Hover-Tafel und die Liste hinter dem Knopf „Liste“. Ausgabe = die Frequenz, die hier zu hören ist (kHz, z. B. 438700). Ablage = Eingabe − Ausgabe in kHz (z. B. −7600; leer = kein Relais). System = FM, DMR, C4FM, D-Star, TETRA, ATV, DAPNET (leer = FM); gleiche Ausgabe und gleiches Rufzeichen werden im Wasserfall zu einer Marke mit Kürzel gebündelt. Mode = Betriebsart beim Klick (fm, data …). Entfernung und Richtung rechnet die Oberfläche aus dem Locator (4 oder 6 Stellen) und dem Standort der Station. Wird es im Wasserfall eng, behalten die nahen Relais ihre Beschriftung, die fernen nur die Linie.' }),
         r.writable ? null : h('p', { cls: 'warn', text: 'Der Stationsordner ist nicht beschreibbar – Änderungen lassen sich hier nicht speichern.' }),
         h('div', { cls: 'adm-tablewrap' }, h('table', { cls: 'adm-table adm-edit' }, h('thead', null, h('tr', null, COLS.map(function (c) { return h('th', { text: c[1] }); }).concat([h('th')]))), tb)),
         h('div', { cls: 'adm-row' },

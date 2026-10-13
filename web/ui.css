@@ -492,3 +492,8 @@ body.look-crab .dxl.rel { background: #3c6; }
 .dxl.rel.inp:hover, .dxm.rel.inp:hover { opacity: 1; }
 .relpanel { position: fixed; z-index: 60; max-width: 300px; background: rgba(16, 20, 26, .96); color: #ddd; border: 1px solid #3d5a6a; border-radius: 6px; padding: 6px 9px; font: 12px/1.45 system-ui, sans-serif; pointer-events: none; box-shadow: 0 4px 16px rgba(0, 0, 0, .5); }
 .relpanel .muted { color: #9ab; }
+
+/* Digitale Systeme: kleines Kürzel an der Marke, Linienfarbe je System (FM bleibt grün) */
+.dxm i.sys { font-style: normal; font-size: 7px; line-height: 1; opacity: .7; margin-left: 3px; vertical-align: top; letter-spacing: .02em; }
+.dxl.rel.sys-dmr { background: #c8862c; } .dxl.rel.sys-c4fm { background: #4b8ad6; } .dxl.rel.sys-dstar { background: #9b6bd6; }
+.dxl.rel.sys-tetra { background: #d64b4b; } .dxl.rel.sys-atv { background: #999; } .dxl.rel.sys-dapnet { background: #c9b43a; } .dxl.rel.sys-other { background: #8aa; }

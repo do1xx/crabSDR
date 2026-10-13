@@ -352,7 +352,29 @@
   }
   // Marker: markers.json (feste Marken) und relais.json (Relais mit Locator/QTH – daraus Marker samt Hover-Tafel,
   // Eingabefrequenz als kleine Marke „↑“); showMarks() aus core.js zeichnet sie unter dem Wasserfall
-  var markers = [], relaisRaw = [], relais = [];
+  var markers = [], relaisRaw = [], relais = [], relGroups = [];
+  /* Systeme (relais.json "system"): Kürzel für die Marke, Klasse für die Linienfarbe */
+  var SYSTEMS = { 'fm': ['', 'fm'], 'dmr': ['DMR', 'dmr'], 'c4fm': ['C4FM', 'c4fm'], 'd-star': ['D-Star', 'dstar'], 'dstar': ['D-Star', 'dstar'], 'tetra': ['TETRA', 'tetra'], 'atv': ['ATV', 'atv'], 'dapnet': ['DAPNET', 'dapnet'], 'pocsag': ['DAPNET', 'dapnet'] };
+  function sysInfo(name) { return SYSTEMS[String(name || 'FM').toLowerCase()] || [String(name).toUpperCase().slice(0, 6), 'other']; }
+  /* Einträge mit gleichem Rufzeichen (ohne Modul-Suffix wie -B/-C/-M) und gleicher Ausgabe zu einer Marke bündeln */
+  function groupRelais(list) {
+    var map = {}, groups = [];
+    list.forEach(function (r) {
+      var base = r.call.replace(/-[A-Z]$/i, ''), key = base + '|' + r.khz, g = map[key];
+      if (!g) { g = map[key] = { call: base, khz: r.khz, entries: [], inputs: [], systems: [], km: r.km, deg: r.deg, qth: r.qth, locator: r.locator, mode: r.mode }; groups.push(g); }
+      g.entries.push(r);
+      if (r.shift && g.inputs.indexOf(r.khz + r.shift) < 0) g.inputs.push(r.khz + r.shift);
+      var sy = sysInfo(r.system); if (g.systems.indexOf(sy[0]) < 0) g.systems.push(sy[0]);
+      if (r.mode === 'fm') g.mode = 'fm';
+    });
+    groups.forEach(function (g) {
+      var digital = g.systems.filter(function (x) { return x !== ''; });
+      g.tag = digital.length ? digital[0] + (digital.length > 1 ? '+' : '') : '';
+      // Linienfarbe: FM dabei → grün wie bisher, sonst die Farbe des (ersten) Digitalsystems
+      g.sysClass = g.systems.indexOf('') >= 0 ? 'fm' : sysInfo(g.entries[0].system)[1];
+    });
+    return groups;
+  }
   function loadMarkers() {
     var x = new XMLHttpRequest(); x.open('GET', 'markers.json?' + Date.now());
     x.onload = function () { try { markers = JSON.parse(x.responseText); } catch (e) { markers = []; } for (var i = 0; i < nWaterfalls; i++) loadMarks(id2band(i)); };
@@ -382,7 +404,7 @@
     var home = stationPos();
     return (Array.isArray(list) ? list : []).map(function (r) {
       var khz = Number(r.freq || r.khz); if (!khz) return null;
-      var o = { khz: khz, call: r.call || '', qth: r.qth || '', locator: r.locator || '', info: r.info || '', shift: (r.shift != null && r.shift !== '') ? Number(r.shift) : null, tone: r.tone || '', mode: (r.mode || 'fm').toLowerCase(), km: r.km != null ? Number(r.km) : null, deg: null };
+      var o = { khz: khz, call: r.call || '', qth: r.qth || '', locator: r.locator || '', info: r.info || '', shift: (r.shift != null && r.shift !== '') ? Number(r.shift) : null, tone: r.tone || '', mode: (r.mode || 'fm').toLowerCase(), system: String(r.system || 'FM').trim(), km: r.km != null ? Number(r.km) : null, deg: null };
       var pos = locToLatLon(o.locator);
       if (pos && home) { var db = distBearing(home, pos); o.km = Math.round(db[0]); o.deg = Math.round(db[1]); }
       return o;
@@ -394,13 +416,14 @@
     var list = markers.filter(function (m) { return m.freq >= lo_ && m.freq <= hi_; })
                       .map(function (m) { return { freq: m.freq, mode: (m.mode || 'fm').toUpperCase(), text: m.text, minor: !!m.minor, prio: 25 }; });   // feste Marken: wie ein Relais in 25 km – nähere Relais gewinnen die Beschriftung
     relais = normRelais(relaisRaw);
-    // Relais: Ausgabe als Marke mit Rufzeichen (Beschriftung nach Entfernung: die nahen zuerst, wenn es eng wird; feste
-    // Marken zählen wie 25 km),
-    // Eingabe als kleine Marke „↑“ – wer die Eingabe hört, hört die Station direkt
-    relais.forEach(function (r, i) {
-      var prio = r.km != null ? r.km : 9999, md = r.mode.toUpperCase();
-      if (r.khz >= lo_ && r.khz <= hi_) list.push({ freq: r.khz, mode: md, text: r.call, rel: i, prio: prio });
-      if (r.shift) { var inp = r.khz + r.shift; if (inp >= lo_ && inp <= hi_) list.push({ freq: inp, mode: md, text: '↑ ' + r.call, rel: i, input: true, minor: true, prio: prio }); }
+    relGroups = groupRelais(relais);
+    // Relais: eine Marke je Rufzeichen und Ausgabe (mehrere Systeme wie FM/DMR/C4FM gebündelt), Beschriftung nach
+    // Entfernung (die nahen zuerst, wenn es eng wird; feste Marken zählen wie 25 km), Eingabe als kleine Marke „↑“ –
+    // wer die Eingabe hört, hört die Station direkt
+    relGroups.forEach(function (g, i) {
+      var prio = g.km != null ? g.km : 9999, md = g.mode.toUpperCase();
+      if (g.khz >= lo_ && g.khz <= hi_) list.push({ freq: g.khz, mode: md, text: g.call, rel: i, sys: g.sysClass, tag: g.tag, prio: prio });
+      g.inputs.forEach(function (inp) { if (inp >= lo_ && inp <= hi_) list.push({ freq: inp, mode: md, text: '↑ ' + g.call, rel: i, sys: g.sysClass, input: true, minor: true, prio: prio }); });
     });
     marks = marksByBand[b] = list.sort(function (a, c) { return a.freq - c.freq; });
     showMarks(b);
@@ -409,15 +432,28 @@
   window.relHover = function (ev, i, on, inp) {
     var p = $('relpanel'); if (!p) return;
     if (!on) { p.hidden = true; return; }
-    var r = relais[i]; if (!r) return;
+    var g = relGroups[i]; if (!g) return;
     if (on === 1) {
-      var de = lang === 'de', ab = (r.shift > 0 ? '+' : '−') + fmtMhz(Math.abs(r.shift || 0)) + ' MHz', rows;
-      if (inp) rows = ['<b>↑ ' + (de ? 'Eingabe von ' : 'Input of ') + escapeHtml(r.call) + '</b> · ' + fmtMhz(r.khz + r.shift) + ' MHz ' + r.mode.toUpperCase(), (de ? 'Ausgabe ' : 'Output ') + fmtMhz(r.khz) + ' MHz (' + ab + ')', '<span class="muted">' + (de ? 'Hier hört man die Stationen direkt, nicht das Relais' : 'Direct signals of the users, not the repeater') + '</span>'];
-      else { rows = ['<b>' + escapeHtml(r.call) + '</b> · ' + fmtMhz(r.khz) + ' MHz ' + r.mode.toUpperCase()]; if (r.shift) rows.push((de ? 'Eingabe ' : 'Input ') + fmtMhz(r.khz + r.shift) + ' MHz (' + ab + ')'); }
-      if (r.tone) rows.push((de ? 'Ton ' : 'Tone ') + escapeHtml(r.tone));
-      if (r.qth || r.locator) rows.push(escapeHtml(r.qth) + (r.locator ? (r.qth ? ' · ' : '') + escapeHtml(r.locator) : ''));
-      if (r.km != null) rows.push(r.km + ' km' + (r.deg != null ? ' · ' + r.deg + '° ' + compass(r.deg) : '') + (de ? ' von hier' : ' from here'));
-      if (r.info) rows.push('<span class="muted">' + escapeHtml(r.info) + '</span>');
+      var de = lang === 'de', r0 = g.entries[0], rows = [];
+      var sysList = g.systems.map(function (x) { return x || 'FM'; }).join(' · ');
+      if (inp) {
+        var r1 = g.entries.filter(function (r) { return r.shift; })[0] || r0, ab = (r1.shift > 0 ? '+' : '−') + fmtMhz(Math.abs(r1.shift || 0)) + ' MHz';
+        rows.push('<b>↑ ' + (de ? 'Eingabe von ' : 'Input of ') + escapeHtml(g.call) + '</b> · ' + fmtMhz(r1.khz + r1.shift) + ' MHz · ' + sysList);
+        rows.push((de ? 'Ausgabe ' : 'Output ') + fmtMhz(g.khz) + ' MHz (' + ab + ')');
+        rows.push('<span class="muted">' + (de ? 'Hier hört man die Stationen direkt, nicht das Relais' : 'Direct signals of the users, not the repeater') + '</span>');
+      } else {
+        rows.push('<b>' + escapeHtml(g.call) + '</b> · ' + fmtMhz(g.khz) + ' MHz · ' + sysList);
+        if (g.inputs.length) rows.push((de ? 'Eingabe ' : 'Input ') + g.inputs.map(function (f) { return fmtMhz(f); }).join(' / ') + ' MHz (' + (r0.shift > 0 ? '+' : '−') + fmtMhz(Math.abs(g.inputs[0] - g.khz)) + ' MHz)');
+      }
+      if (g.qth || g.locator) rows.push(escapeHtml(g.qth) + (g.locator ? (g.qth ? ' · ' : '') + escapeHtml(g.locator) : ''));
+      if (g.km != null) rows.push(g.km + ' km' + (g.deg != null ? ' · ' + g.deg + '° ' + compass(g.deg) : '') + (de ? ' von hier' : ' from here'));
+      // je System eine Zeile: Ton und Info (bei einem einzigen System ohne Kürzel)
+      g.entries.forEach(function (r) {
+        var bits = []; if (r.tone) bits.push((de ? 'Ton ' : 'Tone ') + escapeHtml(r.tone)); if (r.info) bits.push(escapeHtml(r.info));
+        if (!bits.length && g.entries.length === 1) return;
+        var sy = sysInfo(r.system)[0] || 'FM', suffix = r.call !== g.call ? ' ' + escapeHtml(r.call.slice(g.call.length)) : '';
+        rows.push('<span class="muted">' + (g.entries.length > 1 ? '<b>' + sy + suffix + '</b> ' : '') + bits.join(' · ') + '</span>');
+      });
       p.innerHTML = rows.join('<br>'); p.hidden = false;
     }
     var x = ev.clientX + 14, y = ev.clientY + 16;
@@ -692,8 +728,8 @@
     function shift(o) { if (!o) return ''; var n = Number(o); if (!n) return ''; return (n > 0 ? '+' : '−') + (Math.abs(n) / 1000).toFixed(Math.abs(n) % 1000 ? 1 : 0).replace('.', ',') + ' MHz'; }
     function render() {
       var rows = [], seen = {};
-      function add(r) { var k = Math.round(r.khz * 10); if (seen[k] && r.src !== 'own') return; if (bandOf(r.khz) < 0) return; seen[k] = true; rows.push(r); }
-      normRelais(data.own || []).forEach(function (r) { add({ khz: r.khz, call: r.call, info: r.qth ? r.qth + (r.info ? ' – ' + r.info : '') : r.info, shift: r.shift != null ? String(r.shift) : '', tone: r.tone, km: r.km, deg: r.deg, mode: r.mode, src: 'own' }); });
+      function add(r) { var k = Math.round(r.khz * 10) + '|' + r.call + '|' + r.info; if (seen[k] && r.src !== 'own') return; if (bandOf(r.khz) < 0) return; seen[k] = true; rows.push(r); }
+      normRelais(data.own || []).forEach(function (r) { var sy = sysInfo(r.system)[0]; add({ khz: r.khz, call: r.call, info: (sy ? sy + ' · ' : '') + (r.qth ? r.qth + (r.info ? ' – ' + r.info : '') : r.info), shift: r.shift != null ? String(r.shift) : '', tone: r.tone, km: r.km, deg: r.deg, mode: r.mode, src: 'own' }); });
       (data.aprs || []).forEach(function (r) { add({ khz: r.khz, call: r.call, info: r.comment, shift: r.offset, tone: r.tone, km: r.km, mode: 'fm', src: 'aprs' }); });
       markers.forEach(function (m) { add({ khz: m.freq, call: '', info: m.text, shift: '', tone: '', km: null, mode: (m.mode || 'fm').toLowerCase(), src: 'marker' }); });
       rows.sort(function (a, b) { return a.khz - b.khz; });

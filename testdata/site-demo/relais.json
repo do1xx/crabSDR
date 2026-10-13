@@ -1,5 +1,77 @@
 [
  {
+  "call": "DO0TPB",
+  "freq": 144812.5,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO53HJ",
+  "qth": "Basedow",
+  "info": "Multimode-Hotspot MMDVM"
+ },
+ {
+  "call": "DO0TPB",
+  "freq": 144812.5,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO53HJ",
+  "qth": "Basedow",
+  "info": "Multimode-Hotspot MMDVM: DMR, D-Star, C4FM"
+ },
+ {
+  "call": "DO0TPB",
+  "freq": 144812.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO53HJ",
+  "qth": "Basedow",
+  "info": "Multimode-Hotspot MMDVM, DMR-ID 262231"
+ },
+ {
+  "call": "DM0BAM-C",
+  "freq": 144837.5,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO43KC",
+  "qth": "Horn-Lehe",
+  "info": "evtl. QRT?"
+ },
+ {
+  "call": "DM0HAT-C",
+  "freq": 144850,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO54LD",
+  "qth": "Grömitz",
+  "info": "Hotspot"
+ },
+ {
+  "call": "DO0GUD",
+  "freq": 144875,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO53JN",
+  "qth": "Gudow",
+  "info": "Antenne 12 m über Grund"
+ },
+ {
+  "call": "DO0GUD",
+  "freq": 144875,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO53JN",
+  "qth": "Gudow",
+  "info": "Hotspot D-Star/C4FM am Standort von DO0BAB (Mühlenweg 7), Antenne 12 m über Grund"
+ },
+ {
+  "call": "DM0TR",
+  "freq": 144887.5,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO54CB",
+  "qth": "Trappenkamp",
+  "info": "Ab 1.10.2022 Abschaltung für 1 Jahr"
+ },
+ {
   "call": "DO0RAM",
   "freq": 145575,
   "mode": "fm",
@@ -7,7 +79,18 @@
   "qth": "Ramelsloh, Seevetal",
   "shift": -600,
   "tone": "79,7 Hz",
-  "info": "TX-CTCSS=79,7 Hz, aber Relais ist trägergesteuert -12,5 kHz Bandbreite (± 2,5 kHz Hub )"
+  "info": "TX-CTCSS=79,7 Hz, aber Relais ist trägergesteuert -12,5 kHz Bandbreite (± 2,5 kHz Hub )",
+  "system": "FM"
+ },
+ {
+  "call": "DB0AL",
+  "freq": 145587.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO42OX",
+  "qth": "Langwedel",
+  "shift": -600,
+  "info": "262356 IPSC2-DL-RPTR – QRT?"
  },
  {
   "call": "DB0DWL",
@@ -16,17 +99,8 @@
   "locator": "JO53IU",
   "qth": "Lübeck",
   "shift": -600,
-  "info": "FM Funknetz: Talkgroup 23552 - FM narrow - trägergesteuert"
- },
- {
-  "call": "DB0DAN",
-  "freq": 145600,
-  "mode": "fm",
-  "locator": "JO53KB",
-  "qth": "Zernien",
-  "shift": -600,
-  "tone": "1750 Hz",
-  "info": "CTCSS deaktiviert, Rufton 1750 Hz"
+  "info": "FM Funknetz: Talkgroup 23552 - FM narrow - trägergesteuert",
+  "system": "FM"
  },
  {
   "call": "DB0BHV",
@@ -36,7 +110,28 @@
   "qth": "Bremerhaven",
   "shift": -600,
   "tone": "74,4 Hz",
-  "info": "74,4 Hz – zu öffnen auch mit 1750 Hz"
+  "info": "74,4 Hz – zu öffnen auch mit 1750 Hz",
+  "system": "FM"
+ },
+ {
+  "call": "DB0DAN",
+  "freq": 145600,
+  "mode": "fm",
+  "locator": "JO53KB",
+  "qth": "Zernien",
+  "shift": -600,
+  "tone": "1750 Hz",
+  "info": "CTCSS deaktiviert, Rufton 1750 Hz",
+  "system": "FM"
+ },
+ {
+  "call": "DB0HHO",
+  "freq": 145612.5,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO53DP",
+  "qth": "Hamburg - Großhansdorf",
+  "shift": -600
  },
  {
   "call": "DB0WU",
@@ -46,7 +141,8 @@
   "qth": "Bremen",
   "shift": -600,
   "tone": "1750 Hz",
-  "info": "Der 1750-Hz-Ton muss ca. 4 Sekunden gehalten werden"
+  "info": "Der 1750-Hz-Ton muss ca. 4 Sekunden gehalten werden",
+  "system": "FM"
  },
  {
   "call": "DB0ZA",
@@ -55,7 +151,8 @@
   "locator": "JO44UK",
   "qth": "Aschberg",
   "shift": -600,
-  "info": "Sept. 26: offline"
+  "info": "Sept. 26: offline",
+  "system": "FM"
  },
  {
   "call": "DB0FA",
@@ -65,7 +162,8 @@
   "qth": "Faßberg",
   "shift": -600,
   "tone": "67,0 Hz",
-  "info": "CTCSS 67.0 Hz"
+  "info": "CTCSS 67.0 Hz",
+  "system": "FM"
  },
  {
   "call": "DB0MVP",
@@ -75,7 +173,8 @@
   "qth": "Schwerin",
   "shift": -600,
   "tone": "88 Hz",
-  "info": "24 Std – CTCSS 88,5 öffnen per HF (trägergesteuert)"
+  "info": "24 Std – CTCSS 88,5 öffnen per HF (trägergesteuert)",
+  "system": "FM"
  },
  {
   "call": "DB0HEI",
@@ -84,7 +183,8 @@
   "locator": "JO44NE",
   "qth": "Heide",
   "shift": 285762.5,
-  "info": "setzt um von 70 cm auf 2 m"
+  "info": "setzt um von 70 cm auf 2 m",
+  "system": "FM"
  },
  {
   "call": "DB0MAR",
@@ -94,7 +194,8 @@
   "qth": "Timmendorf",
   "shift": -600,
   "tone": "1750 Hz",
-  "info": "1750 Hz erforderlich"
+  "info": "1750 Hz erforderlich",
+  "system": "FM"
  },
  {
   "call": "DB0RH",
@@ -102,7 +203,8 @@
   "mode": "fm",
   "locator": "JO42WU",
   "qth": "Heiderelais",
-  "shift": -600
+  "shift": -600,
+  "system": "FM"
  },
  {
   "call": "DB0NAS",
@@ -112,7 +214,8 @@
   "qth": "Niendorf a.d.St.",
   "shift": -600,
   "tone": "123 Hz",
-  "info": "CTCSS 123Hz"
+  "info": "CTCSS 123Hz",
+  "system": "FM"
  },
  {
   "call": "DM0NDR",
@@ -122,7 +225,149 @@
   "qth": "Hamburg Billwerder / Moorfleet",
   "shift": -600,
   "tone": "79,7 Hz",
-  "info": "Echo Link ID #505114 - FM Narrow - Es wird ein 79,7Hz CTCSS Ton bei geöffneter Rauschsperre vom Relais mit ausgesendet"
+  "info": "Echo Link ID #505114 - FM Narrow - Es wird ein 79,7Hz CTCSS Ton bei geöffneter Rauschsperre vom Relais mit ausgesendet",
+  "system": "FM"
+ },
+ {
+  "call": "DO0RAM",
+  "freq": 430350,
+  "mode": "data",
+  "system": "TETRA",
+  "locator": "JO53AI",
+  "qth": "Ramelsloh, Seevetal",
+  "info": "TETRA DMO, verbunden mit TETRA-DL-Reflector"
+ },
+ {
+  "call": "DM0HAT",
+  "freq": 430387.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO54LD",
+  "qth": "Grömitz"
+ },
+ {
+  "call": "DB0FTN",
+  "freq": 434762.5,
+  "mode": "data",
+  "system": "TETRA",
+  "locator": "JO43GM",
+  "qth": "Bremerhaven",
+  "info": "Abschattung durch Turm Richtung WHV"
+ },
+ {
+  "call": "DB0FS",
+  "freq": 434787.5,
+  "mode": "data",
+  "system": "TETRA",
+  "locator": "JO43XO",
+  "qth": "Hamburg - Lokstedt",
+  "info": "MCC 901, MNC 16383, TG1"
+ },
+ {
+  "call": "DB0OV",
+  "freq": 437500,
+  "mode": "data",
+  "system": "ATV",
+  "locator": "JO43FL",
+  "qth": "Nordenham"
+ },
+ {
+  "call": "DB0HEI",
+  "freq": 438225,
+  "mode": "data",
+  "system": "TETRA",
+  "locator": "JO44NE",
+  "qth": "Heide",
+  "shift": -7600,
+  "info": "TMO, MCC 901, MNC 9998, Spacing 1, DMR-ID nötig"
+ },
+ {
+  "call": "DB0FS",
+  "freq": 438250,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO43XO",
+  "qth": "Hamburg - Lokstedt",
+  "shift": -7600,
+  "info": "Wires-X-ID 31073, Room Hamburg-City 41073; seit April 2025 nur Lokalbetrieb (Wires-X-Anbindung ausgefallen)"
+ },
+ {
+  "call": "DB0VC",
+  "freq": 438250,
+  "mode": "data",
+  "system": "TETRA",
+  "locator": "JO54IF",
+  "qth": "Bungsberg",
+  "shift": -7600,
+  "info": "TMO, MCC 901, MNC 9998, Spacing 1, DMR-ID nötig"
+ },
+ {
+  "call": "DB0CHV",
+  "freq": 438275,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO43IU",
+  "qth": "Cuxhaven",
+  "shift": -7600,
+  "info": "262350 IPSC2-DL-RPTR"
+ },
+ {
+  "call": "DM0KIL",
+  "freq": 438275,
+  "mode": "data",
+  "system": "TETRA",
+  "locator": "JO54BH",
+  "qth": "Kiel",
+  "info": "TMO, MCC 901, MNC 9998, Spacing 1, DMR-ID nötig"
+ },
+ {
+  "call": "DB0OZ",
+  "freq": 438325,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO43JC",
+  "qth": "Bremen",
+  "shift": -7600
+ },
+ {
+  "call": "DB0OZ",
+  "freq": 438325,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO43JC",
+  "qth": "Bremen",
+  "shift": -7600,
+  "info": "262353 IPSC2-DL-RPTR"
+ },
+ {
+  "call": "DB0HEI",
+  "freq": 438337.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO44NE",
+  "qth": "Heide",
+  "shift": -7600,
+  "info": "DMR wieder mit Brandmeister verbunden"
+ },
+ {
+  "call": "DB0SAH",
+  "freq": 438362.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO43HU",
+  "qth": "Cuxhaven Sahlenburg",
+  "shift": -7600,
+  "info": "Brandmeister ID 262358"
+ },
+ {
+  "call": "DB0VC",
+  "freq": 438387.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO54IF",
+  "qth": "Bungsberg",
+  "shift": -7600,
+  "info": "Dualmode-Repeater: Brandmeister-DMR und Analog-FM"
  },
  {
   "call": "DO0RAM",
@@ -132,7 +377,117 @@
   "qth": "Ramelsloh, Seevetal",
   "shift": -7600,
   "tone": "79,7 Hz",
-  "info": "TX-CTCSS=79,7 Hz, aber Relais ist trägergesteuert"
+  "info": "TX-CTCSS=79,7 Hz, aber Relais ist trägergesteuert",
+  "system": "FM"
+ },
+ {
+  "call": "DM0HL",
+  "freq": 438412.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO53FV",
+  "qth": "Poehls bei Lübeck",
+  "shift": -7600,
+  "info": "QRT bis voraussichtlich September 2026"
+ },
+ {
+  "call": "DB0IL",
+  "freq": 438425,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO54CH",
+  "qth": "Kiel",
+  "shift": -7600,
+  "info": "Brandmeister"
+ },
+ {
+  "call": "DB0KJA",
+  "freq": 438425,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO52JU",
+  "qth": "Soltendieck",
+  "shift": -7600,
+  "info": "Multimode C4FM/Analog"
+ },
+ {
+  "call": "DB0BRV",
+  "freq": 438462.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO43NL",
+  "qth": "Bremervörde",
+  "shift": -7600,
+  "info": "Solar-Notstrom"
+ },
+ {
+  "call": "DB0BHV",
+  "freq": 438475,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO43HO",
+  "qth": "Bremerhaven",
+  "shift": -7600,
+  "info": "262316 IPSC2-DL-RPTR"
+ },
+ {
+  "call": "DB0AGM",
+  "freq": 438500,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO53GG",
+  "qth": "Lüneburg",
+  "shift": -7600,
+  "info": "DMR-ID 262337"
+ },
+ {
+  "call": "DB0BNV",
+  "freq": 438512.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO43HE",
+  "qth": "Bremen-Vegesack",
+  "shift": -7600,
+  "info": "262357 IPSC2-DL-NORD"
+ },
+ {
+  "call": "DB0KUA",
+  "freq": 438525,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO53EP",
+  "qth": "Lütjensee",
+  "shift": -7600,
+  "info": "262260 Brandmeister IPSC2-DL-RPTR"
+ },
+ {
+  "call": "DB0HEW",
+  "freq": 438550,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO53EJ",
+  "qth": "Geesthacht",
+  "shift": -7600
+ },
+ {
+  "call": "DB0HEW",
+  "freq": 438550,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO53EJ",
+  "qth": "Geesthacht",
+  "shift": -7600,
+  "info": "Multimode"
+ },
+ {
+  "call": "DB0HEW",
+  "freq": 438550,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO53EJ",
+  "qth": "Geesthacht",
+  "shift": -7600,
+  "info": "TS2 TG8, TS1 TG263"
  },
  {
   "call": "DB0HEW",
@@ -142,7 +497,8 @@
   "qth": "Geesthacht",
   "shift": -7600,
   "tone": "91,5 Hz",
-  "info": "CTCSS Ausgabe 91,5 Hz - Verbunden mit dem fm-funknetz.de"
+  "info": "CTCSS Ausgabe 91,5 Hz - Verbunden mit dem fm-funknetz.de",
+  "system": "FM"
  },
  {
   "call": "DB0AGM",
@@ -151,15 +507,8 @@
   "locator": "JO53GG",
   "qth": "Lüneburg",
   "shift": -7600,
-  "info": "Multimode, Packet Radio, RTTY, SSTV"
- },
- {
-  "call": "DB0WOT",
-  "freq": 438600,
-  "mode": "fm",
-  "locator": "JO43MR",
-  "qth": "Wingst",
-  "shift": -7600
+  "info": "Multimode, Packet Radio, RTTY, SSTV",
+  "system": "FM"
  },
  {
   "call": "DB0FA",
@@ -169,7 +518,17 @@
   "qth": "Faßberg",
   "shift": -7600,
   "tone": "94,8 Hz",
-  "info": "CTCSS 94.8 Hz, Echolink 281537"
+  "info": "CTCSS 94.8 Hz, Echolink 281537",
+  "system": "FM"
+ },
+ {
+  "call": "DB0WOT",
+  "freq": 438600,
+  "mode": "fm",
+  "locator": "JO43MR",
+  "qth": "Wingst",
+  "shift": -7600,
+  "system": "FM"
  },
  {
   "call": "DB0DAN",
@@ -178,7 +537,8 @@
   "locator": "JO53KB",
   "qth": "Zernien",
   "shift": -7600,
-  "info": "Ab 19. August versuchsweise für etwa vier Wochen DMR statt FM"
+  "info": "Ab 19. August versuchsweise für etwa vier Wochen DMR statt FM",
+  "system": "FM"
  },
  {
   "call": "DB0PI",
@@ -188,7 +548,8 @@
   "qth": "Elmshorn",
   "shift": -7600,
   "tone": "1750 Hz",
-  "info": "1750 Hz-Rufton oder DTMF 5"
+  "info": "1750 Hz-Rufton oder DTMF 5",
+  "system": "FM"
  },
  {
   "call": "DB0SFA",
@@ -196,7 +557,8 @@
   "mode": "fm",
   "locator": "JO42UV",
   "qth": "Dorfmark",
-  "shift": -7600
+  "shift": -7600,
+  "system": "FM"
  },
  {
   "call": "DF0HHH",
@@ -204,7 +566,18 @@
   "mode": "fm",
   "locator": "JO43WJ",
   "qth": "Rosengarten",
-  "shift": -7600
+  "shift": -7600,
+  "system": "FM"
+ },
+ {
+  "call": "DB0FA",
+  "freq": 438712.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO52CV",
+  "qth": "Faßberg",
+  "shift": -7600,
+  "info": "DMR-ID 262341"
  },
  {
   "call": "DB0BNV",
@@ -214,7 +587,17 @@
   "qth": "Bremen-Vegesack",
   "shift": -7600,
   "tone": "110,9 Hz",
-  "info": "110,9 Hz Pilotton, SVXReflector FM-Funknetz.de"
+  "info": "110,9 Hz Pilotton, SVXReflector FM-Funknetz.de",
+  "system": "FM"
+ },
+ {
+  "call": "DB0DI",
+  "freq": 438750,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO53DW",
+  "qth": "Bad Segeberg",
+  "shift": -7600
  },
  {
   "call": "DB0DI",
@@ -222,7 +605,8 @@
   "mode": "fm",
   "locator": "JO53DW",
   "qth": "Bad Segeberg",
-  "shift": -7600
+  "shift": -7600,
+  "system": "FM"
  },
  {
   "call": "DB0NI",
@@ -232,7 +616,18 @@
   "qth": "Lüneburg",
   "shift": -7600,
   "tone": "1750 Hz",
-  "info": "Mit 1750Hz öffnen"
+  "info": "Mit 1750Hz öffnen",
+  "system": "FM"
+ },
+ {
+  "call": "DB0XJ",
+  "freq": 438800,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO43RO",
+  "qth": "Stade",
+  "shift": -7600,
+  "info": "DMR, C4FM und D-Star; zwischen den Betriebsarten (auch FM) Sperrzeiten von 20 s – cc 1, DMR-ID 262056, Brandmeister"
  },
  {
   "call": "DB0XJ",
@@ -242,7 +637,18 @@
   "qth": "Stade",
   "shift": -7600,
   "tone": "88,5 Hz",
-  "info": "CTCSS 88,5 Hz - Der Repeater ist wieder voll funktionsfähig."
+  "info": "CTCSS 88,5 Hz - Der Repeater ist wieder voll funktionsfähig.",
+  "system": "FM"
+ },
+ {
+  "call": "DB0RH",
+  "freq": 438812.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO42WU",
+  "qth": "Heiderelais",
+  "shift": -7600,
+  "info": "Die Inbetriebnahme verzögert sich"
  },
  {
   "call": "DB0OZ",
@@ -250,7 +656,38 @@
   "mode": "fm",
   "locator": "JO43JC",
   "qth": "Bremen",
-  "shift": -7600
+  "shift": -7600,
+  "system": "FM"
+ },
+ {
+  "call": "DO0TPB",
+  "freq": 438837.5,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO53HJ",
+  "qth": "Basedow",
+  "shift": -7600,
+  "info": "Multimode DMR, D-Star, YSF, Analog, Echolink, Yaesu Node 17197"
+ },
+ {
+  "call": "DO0TPB",
+  "freq": 438837.5,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO53HJ",
+  "qth": "Basedow",
+  "shift": -7600,
+  "info": "Multimode DMR, D-Star, YSF, Analog, Echolink"
+ },
+ {
+  "call": "DO0TPB",
+  "freq": 438837.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO53HJ",
+  "qth": "Basedow",
+  "shift": -7600,
+  "info": "Multimode DMR, D-Star, YSF, Analog, Echolink"
  },
  {
   "call": "DO0TPB",
@@ -260,7 +697,8 @@
   "qth": "Basedow",
   "shift": -7600,
   "tone": "94,8 Hz",
-  "info": "Multimode DMR DSTAR YSF Analog Echolink #272360, 94.8Hz"
+  "info": "Multimode DMR DSTAR YSF Analog Echolink #272360, 94.8Hz",
+  "system": "FM"
  },
  {
   "call": "DB0FS",
@@ -270,16 +708,8 @@
   "qth": "Hamburg - Lokstedt",
   "shift": -7600,
   "tone": "88,5 Hz",
-  "info": "TX CTCSS 88,5 Hz oder mit DTMF * öffnen, kein Tonruf, RX-Squelch: CTCSS 88,5 Hz"
- },
- {
-  "call": "DB0TUH",
-  "freq": 438875,
-  "mode": "fm",
-  "locator": "JO43XL",
-  "qth": "TU Harburg,Gebäude b",
-  "shift": -7600,
-  "info": "trägergesteuert"
+  "info": "TX CTCSS 88,5 Hz oder mit DTMF * öffnen, kein Tonruf, RX-Squelch: CTCSS 88,5 Hz",
+  "system": "FM"
  },
  {
   "call": "DB0HFT",
@@ -289,7 +719,18 @@
   "qth": "Bremen",
   "shift": -7600,
   "tone": "74,4 Hz",
-  "info": "1750 Hz oder CTCSS 74,4 Hz"
+  "info": "1750 Hz oder CTCSS 74,4 Hz",
+  "system": "FM"
+ },
+ {
+  "call": "DB0TUH",
+  "freq": 438875,
+  "mode": "fm",
+  "locator": "JO43XL",
+  "qth": "TU Harburg,Gebäude b",
+  "shift": -7600,
+  "info": "trägergesteuert",
+  "system": "FM"
  },
  {
   "call": "DB0XL",
@@ -299,7 +740,8 @@
   "qth": "Lübeck",
   "shift": -7600,
   "tone": "100 Hz",
-  "info": "CTCSS 100Hz"
+  "info": "CTCSS 100Hz",
+  "system": "FM"
  },
  {
   "call": "DM0NDR",
@@ -309,7 +751,18 @@
   "qth": "Hamburg Billwerder / Moorfleet",
   "shift": -7600,
   "tone": "79,7 Hz",
-  "info": "Bei geöffneter Rauschsperre wird ein 79,7 Hz Ton ausgesendet"
+  "info": "Bei geöffneter Rauschsperre wird ein 79,7 Hz Ton ausgesendet",
+  "system": "FM"
+ },
+ {
+  "call": "DB0MVP",
+  "freq": 438950,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO53QP",
+  "qth": "Schwerin",
+  "shift": -7600,
+  "info": "Room ID 07280"
  },
  {
   "call": "DB0TG",
@@ -317,7 +770,8 @@
   "mode": "fm",
   "locator": "JO43JG",
   "qth": "Teufelsmoor",
-  "shift": -7600
+  "shift": -7600,
+  "system": "FM"
  },
  {
   "call": "DM0KIL",
@@ -326,16 +780,8 @@
   "locator": "JO54BH",
   "qth": "Kiel",
   "shift": -7600,
-  "info": "trägergesteuert"
- },
- {
-  "call": "DB0REH",
-  "freq": 439025,
-  "mode": "fm",
-  "locator": "JO53BC",
-  "qth": "Rehlingen / Amelinghausen",
-  "shift": -7600,
-  "info": "Multimode FM + C4FM, Ausgabe immer FM"
+  "info": "trägergesteuert",
+  "system": "FM"
  },
  {
   "call": "DB0QC",
@@ -345,7 +791,27 @@
   "qth": "Bremerhaven",
   "shift": -7600,
   "tone": "1750 Hz",
-  "info": "Rufton 1750 Hz, öffnet auch ohne Rufton"
+  "info": "Rufton 1750 Hz, öffnet auch ohne Rufton",
+  "system": "FM"
+ },
+ {
+  "call": "DB0REH",
+  "freq": 439025,
+  "mode": "fm",
+  "locator": "JO53BC",
+  "qth": "Rehlingen / Amelinghausen",
+  "shift": -7600,
+  "info": "Multimode FM + C4FM, Ausgabe immer FM",
+  "system": "FM"
+ },
+ {
+  "call": "DB0HEI",
+  "freq": 439050,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO44NE",
+  "qth": "Heide",
+  "shift": -7600
  },
  {
   "call": "DB0HEI",
@@ -355,7 +821,18 @@
   "qth": "Heide",
   "shift": -7600,
   "tone": "67 Hz",
-  "info": "67 Hz im RX einrichten, um C4FM zu unterdrücken"
+  "info": "67 Hz im RX einrichten, um C4FM zu unterdrücken",
+  "system": "FM"
+ },
+ {
+  "call": "DB0RCH",
+  "freq": 439062.5,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO42TQ",
+  "qth": "Schwarmstedt",
+  "shift": -7600,
+  "info": "FM-CTCSS 110,9 Hz"
  },
  {
   "call": "DB0PC",
@@ -363,6 +840,16 @@
   "mode": "fm",
   "locator": "JO54IF",
   "qth": "Bungsberg",
+  "shift": -7600,
+  "system": "FM"
+ },
+ {
+  "call": "DB0HT",
+  "freq": 439125,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO43UG",
+  "qth": "Tostedt",
   "shift": -7600
  },
  {
@@ -371,7 +858,28 @@
   "mode": "fm",
   "locator": "JO43UG",
   "qth": "Tostedt",
-  "shift": -7600
+  "shift": -7600,
+  "system": "FM"
+ },
+ {
+  "call": "DB0VER",
+  "freq": 439150,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO42PX",
+  "qth": "Verden",
+  "shift": -7600,
+  "info": "262355 IPSC2-DL-RPTR, CTCSS 67 Hz"
+ },
+ {
+  "call": "DB0EWB",
+  "freq": 439175,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO43ML",
+  "qth": "Oerel-Barchel",
+  "shift": -7600,
+  "info": "C4FM/FM, Echolink 47666 zeitweise"
  },
  {
   "call": "DB0EWB",
@@ -381,7 +889,38 @@
   "qth": "Oerel-Barchel",
   "shift": -7600,
   "tone": "74,4 Hz",
-  "info": "C4FM/FM, Echolink 47666 zeitweise, ID 17209 Raum 27209, CTCSS 74,4 Hz nur TX – Solar/Notstrom"
+  "info": "C4FM/FM, Echolink 47666 zeitweise, ID 17209 Raum 27209, CTCSS 74,4 Hz nur TX – Solar/Notstrom",
+  "system": "FM"
+ },
+ {
+  "call": "DB0NDR",
+  "freq": 439225,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO43XN",
+  "qth": "Hamburg Rotherbaum",
+  "shift": -7600,
+  "info": "Regio TG8 im Verbund mit DB0FS"
+ },
+ {
+  "call": "DO0OST",
+  "freq": 439250,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO53EK",
+  "qth": "Geesthacht",
+  "shift": -7600,
+  "info": "Verbunden mit DE-DL-Hamburg"
+ },
+ {
+  "call": "DO0OST",
+  "freq": 439250,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO53EK",
+  "qth": "Geesthacht",
+  "shift": -7600,
+  "info": "Verbunden mit DCS001-C / Deutschland"
  },
  {
   "call": "DB0OHB",
@@ -390,7 +929,8 @@
   "locator": "JO43KC",
   "qth": "Bremen",
   "shift": -7600,
-  "info": "APRS auf 144.800 MHz – DAPNET auf 439.9875 MHz"
+  "info": "APRS auf 144.800 MHz – DAPNET auf 439.9875 MHz",
+  "system": "FM"
  },
  {
   "call": "DO0BAB",
@@ -399,7 +939,17 @@
   "locator": "JO53JN",
   "qth": "Gudow",
   "shift": -7600,
-  "info": "DO0GUD und DO0BAB am gleichen Standort (Mühlenweg 7, Gudow): Hotspot D-STAR/C4FM (DO0GUD) und FM-Relais (DO0BAB)"
+  "info": "DO0GUD und DO0BAB am gleichen Standort (Mühlenweg 7, Gudow): Hotspot D-STAR/C4FM (DO0GUD) und FM-Relais (DO0BAB)",
+  "system": "FM"
+ },
+ {
+  "call": "DB0PR",
+  "freq": 439350,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO43WX",
+  "qth": "Armstedt",
+  "shift": -7600
  },
  {
   "call": "DB0PR",
@@ -407,7 +957,8 @@
   "mode": "fm",
   "locator": "JO43WX",
   "qth": "Armstedt",
-  "shift": -7600
+  "shift": -7600,
+  "system": "FM"
  },
  {
   "call": "DB0CU",
@@ -417,7 +968,8 @@
   "qth": "Cuxhaven",
   "shift": -7600,
   "tone": "67,0 Hz",
-  "info": "Echolink 7048 (DL0CUX), 67,0 Hz"
+  "info": "Echolink 7048 (DL0CUX), 67,0 Hz",
+  "system": "FM"
  },
  {
   "call": "DB0RNG",
@@ -425,7 +977,18 @@
   "mode": "fm",
   "locator": "JO43UA",
   "qth": "Drögenbostel",
-  "shift": -7600
+  "shift": -7600,
+  "system": "FM"
+ },
+ {
+  "call": "DB0HAW",
+  "freq": 439400,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO54CH",
+  "qth": "Kiel Dietrichsdorf",
+  "shift": -7600,
+  "info": "Hochschule für Angewandte Wissenschaften Kiel"
  },
  {
   "call": "DB0HZL",
@@ -435,7 +998,28 @@
   "qth": "Ratzeburg",
   "shift": -7600,
   "tone": "123 Hz",
-  "info": "CTCSS 123 TX/RX oder Rufton/trägergesteuert"
+  "info": "CTCSS 123 TX/RX oder Rufton/trägergesteuert",
+  "system": "FM"
+ },
+ {
+  "call": "DB0KPI",
+  "freq": 439425,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO43TS",
+  "qth": "Elmshorn",
+  "shift": -7600,
+  "info": "TS2: TG9 lokal, TG8 im Verbund mit TG26221 (HH City); TG262213 lokal, von extern weltweit erreichbar"
+ },
+ {
+  "call": "DB0IL",
+  "freq": 439437.5,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO54CH",
+  "qth": "Kiel",
+  "shift": -7600,
+  "info": "Kein Wires-X / YSF, nur Lokalbetrieb"
  },
  {
   "call": "DB0IL",
@@ -445,7 +1029,28 @@
   "qth": "Kiel",
   "shift": -7600,
   "tone": "67 Hz",
-  "info": "TSQL 67 Hz, um C4FM-Aussendungen zu unterdrücken"
+  "info": "TSQL 67 Hz, um C4FM-Aussendungen zu unterdrücken",
+  "system": "FM"
+ },
+ {
+  "call": "DB0RTN",
+  "freq": 439437.5,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO43QC",
+  "qth": "Rotenburg/Wümme",
+  "shift": -7600,
+  "info": "Linkverbund DL-NORDWEST"
+ },
+ {
+  "call": "DB0RTN",
+  "freq": 439437.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO43QC",
+  "qth": "Rotenburg/Wümme",
+  "shift": -7600,
+  "info": "262031 IPSC2-DL-RPTR; DMR+ Reflektor 4003 TS2 TG9, deutschlandweit TS1 TG262; Brandmeister TG 2623 NI-HB dauerhaft"
  },
  {
   "call": "DM0ROL",
@@ -455,7 +1060,8 @@
   "qth": "Rolofshagen",
   "shift": -7600,
   "tone": "88 Hz",
-  "info": "CTCSS 88.5"
+  "info": "CTCSS 88.5",
+  "system": "FM"
  },
  {
   "call": "DB0LWL",
@@ -465,7 +1071,151 @@
   "qth": "Gusborn",
   "shift": -7600,
   "tone": "88,5 Hz",
-  "info": "CTCSS 88,5 Hz zum Öffnen"
+  "info": "CTCSS 88,5 Hz zum Öffnen",
+  "system": "FM"
+ },
+ {
+  "call": "DB0HFT",
+  "freq": 439487.5,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO43JB",
+  "qth": "Bremen",
+  "shift": -7600
+ },
+ {
+  "call": "DB0NDR",
+  "freq": 439487.5,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO43XN",
+  "qth": "Hamburg Rotherbaum",
+  "shift": -7600,
+  "info": "Standard-Reflektor XLX555 Modul B (Hamburg-City) - REF, XRF, DCS, XLX - ein Funkruf-POCSAG-Sender (DAPNET) ist in Betrieb"
+ },
+ {
+  "call": "DM0KIL",
+  "freq": 439487.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO54BH",
+  "qth": "Kiel",
+  "shift": -7600,
+  "info": "DMR-Brandmeister-Netz"
+ },
+ {
+  "call": "DB0ABG",
+  "freq": 439500,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO53CQ",
+  "qth": "Ahrensburg",
+  "shift": -7600,
+  "info": "262273 IPSC2-DL-RPTR"
+ },
+ {
+  "call": "DB0HHO",
+  "freq": 439525,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO53DP",
+  "qth": "Hamburg - Großhansdorf",
+  "shift": -7600,
+  "info": "262250 Brandmeister IPSC2-DL-RPTR"
+ },
+ {
+  "call": "DB0BHN",
+  "freq": 439537.5,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO43GN",
+  "qth": "Bremerhaven",
+  "shift": -7600
+ },
+ {
+  "call": "DB0CHV-B",
+  "freq": 439550,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO43IU",
+  "qth": "Cuxhaven",
+  "shift": -7600
+ },
+ {
+  "call": "DM0LUE",
+  "freq": 439550,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO53JT",
+  "qth": "Lüdersdorf",
+  "shift": -7600
+ },
+ {
+  "call": "DM0LUE",
+  "freq": 439550,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO53JT",
+  "qth": "Lüdersdorf",
+  "shift": -7600
+ },
+ {
+  "call": "DB0FS",
+  "freq": 439562.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO43XO",
+  "qth": "Hamburg - Lokstedt",
+  "shift": -7600,
+  "info": "DMR-ID 262220, Timeslot 2, TG 9 lokal, TG 8 regional, von außerhalb über TG 26221, Groß-Region Hamburg TG 26220"
+ },
+ {
+  "call": "DM0NDR",
+  "freq": 439575,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO53BM",
+  "qth": "Hamburg Billwerder / Moorfleet",
+  "shift": -7600,
+  "info": "Wires-X mit DE-DL-Hamburg (DB0FS und DO0OST), DMR-ID 262272"
+ },
+ {
+  "call": "DB0NMS",
+  "freq": 439750,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO54AB",
+  "qth": "Neumünster",
+  "shift": -9400
+ },
+ {
+  "call": "DB0BNV",
+  "freq": 439825,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO43HE",
+  "qth": "Bremen-Vegesack",
+  "shift": -9400
+ },
+ {
+  "call": "DB0FTN",
+  "freq": 439887.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO43GM",
+  "qth": "Bremerhaven",
+  "shift": -9400,
+  "info": "Linkverbund DL-NORDWEST, DMR (BM)"
+ },
+ {
+  "call": "DO0BSH",
+  "freq": 439900,
+  "mode": "data",
+  "system": "C4FM",
+  "locator": "JO43XN",
+  "qth": "Hamburg - St. Pauli",
+  "shift": -9400,
+  "info": "FM/C4FM"
  },
  {
   "call": "DO0BSH",
@@ -474,7 +1224,8 @@
   "locator": "JO43XN",
   "qth": "Hamburg - St. Pauli",
   "shift": -9400,
-  "info": "FM/C4FM"
+  "info": "FM/C4FM",
+  "system": "FM"
  },
  {
   "call": "DM0TR",
@@ -484,7 +1235,57 @@
   "qth": "Trappenkamp",
   "shift": -9400,
   "tone": "123 Hz",
-  "info": "FM-Funknetz.de, CTCSS 123 Hz"
+  "info": "FM-Funknetz.de, CTCSS 123 Hz",
+  "system": "FM"
+ },
+ {
+  "call": "DB0DWL",
+  "freq": 439925,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO53IU",
+  "qth": "Lübeck",
+  "shift": -9400,
+  "info": "DB0DWL B ist mit XLX787 C verbunden"
+ },
+ {
+  "call": "DB0DWL",
+  "freq": 439950,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO53IU",
+  "qth": "Lübeck",
+  "shift": -9400,
+  "info": "DMR-ID 262234 Brandmeister"
+ },
+ {
+  "call": "DB0DWL-M",
+  "freq": 439950,
+  "mode": "data",
+  "system": "D-Star",
+  "locator": "JO53IU",
+  "qth": "Lübeck",
+  "shift": -9400,
+  "info": "Shift −9,4 MHz, Server XLX787, Multimode-Repeater"
+ },
+ {
+  "call": "DM0LUE",
+  "freq": 439962.5,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO53JT",
+  "qth": "Lüdersdorf",
+  "shift": -9400,
+  "info": "262007 IPSC2-DL-RPTR"
+ },
+ {
+  "call": "DB0DIT",
+  "freq": 439975,
+  "mode": "data",
+  "system": "DMR",
+  "locator": "JO43LX",
+  "qth": "Kronprinzenkoog",
+  "shift": -9400
  },
  {
   "call": "DB0FS",
@@ -492,6 +1293,7 @@
   "mode": "data",
   "locator": "JO43XO",
   "qth": "Hamburg - Lokstedt",
-  "info": "DAPNET Sender"
+  "info": "DAPNET Sender",
+  "system": "DAPNET"
  }
 ]

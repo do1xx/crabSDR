@@ -440,12 +440,13 @@ function showMarks(b) {
     if ((pass === 0) === !!m.minor) continue;
     var x = freq2x(m.freq, b), md = String(m.mode || 'FM').toUpperCase(), txt = m.text || '';
     var click = ' onclick="setFreqMark(' + b + ',' + m.freq + ',\'' + md + '\')"';
-    var inp = m.input ? 1 : 0, cls = m.rel != null ? ' rel' + (inp ? ' inp' : '') : '';
+    var inp = m.input ? 1 : 0, cls = m.rel != null ? ' rel' + (inp ? ' inp' : '') + (m.sys ? ' sys-' + m.sys : '') : '';
+    var tag = m.tag && !inp ? '<i class="sys">' + _crabEsc(m.tag) + '</i>' : '';
     var rel = m.rel != null ? ' onmouseenter="relHover(event,' + m.rel + ',1,' + inp + ')" onmousemove="relHover(event,' + m.rel + ',2,' + inp + ')" onmouseleave="relHover(event,' + m.rel + ',0,' + inp + ')"' : '';
     html += '<div class="dxl' + cls + '" style="left:' + x.toFixed(1) + 'px"' + rel + (m.rel != null ? click : '') + '></div>';
     if (!free(x)) continue;
     placed.push(x);
-    html += '<div class="dxm' + cls + '" style="left:' + (x - 6).toFixed(1) + 'px"' + (m.rel != null ? rel : ' title="' + _crabEsc(txt) + ' ' + (m.freq / 1000).toFixed(4) + ' MHz ' + md + '"') + click + '>' + _crabEsc(txt) + '</div>';
+    html += '<div class="dxm' + cls + '" style="left:' + (x - 6).toFixed(1) + 'px"' + (m.rel != null ? rel : ' title="' + _crabEsc(txt) + ' ' + (m.freq / 1000).toFixed(4) + ' MHz ' + md + '"') + click + '>' + _crabEsc(txt) + tag + '</div>';
   }
   B.bar.innerHTML = html;
 }
