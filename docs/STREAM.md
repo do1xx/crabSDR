@@ -38,7 +38,7 @@ auch für 4FSK (DMR) – Opus rundet die Flanken ab, PCM nicht.
 | `sq` | `auto` (6 dB über dem Rauschen), `auto:10` (eigener Abstand), `-85` (fest in dBFS), `off` | `auto` bei FM/Daten, sonst `off` |
 | `agc` | `fast`, `medium`, `slow`, `off` | `medium` |
 | `br` | Opus-Bitrate in kbit/s, 8–128 (nur `.ogg`) | Bitrate der Station (32) |
-| `pic` | `1` = Stationsbild in den OpusTags, `0` = ohne. Ohne Angabe: mit für Abspielprogramme, ohne für Browser (User-Agent Mozilla) – Chrome spielt Ogg mit eingebettetem Bild nicht ab |
+| `pic` | `1` = Stationsbild in den OpusTags, `0` = ohne. Ohne Angabe: mit für Abspielprogramme, ohne für Browser (User-Agent Mozilla) – Chrome spielt Ogg mit eingebettetem Bild nicht ab. Browser bekommen außerdem einen Kopf von knapp 32 kB und Ton mit konstanter Paketgröße: Chrome verarbeitet Streams nur in vollen 32-kB-Blöcken, der Ton läuft dort deshalb ~7,5 s (bei `br=64` ~4 s) hinterher |
 | `live` | `1` = Live-Titel per Ogg-Kettung (siehe unten), `0` = ein fester Titel. Ohne Angabe: an für Abspielprogramme, aus für Browser |
 | `cover` | `wf` = alle 10 s der Wasserfall um die Frequenz als Titelbild (nur mit Live-Titeln, nur `.ogg`) |
 | `name` | Anzeigename in der Hörerliste | `Stream` |

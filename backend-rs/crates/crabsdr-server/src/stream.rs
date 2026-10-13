@@ -38,6 +38,13 @@ const PER_PAGE: usize = 5;
 const MAX_BUFFER: usize = FRAME * 25;
 /// Vorlauf des Opus-Kodierers (Abtastwerte bei 48 kHz), die der Abspieler am Anfang jedes logischen Stroms verwirft
 const PRE_SKIP: u16 = 312;
+/// Zielgröße der Kopfseiten (OpusHead + OpusTags mit Polster) für Browser. Chrome reicht einen Strom ohne Content-Length
+/// nur in vollen 32-kB-Blöcken an seinen Demuxer weiter (gemessen 13.10.2026 mit dem Stationsstrom in Echtzeit: Bursts
+/// bis 62 kB und 93 kB nichts, 68 kB und 99 kB spielen – Grenzen 64 und 96 kB). Der Kopf endet deshalb knapp unter 32 kB,
+/// sodass die ersten Tonseiten den Block sofort vollmachen; danach kommt jeder weitere Block nach 32 kB Ton – bei
+/// konstanter Paketgröße (CBR, siehe `Encoder::new`) sind das bei 32 kbit/s rund 7,5 s, bei VBR-Stille (3-Byte-Pakete,
+/// ~0,5 kB/s) wären es über 60 s. Eine Minute „Laden“ auf DF0HHH kam genau daher
+const BROWSER_PAD: usize = 32 * 1024 - 1536;
 
 #[derive(Deserialize, Default)]
 pub struct StreamQuery {
@@ -228,13 +235,13 @@ pub async fn ogg(
     let live_on = matches!(format, Format::Ogg) && !iq && q.live.map(|v| v != 0).unwrap_or(!browser);
     let cover_on = live_on && q.cover.as_deref() == Some("wf");
     let mut live = Live::new(sp.freq, sp.mode);
-    let mut tags = Tags { title: if live_on { live.title() } else { title.clone() }, artist: format!("{} · crabSDR", station), album: station.clone(), picture, pad: if browser { 48 * 1024 } else { 0 } };
+    let mut tags = Tags { title: if live_on { live.title() } else { title.clone() }, artist: format!("{} · crabSDR", station), album: station.clone(), picture, pad: if browser { BROWSER_PAD } else { 0 } };
     let hub = state.decoders.clone();
     let (freq, bandwidth) = (sp.freq, sp.bandwidth);
     let (out_tx, out_rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(16);
     let ctype = match format { Format::Ogg => "audio/ogg", Format::Wav => "audio/wav" };
     tokio::spawn(async move {
-        let mut enc = match format { Format::Ogg => Some(match Encoder::new(bitrate, channels, tap.id as u32, tags.clone()) { Some(e) => e, None => return }), Format::Wav => None };
+        let mut enc = match format { Format::Ogg => Some(match Encoder::new(bitrate, channels, tap.id as u32, tags.clone(), browser) { Some(e) => e, None => return }), Format::Wav => None };
         let head = match &mut enc { Some(e) => e.headers(), None => wav_header(channels, rate, bits) };
         if out_tx.send(Ok(Bytes::from(head))).await.is_err() { return; }
         let mut cover = if cover_on { Some(Cover::new(&tap.pipeline, freq)) } else { None };
@@ -590,8 +597,9 @@ struct Encoder {
 }
 
 impl Encoder {
-    fn new(bitrate: u32, channels: u16, serial: u32, tags: Tags) -> Option<Self> {
-        let enc = OpusRaw::new(channels as i32, bitrate as i32)?;
+    /// `cbr`: konstante Paketgröße (für Browser, siehe BROWSER_PAD); sonst VBR
+    fn new(bitrate: u32, channels: u16, serial: u32, tags: Tags, cbr: bool) -> Option<Self> {
+        let enc = OpusRaw::new(channels as i32, bitrate as i32, cbr)?;
         Some(Self { enc, mux: OggOpus::new(serial, channels), buf: vec![0u8; 4000], channels: channels as usize, tags, fifo: VecDeque::with_capacity(FRAME * 3 * channels as usize), last: Vec::new(), chain_req: None, out: Vec::new(), fresh: false })
     }
     fn headers(&mut self) -> Vec<u8> { self.mux.headers(&self.tags) }
@@ -653,13 +661,16 @@ struct OpusRaw { st: *mut audiopus_sys::OpusEncoder, channels: i32 }
 unsafe impl Send for OpusRaw {}
 
 impl OpusRaw {
-    fn new(channels: i32, bitrate: i32) -> Option<Self> {
+    fn new(channels: i32, bitrate: i32, cbr: bool) -> Option<Self> {
         let mut err = 0i32;
         // SAFETY: Argumente gültig (48 kHz, 1–2 Kanäle); Zeiger wird nur hier gehalten und in Drop freigegeben
         let st = unsafe { audiopus_sys::opus_encoder_create(RATE as i32, channels, audiopus_sys::OPUS_APPLICATION_AUDIO, &mut err) };
         if st.is_null() || err != audiopus_sys::OPUS_OK { return None; }
         let e = Self { st, channels };
-        unsafe { audiopus_sys::opus_encoder_ctl(e.st, audiopus_sys::OPUS_SET_BITRATE_REQUEST, bitrate); }
+        unsafe {
+            audiopus_sys::opus_encoder_ctl(e.st, audiopus_sys::OPUS_SET_BITRATE_REQUEST, bitrate);
+            if cbr { audiopus_sys::opus_encoder_ctl(e.st, audiopus_sys::OPUS_SET_VBR_REQUEST, 0i32); }
+        }
         Some(e)
     }
     /// ein Rahmen (verschränkt) → Opus-Paket in `out`; None bei Fehler
@@ -735,9 +746,14 @@ impl OggOpus {
             pic.extend_from_slice(&(data.len() as u32).to_be_bytes()); pic.extend_from_slice(data);
             comments.push(format!("METADATA_BLOCK_PICTURE={}", base64(&pic)));
         }
-        // Polster für Browser: Chrome prüft den Strom erst, wenn einige zehn Kilobyte angekommen sind – bei einem leisen
-        // Kanal (Opus-Ruhepakete, ~1,5 kB/s) dauerte das eine halbe Minute „Laden“. Ein langer Kommentar füllt den Puffer sofort
-        if t.pad > 0 { comments.push(format!("PADDING={}", " ".repeat(t.pad))); }
+        // Polster für Browser (BROWSER_PAD): Chrome öffnet den Strom erst nach 64 kB – bei einem leisen Kanal
+        // (Opus-Ruhepakete, ~0,5 kB/s) dauerte das eine halbe Minute „Laden“. Ein langer Kommentar füllt den Puffer sofort
+        if t.pad > 0 {
+            // t.pad ist die Zielgröße beider Kopfseiten; Seitenköpfe und Lacing (1 Byte je 255) werden abgezogen
+            let so_far = 47 + 8 + 4 + vendor.len() + 4 + comments.iter().map(|c| 4 + c.len()).sum::<usize>();
+            let fill = t.pad.saturating_sub(so_far + 12 + 27 * (t.pad / 65_000 + 1) + t.pad / 255 + 2);
+            if fill > 0 { comments.push(format!("PADDING={}", " ".repeat(fill))); }
+        }
         tags.extend_from_slice(&(comments.len() as u32).to_le_bytes());
         for c in &comments { tags.extend_from_slice(&(c.len() as u32).to_le_bytes()); tags.extend_from_slice(c.as_bytes()); }
         let mut out = self.page(0x02, 0, &[head]);
@@ -999,7 +1015,7 @@ mod tests {
     /// neue Köpfe, und der neue Strom nimmt die 312 Werte aus der Verzögerung mit (kein Abtastwert geht verloren)
     #[test]
     fn kette_nachlauf() {
-        let mut e = Encoder::new(32_000, 1, 1, Tags::default()).expect("Opus-Kodierer");
+        let mut e = Encoder::new(32_000, 1, 1, Tags::default(), false).expect("Opus-Kodierer");
         let _ = e.headers();
         for _ in 0..5 { e.push(&vec![100i16; FRAME]); }
         let _ = e.flush();
@@ -1025,7 +1041,7 @@ mod tests {
     /// zum Abhören und zur Prüfung auf Knacken/Lücken (ffmpeg → WAV → Sprünge zwischen Abtastwerten)
     #[test]
     fn kette_sinus() {
-        let mut e = Encoder::new(32_000, 1, 1, Tags { title: "Glied 0".into(), ..Tags::default() }).expect("Opus-Kodierer");
+        let mut e = Encoder::new(32_000, 1, 1, Tags { title: "Glied 0".into(), ..Tags::default() }, false).expect("Opus-Kodierer");
         let mut out = e.headers();
         for i in 0..250 {                                             // 5 s
             let f: Vec<i16> = (0..FRAME).map(|k| ((2.0 * std::f64::consts::PI * 50.0 * (i * FRAME + k) as f64 / RATE as f64).sin() * 12000.0) as i16).collect();
@@ -1037,6 +1053,15 @@ mod tests {
         if let Ok(p) = std::env::var("CRAB_CHAIN_OUT") { std::fs::write(p, &out).expect("schreiben"); }
     }
 
+    /// Browser-Kopf: beide Kopfseiten zusammen knapp unter 32 kB (Chrome-Blockgrenze), nie darüber
+    #[test]
+    fn browser_kopf_unter_32k() {
+        let mut m = OggOpus::new(9, 1);
+        let h = m.headers(&Tags { title: "145700 kHz FM · DF0HHH WebSDR".into(), artist: "DF0HHH WebSDR · crabSDR".into(), album: "DF0HHH WebSDR".into(), picture: None, pad: BROWSER_PAD });
+        assert!(h.len() <= BROWSER_PAD && h.len() >= BROWSER_PAD - 64, "Kopf {} Byte, Ziel {}", h.len(), BROWSER_PAD);
+        assert!(h.len() + 3 * 440 < 32 * 1024, "drei CBR-Tonseiten müssen noch in den ersten 32-kB-Block passen");
+    }
+
     #[test]
     fn ogg_crc_bekannter_wert() {
         assert_eq!(ogg_crc(b"123456789"), 0x89a1_897f);
@@ -1045,7 +1070,7 @@ mod tests {
     /// Kodierer: Stille und ein Ton ergeben gültige Opus-Pakete und Seiten mit wachsender Granule
     #[test]
     fn opus_kodierer_laeuft() {
-        let mut e = Encoder::new(32_000, 1, 1, Tags { title: "Test".into(), artist: "crabSDR".into(), album: String::new(), picture: Some(("image/png".into(), vec![1, 2, 3])), pad: 0 }).expect("Opus-Kodierer");
+        let mut e = Encoder::new(32_000, 1, 1, Tags { title: "Test".into(), artist: "crabSDR".into(), album: String::new(), picture: Some(("image/png".into(), vec![1, 2, 3])), pad: 0 }, false).expect("Opus-Kodierer");
         let h = e.headers(); assert!(h.len() > 60);
         let silence = vec![0i16; FRAME];
         let tone: Vec<i16> = (0..FRAME).map(|i| ((i as f32 * 0.1).sin() * 8000.0) as i16).collect();

@@ -32,8 +32,13 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
   markiert, 3–25 kB) als `METADATA_BLOCK_PICTURE` ins neue Kettenglied – VLC zeigt es als Cover.
 - **Ogg-Kopf über mehrere Seiten:** Pakete mit mehr als 255 Segmenten (große OpusTags, z. B. mit Bild) verteilt der Muxer jetzt
   auf Fortsetzungsseiten (Flag 0x01, Granule −1); vorher überlief das Zählbyte und die Seite war ungültig. Für Browser
-  (User-Agent Mozilla) steht ein 48-kB-Polster (`PADDING`-Kommentar) im ersten Kopf, damit Chrome den Strom sofort prüft
-  statt bei leisem Kanal (3-Byte-Ruhepakete) eine halbe Minute zu „laden“.
+  (User-Agent Mozilla) enden die Kopfseiten mit einem `PADDING`-Kommentar knapp unter 32 kB und der Ton kommt mit
+  konstanter Paketgröße (CBR): Chrome reicht einen Strom ohne Content-Length nur in vollen 32-kB-Blöcken an seinen
+  Demuxer weiter (gemessen mit dem Stationsstrom in Echtzeit: Bursts bis 62 kB und 93 kB nichts, 68 kB und 99 kB spielen).
+  Mit VBR-Stille (3-Byte-Ruhepakete, ~0,5 kB/s) brauchte ein leiser Kanal über eine Minute je Block – der Browser-Stream von
+  DF0HHH blieb scheinbar für immer stumm. Jetzt füllen die ersten Tonseiten den ersten Block sofort, jeder weitere kommt
+  bei 32 kbit/s nach ~7,5 s (`?br=64`: ~4 s); so viel Verzögerung hat der Browser-Stream, der WebSocket-Ton der Oberfläche
+  nicht.
 - **Ogg-Stream spielt jetzt auch im Browser:** Chrome legte für das eingebettete Stationsbild eine Videospur ohne Bilder an
   und blieb stumm. Browser (User-Agent Mozilla) bekommen den Stream ohne Bild, Abspielprogramme weiter mit; `?pic=0|1`
   erzwingt es. Beispiel-Adressen auf der Info-Seite nutzen die öffentliche Adresse der Station ([station] url).
