@@ -226,6 +226,17 @@ impl DecoderHub {
         self.inner.lock().await.status.iter().filter(|s| s.plugin == plugin && p.may_decoder(&s.id, s.public)).map(|s| s.id.clone()).collect()
     }
 
+    /// Zustand der Decoder dieser Plugins, die diese Person sehen darf (beendete flüchtige DV-Decoder ausgenommen)
+    pub async fn visible_status(&self, plugins: &[&str], p: &crate::access::Principal) -> Vec<Status> {
+        self.inner.lock().await.status.iter().filter(|s| plugins.contains(&s.plugin.as_str()) && p.may_decoder(&s.id, s.public) && !(s.dynamic && s.state == "beendet")).cloned().collect()
+    }
+
+    /// Gespeicherte Treffer einer Art (z. B. `text` = Rufzeichen) der Decoder dieser Plugins, neueste zuerst – auch von
+    /// flüchtigen DV-Decodern, die schon beendet sind (der Ringpuffer behält sie)
+    pub async fn events_of(&self, plugins: &[&str], kind: &str, p: &crate::access::Principal, limit: usize) -> Vec<Event> {
+        self.inner.lock().await.events.iter().rev().filter(|e| e.kind == kind && plugins.contains(&e.plugin.as_str()) && p.may_decoder(&e.id, e.public)).take(limit).cloned().collect()
+    }
+
     /// Für die Admin-Seite: alle Decoder mit den letzten Zeilen ihrer Fehlerausgabe
     pub async fn admin_list(&self) -> Vec<Value> {
         self.inner.lock().await.status.iter().map(|s| {
@@ -313,6 +324,9 @@ impl DecoderHub {
                     match pick_active(cur.as_deref(), &locked) { Some(x) => { a.active.insert(grp.clone(), x); } None => { a.active.remove(grp); } }
                 }
                 data["on"] = json!(!locked.is_empty()); data["plugin"] = json!(st.plugin); ui_id = grp.clone();
+            } else if let (true, Some(grp)) = (k == "text", &st.group) {
+                // Rufzeichen (RADE: EOO-Rahmen, Codec 2: Textkanal) ebenfalls unter der Gruppen-ID, damit der Hörer es seinem DV-Knopf zuordnen kann
+                data["plugin"] = json!(st.plugin); ui_id = grp.clone();
             }
             if let (true, Some(tx)) = (k == "sync" || k == "text", &st.bcast) {
                 let msg = json!({ "type": "decoder", "id": ui_id, "kind": k, "data": data });

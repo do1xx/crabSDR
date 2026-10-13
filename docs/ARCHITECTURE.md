@@ -67,7 +67,8 @@ Befehle vom Browser: `tune` (Frequenz, Modus, Bandbreite), `untune`, `set_squelc
 | `/api/health` | Zustand, Version, Laufzeit |
 | `/api/bands`, `/api/listeners` | Bänder, Hörer (`n` Personen, `n_audio` hören gerade, `connections` Verbindungen) |
 | `/api/decoders`, `/api/decoders/events?since=&wait=1` | Decoder-Zustand, Meldungen (Langabfrage) |
-| `/digi/aprs.json`, `ft8.json`, `sstv.json`, `relais.json` | Übersichten der Decoder |
+| `/digi/aprs.json`, `ft8.json`, `sstv.json`, `relais.json`, `pocsag.json` | Übersichten der Decoder |
+| `/digi/freedv.json` | FreeDV: Codec-2-Zustand, DV-Decoder und gehörte Rufzeichen (`text`-Treffer von `rade`/`freedv` aus dem Ereignisspeicher) |
 | `/logbuch/api/chat`, `/logbuch/api/log`, `/logbuch/api/online` | Chat, Logbuch, Hörer online |
 | `/admin/`, `/api/admin/…` | Admin-Seite und ihre Schnittstelle (nur mit Admin-Anmeldung) |
 | `/api/auth/…` | Anmelden, Passwort ändern, eigenes Konto |
@@ -114,8 +115,12 @@ enthält die Modellgewichte; das Programm liegt nicht im Repo. Testsender `rade_
 Decoder; zusammen bilden sie die Gruppe `dv-<Hz>`, die der Hörer abonniert (`{"type":"dv","freq":…}` →
 `{"type":"dv","id":"dv-<Hz>"}`). Von der Gruppe spielt nur das Mitglied mit Lock (`pick_active`: bisheriges bleibt,
 solange es Lock hat, sonst das erste in `DV_PLUGINS`); Sync-Meldungen an die Hörer des Bandes tragen die Gruppen-ID und
-den Lock der Gruppe (`data.on`), dazu `data.plugin`. `dv_max` begrenzt die Gruppen (Frequenzen), nicht die Prozesse;
-ohne Hörer enden alle Mitglieder (sofort beim Weiterdrehen, sonst nach ≈ 90 s).
+den Lock der Gruppe (`data.on`), dazu `data.plugin`; `text`-Treffer (Rufzeichen) ebenso unter der Gruppen-ID. Die
+Oberfläche zeigt das jüngste Rufzeichen als Marke neben dem Knopf „DV“ (`_crabDecTextMark` in `core.js`: gehörte Gruppe,
+sonst DV-Gruppe nahe der eingestellten Frequenz; Anfangszustand aus `/api/decoders/events`, dort noch unter der
+Mitglieds-ID `dv-<Hz>-rade`). `dv_max` begrenzt die Gruppen (Frequenzen), nicht die Prozesse; ohne Hörer enden alle
+Mitglieder (sofort beim Weiterdrehen, sonst nach ≈ 90 s); ihre Treffer bleiben im Ringpuffer und erscheinen auf der
+Digital-Seite im Reiter „FreeDV“.
 
 ```json
 {

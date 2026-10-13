@@ -63,3 +63,5 @@ body:not(.dec-aprs) .aprsonly { display: none; }
 body:not(.dec-reichweite) .rwonly { display: none; }
 
 body.dec-nomap .card-map { display: none; }
+
+.pk .ok { color: var(--ok); } .pk .warn { color: var(--warn); }

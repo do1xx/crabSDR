@@ -475,5 +475,9 @@ body.min.hoeren .panel { box-shadow: none; }
 @keyframes dvlock { 0%, 100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); } 50% { box-shadow: 0 0 10px 2px rgba(52, 211, 153, .6); } }
 @media (prefers-reduced-motion: reduce) { .modes .btn[data-dec].lock { animation: none; box-shadow: 0 0 8px 1px rgba(52, 211, 153, .5); } }
 
+/* Rufzeichen neben dem Knopf „DV“ (RADE: EOO-Rahmen am Ende der Durchgabe, Codec 2: Textkanal); grau, wenn älter als 10 min */
+.modes .dvcall { flex: 0 0 auto; align-self: center; font: 600 11px/1 "JetBrains Mono", Menlo, monospace; letter-spacing: .04em; padding: 5px 8px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); background: var(--accent-dim); white-space: nowrap; cursor: default; }
+.modes .dvcall.old { border-color: var(--line); color: var(--muted); background: transparent; }
+
 /* In DV (dekodierte Sprache) wirken Bandbreite und AGC nicht: ausgegraut, nicht klickbar */
 body.dvmode .bwpresets .btn, body.dvmode #agccontrol, body.dvmode .bwrow .btn { opacity: .35; pointer-events: none; }

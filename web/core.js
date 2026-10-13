@@ -87,6 +87,7 @@ function _crabRetune() {
     drawPassband(); return;
   }
   if (_crab.decAudio) { _crab.decAudio = null; _crabStatus(''); _crabMarkDec(); }   // fester Decoder: Abstimmen holt den Kanal zurück
+  else if (_crab.decText) _crabDecTextMark();   // Rufzeichen-Marke gilt je Frequenz
   if (B && B.ws && B.ws.readyState === 1) B.ws.send(JSON.stringify(_crabTuneMsg()));
   drawPassband();
 }
@@ -848,7 +849,10 @@ function _crabConnect(b) {
         var j; try { j = JSON.parse(new TextDecoder().decode(u8.subarray(1))); } catch (e) { return; }
         if (j.type === 'level') { if (b === band) { _crab.level = j.db; _crab.floor = j.floor; _crab.sq = j.sq; } }
         else if (j.type === 'listeners') { _crabListenersFromWs(b, j.list || []); }
-        else if (j.type === 'decoder') { if (j.kind === 'sync') { _crab.decLock = _crab.decLock || {}; _crab.decLock[j.id] = !!(j.data && j.data.on); _crabMarkDec(); } }   // FreeDV-Lock → Knopf „DV“ leuchtet
+        else if (j.type === 'decoder') {   // Ton-Decoder im Band: Lock → Knopf „DV“ leuchtet; Rufzeichen (RADE: EOO-Rahmen, Codec 2: Textkanal) → Marke am Knopf
+          if (j.kind === 'sync') { _crab.decLock = _crab.decLock || {}; _crab.decLock[j.id] = !!(j.data && j.data.on); _crabMarkDec(); }
+          else if (j.kind === 'text' && j.data && j.data.text) { _crabDecTextPut(j.id, j.data, Date.now() / 1000); _crabMarkDec(); }
+        }
         else if (j.type === 'dv') { if (_crab.decAudio) _crab.decAudio = j.id; _crabMarkDec(); }
         else if (j.type === 'center_freq_update') { _crabCenterChanged(b, j.center_freq / 1000, j.sample_rate ? j.sample_rate / 1000 : bi[b].samplerate); }   // freier VFO: neue Mitte (Rundsendung an alle Hörer des Bandes)
         else if (j.type === 'system_stats') { if (b === band) { _crab.sysPct = (j.sys_pct != null) ? j.sys_pct : null; _crabStatus('Past 10 seconds: CPUload=' + (j.cpu_pct != null ? j.cpu_pct.toFixed(1) : '0.0') + '%, ' + j.clients + ' users; ' + j.channels + ' channels'); } }
@@ -1088,6 +1092,12 @@ function _crabDecText(e) {
   if (e.plugin === 'aprs') return (d.src || '') + (d.direct ? '' : ' (über ' + (d.digi || 'Digi') + ')') + (d.comment || d.status ? ' · ' + (d.comment || d.status) : '');
   if (e.plugin === 'ft8') return (d.msg || '') + (d.snr != null ? '  ' + d.snr + ' dB' : '');
   if (e.plugin === 'sstv') return e.kind === 'vis' ? 'Bild beginnt: ' + (d.mode || '') : 'Bild ' + (d.mode || '') + (d.lines ? ' · ' + d.lines + '/' + d.of + ' Zeilen' : '');
+  if (e.plugin === 'rade' || e.plugin === 'freedv') {
+    var snr = d.snr != null ? ' · ' + Math.round(d.snr) + ' dB' : '';
+    if (e.kind === 'text') return 'Rufzeichen ' + (d.text || '') + ' · ' + (d.mode || '') + snr;
+    if (e.kind === 'sync') return (d.on ? 'Signal ' : 'Signal weg ') + (d.mode || '') + snr;
+    if (e.kind === 'eoo') return 'Ende der Durchgabe · ' + (d.mode || '') + snr;
+  }
   return d.text || d.msg || d.message || JSON.stringify(d).slice(0, 80);
 }
 function _crabAgo(t) { var s = Math.max(0, Date.now() / 1000 - t); return s < 90 ? 'gerade' : s < 5400 ? 'vor ' + Math.round(s / 60) + ' min' : 'vor ' + Math.round(s / 3600) + ' h'; }
@@ -1151,15 +1161,49 @@ function _crabMarkDec() {
     if (b.dataset.dec) { b.classList.toggle('active', !!mine); b.classList.toggle('lock', lock); }
     else if (mine) b.classList.remove('active');
   });
+  _crabDecTextMark();
 }
+/* Rufzeichen der DV-Decoder (RADE: aus dem EOO-Rahmen am Ende der Durchgabe, Codec 2: Textkanal), je Decoder- oder
+   Gruppen-ID das jüngste. Live über den WebSocket (Gruppen-ID dv-<Hz>), beim Laden aus api/decoders/events (Mitglieds-ID
+   dv-<Hz>-rade) – die Suche nimmt beides. */
+function _crabDecTextPut(id, d, t) {
+  _crab.decText = _crab.decText || {}; var o = _crab.decText[id];
+  if (!o || t >= o.t) _crab.decText[id] = { text: String(d.text).slice(0, 24), mode: d.mode || '', snr: d.snr, plugin: d.plugin || '', t: t };
+}
+/* jüngster Text zur ID (Gruppe samt Mitgliedern); ohne ID: einer DV-Gruppe nahe der Frequenz hz (±3 kHz) */
+function _crabDecTextFor(id, hz) {
+  var T = _crab.decText || {}, best = null;
+  Object.keys(T).forEach(function (k) {
+    var m, ok = id ? (k === id || k.indexOf(id + '-') === 0) : !!((m = /^dv-(\d+)/.exec(k)) && Math.abs(Number(m[1]) - hz) <= 3000);
+    if (ok && (!best || T[k].t > best.t)) best = T[k];
+  });
+  return best;
+}
+/* Marke neben dem Knopf „DV“: Rufzeichen der gehörten Gruppe, sonst einer DV-Gruppe auf der eingestellten Frequenz;
+   Tooltip mit Mode, SNR und Alter; grau nach 10 min, weg nach 1 h */
+function _crabDecTextMark() {
+  var dv = document.querySelector('#modes .btn[data-dec]'), badge = document.getElementById('dvcall');
+  if (!dv) { if (badge) badge.remove(); return; }
+  var mine = _crab.decAudio, base = 'FreeDV (RADE ab 2.0 und Codec 2): digitale Sprache auf der eingestellten Frequenz dekodieren';
+  var tx = _crabDecTextFor(mine && mine !== 'dv' ? mine : null, Math.round(dialFreq() * 1000)), age = tx ? Date.now() / 1000 - tx.t : Infinity;
+  if (!tx || age > 3600) { if (badge) badge.remove(); dv.title = base; return; }
+  var info = tx.text + ' · ' + (tx.mode || (tx.plugin === 'rade' ? 'RADE' : 'FreeDV')) + (tx.snr != null ? ' · ' + Math.round(tx.snr) + ' dB' : '') + ' · ' + _crabAgo(tx.t);
+  dv.title = base + '\nZuletzt gehört: ' + info;
+  if (!badge) { badge = document.createElement('span'); badge.id = 'dvcall'; badge.className = 'dvcall'; dv.insertAdjacentElement('afterend', badge); }
+  badge.textContent = tx.text; badge.title = 'Zuletzt in DV gehört: ' + info; badge.classList.toggle('old', age > 600);
+}
+setInterval(function () { if (_crab.decText) _crabDecTextMark(); }, 30000);   // „vor n min“ und Ausgrauen nachführen
 function _crabLoadAudioDecs() {
   var x = new XMLHttpRequest(); x.open('GET', 'api/decoders'); if (window.crabAccount) crabAccount.header(x);
   x.onload = function () {
     try { var J = JSON.parse(x.responseText); _crab.audioDecs = J.decoders.filter(function (d) { return d.audio; }); _crab.dvAvail = !!J.dv; } catch (e) { _crab.audioDecs = []; }
     _crabDecButtons();
-    // Anfangszustand des Locks aus den letzten Treffern (danach kommt er live über den WebSocket)
-    if (_crab.audioDecs.length) { var y = new XMLHttpRequest(); y.open('GET', 'api/decoders/events?limit=100'); if (window.crabAccount) crabAccount.header(y);
-      y.onload = function () { try { var L = {}; JSON.parse(y.responseText).events.forEach(function (e) { if (e.kind === 'sync') L[e.id] = !!(e.data && e.data.on); }); _crab.decLock = L; _crabMarkDec(); } catch (e) {} }; y.send(); }
+    // Anfangszustand von Lock und Rufzeichen aus den letzten Treffern (danach kommen sie live über den WebSocket)
+    if (_crab.audioDecs.length || _crab.dvAvail) { var y = new XMLHttpRequest(); y.open('GET', 'api/decoders/events?limit=300'); if (window.crabAccount) crabAccount.header(y);
+      y.onload = function () { try { var L = {}; JSON.parse(y.responseText).events.forEach(function (e) {
+        if (e.kind === 'sync') L[e.id] = !!(e.data && e.data.on);
+        else if (e.kind === 'text' && e.data && e.data.text && (e.plugin === 'rade' || e.plugin === 'freedv')) _crabDecTextPut(e.id, e.data, e.t);
+      }); _crab.decLock = L; _crabMarkDec(); } catch (e) {} }; y.send(); }
   };
   x.send();
 }

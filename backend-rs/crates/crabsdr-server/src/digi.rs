@@ -3,7 +3,8 @@
 //!   /digi/aprs.json, /digi/relais.json   vom ersten öffentlichen APRS-Decoder (aprs.json, relais.json)
 //!   /digi/ft8.json                       vom ersten öffentlichen FT8-Decoder
 //!   /digi/sstv.json                      alle öffentlichen SSTV-Decoder zusammen, neueste Bilder zuerst
-//! Fehlt der Decoder oder seine Datei, kommt 404.
+//!   /digi/freedv.json                    FreeDV: freedv.json des Codec-2-Decoders + Rufzeichen (text-Treffer) von rade und freedv
+//! Fehlt der Decoder oder seine Datei, kommt 404 (freedv.json: leere Listen).
 
 use axum::{extract::State, http::{header, HeaderMap, StatusCode}, response::{IntoResponse, Response}};
 use serde_json::{json, Value};
@@ -35,7 +36,24 @@ pub async fn aprs(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response { fi
 pub async fn relais(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response { first(&s, &h, "aprs", "relais.json").await }
 pub async fn ft8(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response { first(&s, &h, "ft8", "ft8.json").await }
 pub async fn pocsag(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response { first(&s, &h, "pocsag", "pocsag.json").await }
-pub async fn freedv(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response { first(&s, &h, "freedv", "freedv.json").await }
+/// Seite „FreeDV“: Zustand der Codec-2-Decoder (`freedv.json` des ersten sichtbaren `freedv`-Decoders: `active`, `modes`),
+/// die sichtbaren Decoder beider DV-Plugins (`rade`, `freedv`, auch die flüchtigen der Betriebsart DV) und die
+/// Rufzeichen (`text`-Treffer aus dem Ereignisspeicher: RADE aus dem EOO-Rahmen, Codec 2 aus dem Textkanal), neueste zuerst.
+/// Nie 404: ohne Decoder leere Listen – die Rufzeichen bleiben im Ringpuffer, auch wenn der DV-Decoder schon beendet ist.
+pub async fn freedv(State(s): State<Arc<AppState>>, h: HeaderMap) -> Response {
+    let p = crate::access::from_headers_or_guest(&s, &h).await;
+    let mut status = Value::Null;
+    for id in s.decoders.visible_ids("freedv", &p).await {
+        if let Some(v) = read(&s, &id, "freedv.json").await.and_then(|b| serde_json::from_slice::<Value>(&b).ok()) { status = v; break; }
+    }
+    let decs: Vec<Value> = s.decoders.visible_status(crate::decoders::DV_PLUGINS, &p).await.iter().map(|d| json!({
+        "id": d.id, "plugin": d.plugin, "label": d.label, "band": d.band, "freq": d.freq, "state": d.state, "dynamic": d.dynamic, "events": d.events, "last_event": d.last_event })).collect();
+    let calls: Vec<Value> = s.decoders.events_of(crate::decoders::DV_PLUGINS, "text", &p, 500).await.iter().map(|e| json!({
+        "t": e.t.round() as i64, "text": e.data.get("text").and_then(|v| v.as_str()).unwrap_or(""), "mode": e.data.get("mode").and_then(|v| v.as_str()).unwrap_or(""),
+        "snr": e.data.get("snr").and_then(|v| v.as_f64()), "freq": e.freq, "band": e.band, "plugin": e.plugin, "id": e.id })).collect();
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    json_resp(json!({ "ts": now, "status": status, "decoders": decs, "calls": calls }).to_string().into_bytes())
+}
 
 /// Neuestes SSTV-Bild für Monitore, Spiegel und Skripte: /digi/sstv/latest.png (immer das jüngste Bild, nie gecacht)
 /// und /digi/sstv/latest.json (sein Eintrag). `?decoder=<id>` nur dieser Decoder, `?max_age=<s>` 404, wenn älter.

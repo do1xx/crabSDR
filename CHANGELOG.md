@@ -4,6 +4,19 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 
 ## Unveröffentlicht
 
+### Oberfläche
+- **RADE-Rufzeichen sichtbar.** Das Rufzeichen, das `crab_rade` am Ende jeder Durchgabe aus dem EOO-Rahmen meldet
+  (`{"kind":"text",…}`), erscheint jetzt als Marke neben dem Knopf „DV“ (Tooltip: Mode, SNR, „vor n min“; grau nach
+  10 min, weg nach 1 h) – für die gehörte DV-Gruppe, sonst für eine DV-Gruppe auf der eingestellten Frequenz (±3 kHz);
+  Anfangszustand beim Laden aus `api/decoders/events`, danach live über den WebSocket. Der Server sendet `text`-Treffer
+  einer DV-Gruppe wie `sync` unter der Gruppen-ID (`dv-<Hz>`, `data.plugin`). Das Decoder-Menü zeigt Sync, EOO und
+  Rufzeichen der DV-Plugins lesbar statt als JSON.
+- **Digital-Seite: Reiter „FreeDV“.** Neu (bisher nur vorbereitet): Liste der gehörten Rufzeichen (Zeit, Rufzeichen,
+  Frequenz, Mode, SNR) aus dem Ereignisspeicher der Plugins `rade` und `freedv` – auch von schon beendeten DV-Decodern –,
+  dazu die Decoder (feste und flüchtige der Betriebsart DV) und der Codec-2-Zustand aus `freedv.json`. Der Reiter
+  erscheint, sobald die Station DV kann oder ein `rade`/`freedv`-Decoder läuft; Deep-Link `digi/?tab=freedv`.
+  `/digi/freedv.json` liefert dafür `{status, decoders, calls}` statt nur der Plugin-Datei (nie 404).
+
 ### Info-Seite
 - **Impressum und Datenschutzerklärung neu gefasst:** sachlich, ohne Anrede, auf das beschränkt, was die Software
   tatsächlich verarbeitet; Chat-Haltegrenzen, Verbund und Verzeichnis kommen aus der Konfiguration. Neu `[station]`
