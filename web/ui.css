@@ -486,5 +486,9 @@ body.dvmode .bwpresets .btn, body.dvmode #agccontrol, body.dvmode .bwrow .btn { 
 .dxl.rel { width: 3px; margin-left: -1px; background: #2f8f6a; cursor: pointer; }
 .dxl.rel:hover { background: #5fd9a8; }
 body.look-crab .dxl.rel { background: #3c6; }
+/* Eingabe-Marken („↑ Rufzeichen“): zweitrangig – gedimmt und schmaler, damit die Ausgabe auffällt */
+.dxm.rel.inp { opacity: .55; font-style: italic; }
+.dxl.rel.inp { width: 1px; margin-left: 0; opacity: .6; }
+.dxl.rel.inp:hover, .dxm.rel.inp:hover { opacity: 1; }
 .relpanel { position: fixed; z-index: 60; max-width: 300px; background: rgba(16, 20, 26, .96); color: #ddd; border: 1px solid #3d5a6a; border-radius: 6px; padding: 6px 9px; font: 12px/1.45 system-ui, sans-serif; pointer-events: none; box-shadow: 0 4px 16px rgba(0, 0, 0, .5); }
 .relpanel .muted { color: #9ab; }

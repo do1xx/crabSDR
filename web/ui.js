@@ -400,19 +400,20 @@
     relais.forEach(function (r, i) {
       var prio = r.km != null ? r.km : 9999, md = r.mode.toUpperCase();
       if (r.khz >= lo_ && r.khz <= hi_) list.push({ freq: r.khz, mode: md, text: r.call, rel: i, prio: prio });
-      if (r.shift) { var inp = r.khz + r.shift; if (inp >= lo_ && inp <= hi_) list.push({ freq: inp, mode: md, text: r.call + ' ↑', rel: i, input: true, minor: true, prio: prio }); }
+      if (r.shift) { var inp = r.khz + r.shift; if (inp >= lo_ && inp <= hi_) list.push({ freq: inp, mode: md, text: '↑ ' + r.call, rel: i, input: true, minor: true, prio: prio }); }
     });
-    marks = list.sort(function (a, c) { return a.freq - c.freq; });
+    marks = marksByBand[b] = list.sort(function (a, c) { return a.freq - c.freq; });
     showMarks(b);
   };
   /* Hover-Tafel zu einer Relais-Marke: on = 1 zeigen, 2 nur nachführen, 0 weg */
-  window.relHover = function (ev, i, on) {
+  window.relHover = function (ev, i, on, inp) {
     var p = $('relpanel'); if (!p) return;
     if (!on) { p.hidden = true; return; }
     var r = relais[i]; if (!r) return;
     if (on === 1) {
-      var de = lang === 'de', rows = ['<b>' + escapeHtml(r.call) + '</b> · ' + fmtMhz(r.khz) + ' MHz ' + r.mode.toUpperCase()];
-      if (r.shift) rows.push((de ? 'Eingabe ' : 'Input ') + fmtMhz(r.khz + r.shift) + ' MHz (' + (r.shift > 0 ? '+' : '−') + fmtMhz(Math.abs(r.shift)) + ' MHz)');
+      var de = lang === 'de', ab = (r.shift > 0 ? '+' : '−') + fmtMhz(Math.abs(r.shift || 0)) + ' MHz', rows;
+      if (inp) rows = ['<b>↑ ' + (de ? 'Eingabe von ' : 'Input of ') + escapeHtml(r.call) + '</b> · ' + fmtMhz(r.khz + r.shift) + ' MHz ' + r.mode.toUpperCase(), (de ? 'Ausgabe ' : 'Output ') + fmtMhz(r.khz) + ' MHz (' + ab + ')', '<span class="muted">' + (de ? 'Hier hört man die Stationen direkt, nicht das Relais' : 'Direct signals of the users, not the repeater') + '</span>'];
+      else { rows = ['<b>' + escapeHtml(r.call) + '</b> · ' + fmtMhz(r.khz) + ' MHz ' + r.mode.toUpperCase()]; if (r.shift) rows.push((de ? 'Eingabe ' : 'Input ') + fmtMhz(r.khz + r.shift) + ' MHz (' + ab + ')'); }
       if (r.tone) rows.push((de ? 'Ton ' : 'Tone ') + escapeHtml(r.tone));
       if (r.qth || r.locator) rows.push(escapeHtml(r.qth) + (r.locator ? (r.qth ? ' · ' : '') + escapeHtml(r.locator) : ''));
       if (r.km != null) rows.push(r.km + ' km' + (r.deg != null ? ' · ' + r.deg + '° ' + compass(r.deg) : '') + (de ? ' von hier' : ' from here'));

@@ -6,7 +6,7 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 
 ### Oberfläche
 - **Relais-Marker mit Hover-Tafel.** `relais.json` im Stationsordner trägt jetzt `locator` und `qth`; daraus entstehen Marker im
-  Wasserfall (Rufzeichen an der Ausgabe, kleine Marke „↑“ an der Eingabe, wo das Band sie zeigt) und beim Überfahren eine
+  Wasserfall (Rufzeichen an der Ausgabe; die Eingabe als gedimmte Marke „↑ Rufzeichen“, wo das Band sie zeigt) und beim Überfahren eine
   Tafel mit Ausgabe/Eingabe/Ablage, Ton, QTH, Locator, Entfernung und Richtung von der Station (aus `[station]` locator
   bzw. lat/lon). Bei Gedränge behalten die nahen Relais ihre Beschriftung, die fernen nur die (jetzt breitere, anklickbare)
   Linie – die Tafel geht an beiden. Die Liste hinter „Liste“ zeigt zusätzlich die Richtung.

@@ -423,25 +423,29 @@ document.addEventListener('mouseup', mouseup);
 /* ===== Marker (marks) unter dem Wasserfall, Hörerliste ===== */
 var _crabMODEFILTER = { fm: [-6, 6], am: [-4, 4], usb: [0.3, 2.7], lsb: [-2.7, -0.3], cw: [-0.95, -0.55] };
 function _crabEsc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+var marksByBand = {};   // Marken je Band (ui.js füllt sie in loadMarks); `marks` bleibt für alte Aufrufer
 function showMarks(b) {
   var id = band2id(b), B = _crab.bands[b]; if (id < 0 || !B || !B.bar) return;
+  var list = marksByBand[b] || marks;
+  if (typeof window.relHover === 'function') window.relHover(null, 0, 0);   // Tafel weg, sonst bleibt sie beim Neuzeichnen unter der Maus hängen
   var e = bi[b], lo_ = e.effcenterfreq - e.effsamplerate / 2, hi_ = e.effcenterfreq + e.effsamplerate / 2, html = '';
   // Linien für alle Marken; Beschriftungen nur, wo Platz ist (44 px): erst die wichtigen, dann Kanalraster wie LPD 1–69
   // (markers.json: "minor": true) in die Lücken – so verdeckt „LPD 5“ nicht „MeshCom“
   // Reihenfolge der Beschriftung: erst feste Marken (prio 0), dann Relais nach Entfernung (prio = km) – wird es eng,
   // behalten die nahen Relais ihr Rufzeichen, die fernen nur die Linie (die Hover-Tafel geht an beiden)
-  var placed = [], order = marks.slice().sort(function (a, c) { return ((a.prio || 0) - (c.prio || 0)) || (a.freq - c.freq); });
+  var placed = [], order = list.slice().sort(function (a, c) { return ((a.prio || 0) - (c.prio || 0)) || (a.freq - c.freq); });
   var free = function (x) { for (var k = 0; k < placed.length; k++) if (Math.abs(x - placed[k]) < 44) return false; return true; };
   if (!hideMarks) for (var pass = 0; pass < 2; pass++) for (var i = 0; i < order.length; i++) {
     var m = order[i]; if (m.freq < lo_ || m.freq > hi_) continue;
     if ((pass === 0) === !!m.minor) continue;
     var x = freq2x(m.freq, b), md = String(m.mode || 'FM').toUpperCase(), txt = m.text || '';
     var click = ' onclick="setFreqMark(' + b + ',' + m.freq + ',\'' + md + '\')"';
-    var rel = m.rel != null ? ' onmouseenter="relHover(event,' + m.rel + ',1)" onmousemove="relHover(event,' + m.rel + ',2)" onmouseleave="relHover(event,' + m.rel + ',0)"' : '';
-    html += '<div class="dxl' + (m.rel != null ? ' rel' : '') + '" style="left:' + x.toFixed(1) + 'px"' + rel + (m.rel != null ? click : '') + '></div>';
+    var inp = m.input ? 1 : 0, cls = m.rel != null ? ' rel' + (inp ? ' inp' : '') : '';
+    var rel = m.rel != null ? ' onmouseenter="relHover(event,' + m.rel + ',1,' + inp + ')" onmousemove="relHover(event,' + m.rel + ',2,' + inp + ')" onmouseleave="relHover(event,' + m.rel + ',0,' + inp + ')"' : '';
+    html += '<div class="dxl' + cls + '" style="left:' + x.toFixed(1) + 'px"' + rel + (m.rel != null ? click : '') + '></div>';
     if (!free(x)) continue;
     placed.push(x);
-    html += '<div class="dxm' + (m.rel != null ? ' rel' : '') + '" style="left:' + (x - 6).toFixed(1) + 'px"' + (m.rel != null ? rel : ' title="' + _crabEsc(txt) + ' ' + (m.freq / 1000).toFixed(4) + ' MHz ' + md + '"') + click + '>' + _crabEsc(txt) + '</div>';
+    html += '<div class="dxm' + cls + '" style="left:' + (x - 6).toFixed(1) + 'px"' + (m.rel != null ? rel : ' title="' + _crabEsc(txt) + ' ' + (m.freq / 1000).toFixed(4) + ' MHz ' + md + '"') + click + '>' + _crabEsc(txt) + '</div>';
   }
   B.bar.innerHTML = html;
 }
