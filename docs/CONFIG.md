@@ -79,6 +79,7 @@ Umgebungsvariablen überschreiben: `PORT`, `PLUGIN_DIR`, `FRONTEND_DIR`, `DATA_D
 | `lat`, `lon` | Standort in Dezimalgrad; ohne Angabe die Mitte des Locators. Dient für Entfernungen im Logbuch, auf der Digital-Seite, für die Reichweite und als Standort der APRS-iGate-Bake |
 | `url` | öffentliche Adresse, z. B. `https://sdr.example.org` (optional; nötig für das Verzeichnis) |
 | `operator`, `address`, `contact` | Betreiber (Name/Rufzeichen), Anschrift (Zeilen mit ` · ` trennen), E-Mail. Mit `operator` zeigt die Info-Seite ein Impressum, der Fuß verlinkt es. Der Datenschutz-Hinweis auf der Info-Seite ist immer da (`[ui] datenschutz` überschreibt den Link) |
+| `hosting`, `hosting_log_days` | Vorgeschalteter Server (Proxy/Hoster), z. B. `"Hetzner Online GmbH, Gunzenhausen"`, und die Aufbewahrung seines Zugriffsprotokolls in Tagen; erscheint in der Datenschutzerklärung. Leer, wenn die Station direkt erreichbar ist |
 
 ## `[[bands]]` – ein Eintrag je Empfänger
 

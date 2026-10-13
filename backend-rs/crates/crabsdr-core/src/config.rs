@@ -136,10 +136,16 @@ pub struct StationConfig {
     pub address: String,
     #[serde(default)]
     pub contact: String,
+    /// Vorgeschalteter Server (Proxy/Hoster) für die Datenschutzerklärung, z. B. "Hetzner Online GmbH, Gunzenhausen";
+    /// leer = die Station ist direkt erreichbar. `hosting_log_days`: wie lange dessen Zugriffsprotokoll aufbewahrt wird
+    #[serde(default)]
+    pub hosting: String,
+    #[serde(default)]
+    pub hosting_log_days: u32,
 }
 fn default_station_name() -> String { "crabSDR".into() }
 impl Default for StationConfig {
-    fn default() -> Self { Self { name: default_station_name(), subtitle: String::new(), url: String::new(), locator: String::new(), lat: None, lon: None, operator: String::new(), address: String::new(), contact: String::new() } }
+    fn default() -> Self { Self { name: default_station_name(), subtitle: String::new(), url: String::new(), locator: String::new(), lat: None, lon: None, operator: String::new(), address: String::new(), contact: String::new(), hosting: String::new(), hosting_log_days: 0 } }
 }
 impl StationConfig {
     /// Standort: lat/lon, sonst Mitte des Locators (4/6/8 Zeichen), sonst None

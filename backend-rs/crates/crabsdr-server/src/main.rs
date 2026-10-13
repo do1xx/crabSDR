@@ -736,7 +736,10 @@ async fn ui_json(State(state): State<Arc<AppState>>) -> impl IntoResponse {
         let home = station.home();
         o.insert("station".into(), json!({"name": station.name, "subtitle": station.subtitle, "locator": station.locator, "url": station.url,
             "lat": home.map(|h| (h.0 * 1e5).round() / 1e5), "lon": home.map(|h| (h.1 * 1e5).round() / 1e5),
-            "operator": station.operator, "address": station.address, "contact": station.contact}));
+            "operator": station.operator, "address": station.address, "contact": station.contact,
+            "hosting": station.hosting, "hosting_log_days": station.hosting_log_days}));
+        // Zahlen für die Datenschutzerklärung der Info-Seite: Chat-Haltegrenzen, Verzeichnis an/aus
+        { let c = state.config.read().await; o.insert("datenschutz".into(), json!({"chat_lines": c.chat_keep_lines, "chat_hours": c.chat_keep_hours, "directory": c.directory.enabled})); }
         // Admin-Link (nur bei Aufruf über private Adressen sichtbar): eigene Angabe, sonst die eingebaute Admin-Seite
         let admin_link = ui.admin.clone().or_else(|| state.auth.is_some().then(|| "admin/".to_string()));
         // Impressum/Datenschutz: eigene Links, sonst die Abschnitte auf der Info-Seite (Impressum nur mit Betreiber-Angabe)

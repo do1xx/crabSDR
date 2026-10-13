@@ -18,6 +18,20 @@ crabReady(function (UI) {
     $('imp').innerHTML = imp.map(function (r) { return '<dt>' + r[0] + '</dt><dd>' + r[1] + '</dd>'; }).join('');
     $('impwrap').hidden = false;
   }
+  // Datenschutz: Hoster, Chat-Haltegrenzen und Verzeichnis aus der Konfiguration
+  if (st.hosting) {
+    $('hoster').textContent = st.hosting;
+    $('hostdays').textContent = st.hosting_log_days > 0 ? ' und wird nach ' + st.hosting_log_days + ' Tagen gelöscht' : '';
+    $('hosting').hidden = false;
+  }
+  var ds = UI.datenschutz || {};
+  if (ds.chat_lines > 0 || ds.chat_hours > 0) {
+    var parts = [];
+    if (ds.chat_lines > 0) parts.push('höchstens die letzten ' + ds.chat_lines + ' Zeilen');
+    if (ds.chat_hours > 0) parts.push('nichts, was älter als ' + ds.chat_hours + ' Stunden ist');
+    $('chatkeep').textContent = parts.join(' und ');
+  }
+  if (ds.directory) { $('dirdt').hidden = false; $('dirdd').hidden = false; }
 
   var B = window.bandinfo || [];
   $('bands').innerHTML = B.length ? B.map(function (b) {

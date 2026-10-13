@@ -120,31 +120,40 @@ sys();window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change
   <p class="muted">Sysop: Verwaltung der Station unter <a href="../admin/">Admin</a> (Anmeldung nötig).</p>
 
   <div id="impwrap" hidden>
-    <h2 id="impressum">Betreiber</h2>
+    <h2 id="impressum">Impressum</h2>
+    <p class="muted">Angaben gemäß § 5 DDG</p>
     <dl class="facts" id="imp"></dl>
   </div>
 
   <h2 id="datenschutz">Datenschutz</h2>
-  <p>Diese Station ist ein Hobbyprojekt im Amateurfunk. Beim Hören werden so wenige Daten wie möglich verarbeitet:</p>
+  <p>Verantwortlich für die Verarbeitung ist der im Impressum genannte Betreiber. Rechtsgrundlage für die nachfolgend
+     beschriebene Verarbeitung ist Art. 6 Abs. 1 lit. f DSGVO (Betrieb und Sicherheit der Station).</p>
   <dl class="facts">
-    <dt>Verbindungsdaten</dt><dd>Der Server sieht die IP-Adresse deines Browsers, solange du verbunden bist. Sie steht kurzzeitig
-      im Systemprotokoll des Rechners (Fehlersuche, Schutz vor Missbrauch) und wird sonst nicht ausgewertet oder weitergegeben.</dd>
-    <dt>Name</dt><dd>Der Name, den du oben einträgst, wird anderen Hörern und im Chat gezeigt. Er bleibt in deinem Browser gespeichert
-      (Cookie) – lass ihn leer, wenn du nicht genannt werden willst.</dd>
-    <dt data-feature="chat">Chat und Logbuch</dt><dd data-feature="chat">Einträge werden mit dem gewählten Namen und der Uhrzeit auf der Station
-      gespeichert und allen Besuchern gezeigt. Zum Löschen eines Eintrags an den Betreiber wenden.
-      <span data-feature="chat_verbund">Diese Station nimmt am Verbund-Chat teil: Chatzeilen gehen mit Name, Text, Uhrzeit und Stationskürzel
-      über crabsdr.de an alle teilnehmenden Stationen und dort bleiben höchstens die letzten 50 Zeilen und nichts älter als 3 Stunden.</span></dd>
-    <dt>Einstellungen</dt><dd>Frequenz, Lautstärke, Rauschsperre, Ansicht und Sprache merkt sich dein Browser selbst (localStorage).
-      Nichts davon geht an den Server.</dd>
-    <dt>Ton</dt><dd>Der Ton wird nur zu dir gestreamt. Aufnahmen entstehen ausschließlich in deinem Browser.</dd>
-    <dt data-feature="digital">Decoder</dt><dd data-feature="digital">APRS, FT8 und ähnliche Aussendungen sind Amateurfunk und öffentlich; die Station
-      zeigt sie an und gibt sie an APRS-Netz und Karten weiter. Das betrifft Funkamateure, nicht Hörer.</dd>
-    <dt>Karten</dt><dd>Die Karte auf der Digital-Seite lädt Kacheln von OpenFreeMap (openfreemap.org); dabei sieht dieser Dienst deine
-      IP-Adresse.</dd>
-    <dt>Verzeichnis</dt><dd>Ist die Station auf crabsdr.de gelistet, meldet sie nur ihre eigenen Daten (Name, Standort, Bänder,
-      Hörerzahl) – keine Daten über Hörer.</dd>
-    <dt>Keine Auswertung</dt><dd>Keine Analyse-Werkzeuge, keine Werbung, keine Weitergabe an Dritte.</dd>
+    <dt>Verbindungsdaten</dt><dd>Beim Aufruf der Seite und während des Hörens verarbeitet der Stationsrechner die IP-Adresse
+      des Browsers, den Zeitpunkt und die aufgerufenen Adressen. Diese Angaben stehen im Systemprotokoll des Rechners, dienen
+      der Fehlersuche und der Abwehr von Missbrauch und werden weder ausgewertet noch weitergegeben.
+      <span id="hosting" hidden> Die Station ist über einen Server von <span id="hoster"></span> erreichbar. Dessen
+      Zugriffsprotokoll enthält IP-Adresse, Zeitpunkt, aufgerufene Adresse, Datenmenge und Browserkennung<span id="hostdays"></span>.</span></dd>
+    <dt>Name</dt><dd>Der freiwillig eingetragene Name wird den anderen Hörern angezeigt und im Browser als Cookie gespeichert.
+      Ohne Eintrag erscheint die Bezeichnung „Hörer“.</dd>
+    <dt data-feature="chat">Chat und Logbuch</dt><dd data-feature="chat">Einträge werden mit Name und Uhrzeit auf der Station gespeichert und
+      allen Besuchern angezeigt. Der Chat behält <span id="chatkeep">die letzten Zeilen</span>; Logbucheinträge bleiben, bis
+      der Betreiber sie löscht. Löschwünsche nimmt der Betreiber unter der Kontaktadresse entgegen.
+      <span data-feature="chat_verbund"> Die Station nimmt am Verbund-Chat teil: Chatzeilen werden mit Name, Text, Uhrzeit und
+      Stationskürzel über crabsdr.de an die anderen teilnehmenden Stationen übertragen und dort mit denselben Grenzen gehalten.</span></dd>
+    <dt>Einstellungen</dt><dd>Frequenz, Lautstärke, Rauschsperre, Ansicht und Sprache speichert der Browser lokal
+      (localStorage, Cookie). Eine Übertragung an den Server findet nicht statt.</dd>
+    <dt>Ton</dt><dd>Der Ton wird ausschließlich an den jeweiligen Hörer gestreamt und auf der Station nicht aufgezeichnet.</dd>
+    <dt data-feature="digital">Decoder</dt><dd data-feature="digital">Dekodierte Amateurfunkaussendungen (APRS, FT8, SSTV) sind öffentlich. Die
+      Station zeigt sie an und gibt APRS-Daten an das APRS-Netz weiter. Daten von Hörern sind davon nicht betroffen.</dd>
+    <dt data-feature="digital">Karten</dt><dd data-feature="digital">Die Karte auf der Digital-Seite lädt Kartenkacheln von OpenFreeMap
+      (openfreemap.org). Dabei erhält dieser Dienst die IP-Adresse des Browsers.</dd>
+    <dt id="dirdt" hidden>Verzeichnis</dt><dd id="dirdd" hidden>Die Station meldet an das Verzeichnis auf crabsdr.de ihren Namen, Standort,
+      ihre Bänder und die Zahl der Hörer. Daten einzelner Hörer werden nicht übermittelt.</dd>
+    <dt>Keine Auswertung</dt><dd>Es werden keine Analysewerkzeuge eingesetzt, keine Werbung ausgespielt und keine Daten an
+      Dritte weitergegeben.</dd>
+    <dt>Rechte</dt><dd>Auskunft, Berichtigung, Löschung, Einschränkung und Widerspruch nach Art. 15 bis 21 DSGVO können beim
+      Betreiber geltend gemacht werden. Daneben besteht das Recht auf Beschwerde bei einer Datenschutzaufsichtsbehörde.</dd>
   </dl>
 </main>
 
@@ -154,7 +163,7 @@ sys();window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change
 
 <script>(function(){var t=null;try{t=localStorage.getItem('crab_token')}catch(e){}document.write('<script src="../bandinfo.js?_=' + Date.now() + (t ? '&token=' + encodeURIComponent(t) : '') + '"><\/script>');})();</script>
 <script src="../common.js?v=2"></script>
-<script src="info.js?v=3"></script>
+<script src="info.js?v=4"></script>
 <script src="../account.js?v=1"></script>
 </body>
 </html>

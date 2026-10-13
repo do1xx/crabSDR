@@ -3,9 +3,16 @@
  * Liest USB-Ton (s16le mono, 8000 Hz) von stdin, demoduliert RADE V1 (Vorgabe) oder V2 mit rade_c (github.com/freedv/rade_c,
  * BSD-2-Clause) und synthetisiert die Sprache mit FARGAN (Opus). Ausgabe: Sprache als s16le mono 16000 Hz auf stdout,
  * crabSDR verteilt sie als hörbaren Kanal. Ereignisse als JSON-Zeilen auf stderr:
- *   {"kind":"sync","mode":"RADE V1","on":true,"snr":12.3}   beim Kommen und Gehen des Signals (entprellt, siehe unten)
+ *   {"kind":"sync","mode":"RADE V1","on":true,"snr":12.3,"foff":-18.0}   beim Kommen und Gehen des Signals (entprellt, siehe
+ *                                                           unten); foff = Frequenzversatz des Signals in Hz (rade_freq_offset)
  *   {"kind":"eoo","mode":"RADE V1","snr":12.3}              Ende der Durchgabe erkannt (EOO-Rahmen)
+ *   {"kind":"text","mode":"RADE V1","text":"DO1XX","snr":12.3}   Rufzeichen aus dem EOO-Rahmen (Format der FreeDV-App:
+ *                                                           LDPC HRA_56_56 + CRC-8, Modul eoo/EooCallsignCodec aus
+ *                                                           peterbmarks/radae_decoder, LGPL 2.1); nur wenn die CRC stimmt
  * Alle anderen stderr-Zeilen sind Logtext (Start, Fehler).
+ *
+ * Die Sprachsynthese (FARGAN) beginnt bei jedem neuen Sync von vorn (fargan_init + 5 Rahmen Vorlauf, wie webrx_rade_decode
+ * aus radae_decoder): jede Durchgabe startet mit sauberem Zustand statt mit dem Nachhall der vorigen.
  *
  * Das reelle SSB-Signal geht ohne Hilbert-Transformation als I (Q = 0) in den Demodulator: die OFDM-Träger liegen bei
  * 1062–1875 Hz, das Spiegelbild bei negativen Frequenzen weisen die Korrelatoren ab (so macht es auch rade_rx_wav).
@@ -31,6 +38,7 @@
 #include "rade_dsp.h"
 #include "fargan.h"
 #include "lpcnet.h"
+#include "eoo/eoo_bridge.h"
 
 static double env_num(const char *name, double def) {
     const char *v = getenv(name);
@@ -39,9 +47,17 @@ static double env_num(const char *name, double def) {
     return (end == v) ? def : d;
 }
 
-static void say_sync(const char *mode, int on, float snr) {
-    fprintf(stderr, "{\"kind\":\"sync\",\"mode\":\"%s\",\"on\":%s,\"snr\":%.1f}\n", mode, on ? "true" : "false", (double)snr);
+static void say_sync(const char *mode, int on, float snr, float foff) {
+    fprintf(stderr, "{\"kind\":\"sync\",\"mode\":\"%s\",\"on\":%s,\"snr\":%.1f,\"foff\":%.1f}\n", mode, on ? "true" : "false", (double)snr, (double)foff);
     fflush(stderr);
+}
+
+/* Rufzeichen als JSON-String: der EOO-Zeichensatz ist A–Z 0–9 &'()*+,-./, zur Sicherheit trotzdem " und \ maskieren */
+static void put_json_str(const char *s) {
+    for (; *s; s++) {
+        if (*s == '"' || *s == '\\') fputc('\\', stderr);
+        if ((unsigned char)*s >= 0x20 && (unsigned char)*s < 0x7f) fputc(*s, stderr);
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -81,13 +97,13 @@ int main(int argc, char *argv[]) {
     if (!pcm_in || !rx_buf || !feat || (n_eoo_bits && !eoo)) { fprintf(stderr, "crab_rade: kein Speicher\n"); return 1; }
 
     FARGANState fargan; fargan_init(&fargan);
-    float cont_buf[5 * NB_TOTAL_FEATURES]; int cont_frames = 0, fargan_ready = 0;
+    float cont_buf[5 * NB_TOTAL_FEATURES]; int cont_frames = 0, fargan_ready = 0, was_sync = 0;
 
     fprintf(stderr, "crab_rade: %s, rade_c API %d.%d, nin_max %d, snr_min %.1f dB, hold %.1f s\n", mode, rade_version(), rade_version_minor(), nin_max, (double)snr_min, (double)hold);
 
     const float scale = (2.0f / RADE_INT16_SCALE) * gain;
     double t_audio = 0.0, since = -1.0, lost = -1.0;   /* Entprellung nach Tonzeit, nicht Wanduhr */
-    int on = 0; float snr = 0.0f;
+    int on = 0; float snr = 0.0f, foff = 0.0f;
     long frames_out = 0;
 
     for (;;) {
@@ -103,22 +119,34 @@ int main(int argc, char *argv[]) {
         int n_out = rade_rx(r, feat, &has_eoo, eoo, rx_buf);
         int sync = rade_sync(r);
         snr = rade_snrdB_3k_est(r);
+        if (sync) foff = rade_freq_offset(r);
         t_audio += (double)nin / RADE_FS;
+
+        if (sync && !was_sync) {   /* neue Durchgabe: Sprachsynthese von vorn, mit neuem Vorlauf */
+            fargan_init(&fargan); fargan_ready = 0; cont_frames = 0;
+        }
+        was_sync = sync;
 
         int good = sync && snr >= snr_min;
         if (good) {
             if (since < 0) since = t_audio;
             lost = -1.0;
-            if (!on && t_audio - since >= hold) { on = 1; say_sync(mode, 1, snr); }
+            if (!on && t_audio - since >= hold) { on = 1; say_sync(mode, 1, snr, foff); }
         } else {
             since = -1.0;
             if (on) {
                 if (lost < 0) lost = t_audio;
-                else if (t_audio - lost >= hold) { on = 0; say_sync(mode, 0, snr); }
+                else if (t_audio - lost >= hold) { on = 0; say_sync(mode, 0, snr, foff); }
             }
         }
         if (has_eoo) {
-            fprintf(stderr, "{\"kind\":\"eoo\",\"mode\":\"%s\",\"snr\":%.1f}\n", mode, (double)snr); fflush(stderr);
+            fprintf(stderr, "{\"kind\":\"eoo\",\"mode\":\"%s\",\"snr\":%.1f}\n", mode, (double)snr);
+            char callsign[16];
+            if (n_eoo_bits > 0 && eoo_callsign_decode(eoo, n_eoo_bits / 2, callsign, sizeof callsign)) {
+                fprintf(stderr, "{\"kind\":\"text\",\"mode\":\"%s\",\"text\":\"", mode); put_json_str(callsign);
+                fprintf(stderr, "\",\"snr\":%.1f}\n", (double)snr);
+            }
+            fflush(stderr);
         }
 
         if (n_out > 0 && (on || good)) {
@@ -152,7 +180,7 @@ int main(int argc, char *argv[]) {
         if (got < (size_t)nin) break;
     }
 done:
-    if (on) say_sync(mode, 0, snr);
+    if (on) say_sync(mode, 0, snr, foff);
     fprintf(stderr, "crab_rade: Ende nach %.1f s Ton, %.1f s Sprache\n", t_audio, frames_out * (double)LPCNET_FRAME_SIZE / RADE_FS_SPEECH);
     free(pcm_in); free(rx_buf); free(feat); free(eoo);
     rade_close(r); rade_finalize();

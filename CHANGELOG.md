@@ -4,6 +4,11 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 
 ## Unveröffentlicht
 
+### Info-Seite
+- **Impressum und Datenschutzerklärung neu gefasst:** sachlich, ohne Anrede, auf das beschränkt, was die Software
+  tatsächlich verarbeitet; Chat-Haltegrenzen, Verbund und Verzeichnis kommen aus der Konfiguration. Neu `[station]`
+  `hosting` und `hosting_log_days` für einen vorgeschalteten Server (Proxy/Hoster) mit seinem Zugriffsprotokoll.
+
 ### Decoder
 - **Neuestes SSTV-Bild als feste Adresse:** `/digi/sstv/latest.png` (immer das jüngste Bild, nie gecacht), `/digi/sstv/latest.json`
   und die Vollbildseite `/digi/latest.html` für Monitore und Spiegel (`?decoder=`, `?max_age=`, `?caption=0`, `?every=`).
