@@ -354,8 +354,8 @@
   // Eingabefrequenz als kleine Marke „↑“); showMarks() aus core.js zeichnet sie unter dem Wasserfall
   var markers = [], relaisRaw = [], relais = [], relGroups = [];
   /* Systeme (relais.json "system"): Kürzel für die Marke, Klasse für die Linienfarbe */
-  var SYSTEMS = { 'fm': ['', 'fm'], 'dmr': ['DMR', 'dmr'], 'c4fm': ['C4FM', 'c4fm'], 'd-star': ['D-Star', 'dstar'], 'dstar': ['D-Star', 'dstar'], 'tetra': ['TETRA', 'tetra'], 'atv': ['ATV', 'atv'], 'dapnet': ['DAPNET', 'dapnet'], 'pocsag': ['DAPNET', 'dapnet'] };
-  function sysInfo(name) { return SYSTEMS[String(name || 'FM').toLowerCase()] || [String(name).toUpperCase().slice(0, 6), 'other']; }
+  var SYSTEMS = { 'fm': ['FM', 'fm', '#2f8f6a'], 'dmr': ['DMR', 'dmr', '#c8862c'], 'c4fm': ['C4FM', 'c4fm', '#4b8ad6'], 'd-star': ['D-Star', 'dstar', '#9b6bd6'], 'dstar': ['D-Star', 'dstar', '#9b6bd6'], 'tetra': ['TETRA', 'tetra', '#d64b4b'], 'atv': ['ATV', 'atv', '#999'], 'dapnet': ['DAPNET', 'dapnet', '#c9b43a'], 'pocsag': ['DAPNET', 'dapnet', '#c9b43a'] };
+  function sysInfo(name) { return SYSTEMS[String(name || 'FM').toLowerCase()] || [String(name).toUpperCase().slice(0, 6), 'other', '#8aa']; }
   /* Einträge mit gleichem Rufzeichen (ohne Modul-Suffix wie -B/-C/-M) und gleicher Ausgabe zu einer Marke bündeln */
   function groupRelais(list) {
     var map = {}, groups = [];
@@ -368,10 +368,10 @@
       if (r.mode === 'fm') g.mode = 'fm';
     });
     groups.forEach(function (g) {
-      var digital = g.systems.filter(function (x) { return x !== ''; });
-      g.tag = digital.length ? digital[0] + (digital.length > 1 ? '+' : '') : '';
-      // Linienfarbe: FM dabei → grün wie bisher, sonst die Farbe des (ersten) Digitalsystems
-      g.sysClass = g.systems.indexOf('') >= 0 ? 'fm' : sysInfo(g.entries[0].system)[1];
+      // Farben je System, FM zuerst – Linie und Strich unter dem Rufzeichen zeigen sie als Streifen („Regenbogen“)
+      g.systems.sort(function (a, b) { return (a === 'FM' ? 0 : 1) - (b === 'FM' ? 0 : 1); });
+      g.colors = g.systems.map(function (n) { return sysInfo(n)[2]; });
+      g.digital = g.systems.some(function (n) { return n !== 'FM'; });
     });
     return groups;
   }
@@ -422,8 +422,8 @@
     // wer die Eingabe hört, hört die Station direkt
     relGroups.forEach(function (g, i) {
       var prio = g.km != null ? g.km : 9999, md = g.mode.toUpperCase();
-      if (g.khz >= lo_ && g.khz <= hi_) list.push({ freq: g.khz, mode: md, text: g.call, rel: i, sys: g.sysClass, tag: g.tag, prio: prio });
-      g.inputs.forEach(function (inp) { if (inp >= lo_ && inp <= hi_) list.push({ freq: inp, mode: md, text: '↑ ' + g.call, rel: i, sys: g.sysClass, input: true, minor: true, prio: prio }); });
+      if (g.khz >= lo_ && g.khz <= hi_) list.push({ freq: g.khz, mode: md, text: g.call, rel: i, colors: g.colors, digital: g.digital, prio: prio });
+      g.inputs.forEach(function (inp) { if (inp >= lo_ && inp <= hi_) list.push({ freq: inp, mode: md, text: '↑ ' + g.call, rel: i, colors: g.colors, digital: g.digital, input: true, minor: true, prio: prio }); });
     });
     marks = marksByBand[b] = list.sort(function (a, c) { return a.freq - c.freq; });
     showMarks(b);
@@ -435,7 +435,7 @@
     var g = relGroups[i]; if (!g) return;
     if (on === 1) {
       var de = lang === 'de', r0 = g.entries[0], rows = [];
-      var sysList = g.systems.map(function (x) { return x || 'FM'; }).join(' · ');
+      var sysList = g.systems.join(' · ');
       if (inp) {
         var r1 = g.entries.filter(function (r) { return r.shift; })[0] || r0, ab = (r1.shift > 0 ? '+' : '−') + fmtMhz(Math.abs(r1.shift || 0)) + ' MHz';
         rows.push('<b>↑ ' + (de ? 'Eingabe von ' : 'Input of ') + escapeHtml(g.call) + '</b> · ' + fmtMhz(r1.khz + r1.shift) + ' MHz · ' + sysList);
@@ -451,7 +451,7 @@
       g.entries.forEach(function (r) {
         var bits = []; if (r.tone) bits.push((de ? 'Ton ' : 'Tone ') + escapeHtml(r.tone)); if (r.info) bits.push(escapeHtml(r.info));
         if (!bits.length && g.entries.length === 1) return;
-        var sy = sysInfo(r.system)[0] || 'FM', suffix = r.call !== g.call ? ' ' + escapeHtml(r.call.slice(g.call.length)) : '';
+        var sy = sysInfo(r.system)[0], suffix = r.call !== g.call ? ' ' + escapeHtml(r.call.slice(g.call.length)) : '';
         rows.push('<span class="muted">' + (g.entries.length > 1 ? '<b>' + sy + suffix + '</b> ' : '') + bits.join(' · ') + '</span>');
       });
       p.innerHTML = rows.join('<br>'); p.hidden = false;
@@ -729,7 +729,7 @@
     function render() {
       var rows = [], seen = {};
       function add(r) { var k = Math.round(r.khz * 10) + '|' + r.call + '|' + r.info; if (seen[k] && r.src !== 'own') return; if (bandOf(r.khz) < 0) return; seen[k] = true; rows.push(r); }
-      normRelais(data.own || []).forEach(function (r) { var sy = sysInfo(r.system)[0]; add({ khz: r.khz, call: r.call, info: (sy ? sy + ' · ' : '') + (r.qth ? r.qth + (r.info ? ' – ' + r.info : '') : r.info), shift: r.shift != null ? String(r.shift) : '', tone: r.tone, km: r.km, deg: r.deg, mode: r.mode, src: 'own' }); });
+      normRelais(data.own || []).forEach(function (r) { var sy = sysInfo(r.system)[0]; if (sy === 'FM') sy = ''; add({ khz: r.khz, call: r.call, info: (sy ? sy + ' · ' : '') + (r.qth ? r.qth + (r.info ? ' – ' + r.info : '') : r.info), shift: r.shift != null ? String(r.shift) : '', tone: r.tone, km: r.km, deg: r.deg, mode: r.mode, src: 'own' }); });
       (data.aprs || []).forEach(function (r) { add({ khz: r.khz, call: r.call, info: r.comment, shift: r.offset, tone: r.tone, km: r.km, mode: 'fm', src: 'aprs' }); });
       markers.forEach(function (m) { add({ khz: m.freq, call: '', info: m.text, shift: '', tone: '', km: null, mode: (m.mode || 'fm').toLowerCase(), src: 'marker' }); });
       rows.sort(function (a, b) { return a.khz - b.khz; });
@@ -874,6 +874,12 @@
     if (s.up_s != null || s.uptime) parts.push('<span>' + (de ? 'läuft seit ' : 'up ') + (s.up_s != null ? fmtDuration(s.up_s) : s.uptime) + '</span>');
     var cpu = serverStats(); if (cpu !== null) parts.push('<span title="' + (de ? 'Gesamtlast des Rechners (alle Kerne)' : 'total CPU load (all cores)') + '">' + (de ? 'Last ' : 'load ') + Math.round(cpu) + ' %</span>');
     if (s.ts) parts.push('<span>' + (de ? 'Stand ' : 'as of ') + new Date(s.ts * 1000).toLocaleTimeString(de ? 'de-DE' : 'en-GB', { hour: '2-digit', minute: '2-digit' }) + '</span>');
+    // kleine Legende der Relais-Systeme (nur, wenn digitale dabei sind)
+    var seen = {}, legend = [];
+    relais.forEach(function (r) { var sy = sysInfo(r.system); if (!seen[sy[0]]) { seen[sy[0]] = true; legend.push(sy); } });
+    var ORDER = ['FM', 'DMR', 'C4FM', 'D-Star', 'TETRA', 'ATV', 'DAPNET'];
+    legend.sort(function (a, b) { var ia = ORDER.indexOf(a[0]), ib = ORDER.indexOf(b[0]); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib); });
+    if (legend.length > 1) parts.push('<span class="legend" title="' + (de ? 'Farben der Relais-Marken' : 'colours of the repeater marks') + '">' + legend.map(function (sy) { return '<b style="background:' + sy[2] + '"></b>' + sy[0]; }).join(' ') + '</span>');
     $('status').innerHTML = parts.join(' · ');
   }
 

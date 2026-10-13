@@ -10,8 +10,10 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
   Tafel mit Ausgabe/Eingabe/Ablage, Ton, QTH, Locator, Entfernung und Richtung von der Station (aus `[station]` locator
   bzw. lat/lon). Bei Gedränge behalten die nahen Relais ihre Beschriftung, die fernen nur die (jetzt breitere, anklickbare)
   Linie – die Tafel geht an beiden. Die Liste hinter „Liste“ zeigt zusätzlich die Richtung. Feld `system` (DMR, C4FM,
-  D-Star, TETRA, ATV, DAPNET) kennzeichnet digitale Relais: dezentes Kürzel an der Marke, Linie je System gefärbt,
-  gleiche Ausgabe mit mehreren Systemen (DB0HEW: FM, DMR, D-Star, C4FM) ist eine Marke, die Tafel listet je System Ton und Info.
+  D-Star, TETRA, ATV, DAPNET) kennzeichnet digitale Relais: Linie und ein Strich unter dem Rufzeichen zeigen die Systeme
+  als Farbstreifen (FM grün, DMR orange, C4FM blau, D-Star violett, TETRA rot), gleiche Ausgabe mit mehreren Systemen
+  (DB0HEW: FM, DMR, D-Star, C4FM) ist eine Marke mit „Regenbogen“, die Tafel listet je System Ton und Info; kleine
+  Legende in der Statuszeile. `ui.json` `"crab_brand": false` lässt die crabSDR-Marke neben einem eigenen Logo weg.
 - **Admin-Seite: Reiter „Relais & Marker“.** `relais.json` als Tabelle (Zeilen hinzufügen/löschen, Speichern) oder als Text,
   `markers.json` als Text; Endpunkte `GET/PUT /api/admin/site/{relais,markers,presets}.json` mit Prüfsumme gegen
   Überschreiben, Sicherungen unter `data_dir/site-backups/` (die letzten 20). Die Oberfläche liest die Dateien bei jedem

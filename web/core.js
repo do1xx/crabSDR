@@ -440,10 +440,12 @@ function showMarks(b) {
     if ((pass === 0) === !!m.minor) continue;
     var x = freq2x(m.freq, b), md = String(m.mode || 'FM').toUpperCase(), txt = m.text || '';
     var click = ' onclick="setFreqMark(' + b + ',' + m.freq + ',\'' + md + '\')"';
-    var inp = m.input ? 1 : 0, cls = m.rel != null ? ' rel' + (inp ? ' inp' : '') + (m.sys ? ' sys-' + m.sys : '') : '';
-    var tag = m.tag && !inp ? '<i class="sys">' + _crabEsc(m.tag) + '</i>' : '';
+    var inp = m.input ? 1 : 0, cls = m.rel != null ? ' rel' + (inp ? ' inp' : '') : '';
+    // Relais: Linie aus Farbstreifen je System; digitale Relais bekommen den Streifen auch unter dem Rufzeichen
+    var segs = (m.colors || []).map(function (c) { return '<b style="background:' + c + '"></b>'; }).join('');
+    var tag = m.digital && segs ? '<u class="sysbar">' + segs + '</u>' : '';
     var rel = m.rel != null ? ' onmouseenter="relHover(event,' + m.rel + ',1,' + inp + ')" onmousemove="relHover(event,' + m.rel + ',2,' + inp + ')" onmouseleave="relHover(event,' + m.rel + ',0,' + inp + ')"' : '';
-    html += '<div class="dxl' + cls + '" style="left:' + x.toFixed(1) + 'px"' + rel + (m.rel != null ? click : '') + '></div>';
+    html += '<div class="dxl' + cls + '" style="left:' + x.toFixed(1) + 'px"' + rel + (m.rel != null ? click : '') + '>' + segs + '</div>';
     if (!free(x)) continue;
     placed.push(x);
     html += '<div class="dxm' + cls + '" style="left:' + (x - 6).toFixed(1) + 'px"' + (m.rel != null ? rel : ' title="' + _crabEsc(txt) + ' ' + (m.freq / 1000).toFixed(4) + ' MHz ' + md + '"') + click + '>' + _crabEsc(txt) + tag + '</div>';
@@ -888,12 +890,13 @@ function _crabLoadLook() {
     if (_crab.features.chat_verbund) { var ch = document.querySelector('.chathead small'); if (ch) { ch.textContent = 'Verbund: alle crabSDR-Stationen'; ch.title = 'Nachrichten gehen über crabsdr.de an alle Stationen mit Verbund-Chat'; } }
     _crab.bandsOff = Array.isArray(u.bands_off) ? u.bands_off.map(String) : [];
     _crab.parkMarkers = u.park_markers === true;
+    _crab.crabBrand = u.crab_brand !== false;   // ui.json {"crab_brand": false}: keine crabSDR-Marke neben dem eigenen Logo
   } catch (e) {}
   document.body.classList.add('look-crab');
   if (!document.getElementById('crabmark')) {
     var foot = document.querySelector('.foot');
     var h1 = document.querySelector('.brand h1');
-    if (h1 && !document.getElementById('crabbrand') && _crab.features.own_logo) { var cb = document.createElement('a'); cb.id = 'crabbrand'; cb.className = 'crabbrand'; cb.href = 'https://github.com/do1xx/crabSDR'; cb.target = '_blank'; cb.rel = 'noopener';
+    if (h1 && !document.getElementById('crabbrand') && _crab.features.own_logo && _crab.crabBrand !== false) { var cb = document.createElement('a'); cb.id = 'crabbrand'; cb.className = 'crabbrand'; cb.href = 'https://github.com/do1xx/crabSDR'; cb.target = '_blank'; cb.rel = 'noopener';
       cb.title = 'läuft mit crabSDR – freie Software (MIT)'; cb.innerHTML = '<img src="crabsdr-mark.svg" alt="crabSDR"><span>crabSDR</span>'; h1.appendChild(cb); }
     if (foot) { var a = document.createElement('a'); a.id = 'crabmark'; a.className = 'crabmark'; a.href = 'admin/';   // Sysop-Bereich (Anmeldung); Projektseite steht auf der Info-Seite
       a.title = 'crabSDR – Sysop-Bereich'; a.setAttribute('aria-label', 'crabSDR – Sysop-Bereich'); a.innerHTML = '<span class="crabemoji" aria-hidden="true">🦀</span>'; foot.appendChild(a); }

@@ -488,12 +488,17 @@ body.dvmode .bwpresets .btn, body.dvmode #agccontrol, body.dvmode .bwrow .btn { 
 body.look-crab .dxl.rel { background: #3c6; }
 /* Eingabe-Marken („↑ Rufzeichen“): zweitrangig – gedimmt und schmaler, damit die Ausgabe auffällt */
 .dxm.rel.inp { opacity: .55; font-style: italic; }
-.dxl.rel.inp { width: 1px; margin-left: 0; opacity: .6; }
+.dxl.rel.inp { margin-left: 0; opacity: .6; }
 .dxl.rel.inp:hover, .dxm.rel.inp:hover { opacity: 1; }
 .relpanel { position: fixed; z-index: 60; max-width: 300px; background: rgba(16, 20, 26, .96); color: #ddd; border: 1px solid #3d5a6a; border-radius: 6px; padding: 6px 9px; font: 12px/1.45 system-ui, sans-serif; pointer-events: none; box-shadow: 0 4px 16px rgba(0, 0, 0, .5); }
 .relpanel .muted { color: #9ab; }
 
-/* Digitale Systeme: kleines Kürzel an der Marke, Linienfarbe je System (FM bleibt grün) */
-.dxm i.sys { font-style: normal; font-size: 7px; line-height: 1; opacity: .7; margin-left: 3px; vertical-align: top; letter-spacing: .02em; }
-.dxl.rel.sys-dmr { background: #c8862c; } .dxl.rel.sys-c4fm { background: #4b8ad6; } .dxl.rel.sys-dstar { background: #9b6bd6; }
-.dxl.rel.sys-tetra { background: #d64b4b; } .dxl.rel.sys-atv { background: #999; } .dxl.rel.sys-dapnet { background: #c9b43a; } .dxl.rel.sys-other { background: #8aa; }
+/* Systeme als Farbstreifen: die Linie besteht aus Streifen je System (FM grün, DMR orange, C4FM blau, D-Star violett,
+   TETRA rot, ATV grau, DAPNET gelb), digitale Relais tragen den Streifen auch unter dem Rufzeichen */
+.dxl.rel { display: flex; width: auto; min-width: 3px; background: transparent; }
+.dxl.rel b { display: block; width: 3px; }
+.dxl.rel b + b { width: 2px; }
+.dxl.rel.inp b { width: 1px; }
+.dxm u.sysbar { display: flex; height: 2px; margin: 1px 3px 0; border-radius: 1px; overflow: hidden; }
+.dxm u.sysbar b { flex: 1; }
+.status .legend b { display: inline-block; width: 7px; height: 7px; border-radius: 2px; margin: 0 3px 0 4px; vertical-align: 0; }
