@@ -56,21 +56,19 @@ int main(int argc, char *argv[]) {
     if (!net) { fprintf(stderr, "rade_eoo_tx: lpcnet_encoder_create fehlgeschlagen\n"); return 1; }
 
     write_silence(1.0);
-    int16_t pcm[LPCNET_FRAME_SIZE]; int fi = 0, mf = 0; long frames_in = 0;
-    const long min_frames = 3 * RADE_FS_SPEECH / LPCNET_FRAME_SIZE;   /* mindestens 3 s */
+    int16_t pcm[LPCNET_FRAME_SIZE]; int fi = 0, mf = 0, eof = 0; long frames_in = 0;
+    const long min_frames = 3 * RADE_FS_SPEECH / LPCNET_FRAME_SIZE;   /* mindestens 3 s, sonst mit Stille auffüllen */
     for (;;) {
-        size_t got = fread(pcm, sizeof(int16_t), LPCNET_FRAME_SIZE, stdin);
+        size_t got = eof ? 0 : fread(pcm, sizeof(int16_t), LPCNET_FRAME_SIZE, stdin);
         if (got < LPCNET_FRAME_SIZE) {
-            if (frames_in >= min_frames && got == 0) break;
+            if (got == 0) { eof = 1; if (frames_in >= min_frames) break; }
             memset(pcm + got, 0, (LPCNET_FRAME_SIZE - got) * sizeof(int16_t));
-            if (got == 0) stdin = NULL;   /* ab jetzt Stille auffüllen */
         }
         frames_in++;
         lpcnet_compute_single_frame_features(net, pcm, &feat[fi * RADE_NB_TOTAL_FEATURES], arch);
         if (++fi >= frames_per_mf) {
             write_real(tx, rade_tx(r, tx, feat)); fi = 0; mf++;
         }
-        if (!stdin) { if (frames_in >= min_frames) break; else continue; }
     }
     if (fi > 0) {
         memset(&feat[fi * RADE_NB_TOTAL_FEATURES], 0, (size_t)(frames_per_mf - fi) * RADE_NB_TOTAL_FEATURES * sizeof(float));

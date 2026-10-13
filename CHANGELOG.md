@@ -10,6 +10,18 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
   `hosting` und `hosting_log_days` für einen vorgeschalteten Server (Proxy/Hoster) mit seinem Zugriffsprotokoll.
 
 ### Decoder
+- **RADE: Rufzeichen am Ende der Durchgabe.** `crab_rade` liest jetzt das Rufzeichen aus dem EOO-Rahmen (Format der
+  FreeDV-App: LDPC HRA_56_56 mit CRC-8) und meldet es als `{"kind":"text","mode":"RADE V1","text":"DO1XX","snr":…}`;
+  das Ereignis `eoo` bleibt. Decoder-Modul `plugins/rade/eoo/EooCallsignCodec` aus
+  [radae_decoder](https://github.com/peterbmarks/radae_decoder) (Peter Marks, LGPL 2.1, siehe THIRD-PARTY.md), per
+  C-Brücke eingebunden – `build.sh` braucht jetzt auch einen C++-Compiler (`CXX`, im Cross-Container `$HOST-g++`).
+  Zeichensatz wie in FreeDV: A–Z, 0–9 und `&'()*+,-./`, wobei `/` on air wie `0` kodiert wird (`DF0HHH/P` → `DF0HHH0P`).
+- **RADE: sauberer Start je Durchgabe.** Die Sprachsynthese (FARGAN) beginnt bei jedem neuen Sync von vorn
+  (`fargan_init` + 5 Rahmen Vorlauf, wie `webrx_rade_decode`), statt den Zustand der vorigen Durchgabe mitzunehmen.
+- **RADE: Frequenzversatz im Sync-Ereignis.** `sync` trägt `foff` (Hz, aus `rade_freq_offset`) – zeigt, wie weit der
+  Hörer neben der Sendefrequenz liegt (Mitschnitt DF0HHH: −18 Hz, passt zur Stick-Messung).
+- Testsender `plugins/rade/rade_eoo_tx.c` (`EOO_TX=1 plugins/rade/build.sh`): Sprache 16 kHz → RADE-V1-Signal 8 kHz mit
+  EOO-Rufzeichen, für Prüfungen des Decoders ohne Funkgerät.
 - **Neuestes SSTV-Bild als feste Adresse:** `/digi/sstv/latest.png` (immer das jüngste Bild, nie gecacht), `/digi/sstv/latest.json`
   und die Vollbildseite `/digi/latest.html` für Monitore und Spiegel (`?decoder=`, `?max_age=`, `?caption=0`, `?every=`).
 - **SSTV: Farben und Zeilen stimmen wieder.** Der Decoder bekam vom Lauscher den Puffer ohne die Lage des VIS-Kopfs

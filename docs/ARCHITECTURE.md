@@ -100,9 +100,14 @@ Decoder gewählt haben, sowie unter `/stream/decoder/<id>.ogg`. Kodiert wird nur
 **Audio-Plugins mitgeliefert:** `freedv` (Python, libcodec2 per ctypes: Codec-2-Modes 700D/700E/1600, Ton 8 kHz) und
 `rade` (C-Programm `crab_rade` gegen rade_c: RADE V1, die Wellenform der FreeDV-App ab 2.0, Ton 16 kHz). Beide hören
 USB mit 8 kHz, 3 kHz breit, mit Pegelregler (`level: norm`), und melden `{"kind":"sync","mode":…,"on":…,"snr":…}` beim
-Kommen und Gehen des Signals (entprellt: `snr_min`, `hold`), `freedv` außerdem `text` aus dem Textkanal, `rade` ein `eoo`
-am Ende einer Durchgabe. `crab_rade` wird aus `plugins/rade/crab_rade.c` gebaut (`plugins/rade/build.sh`, statisch für
-Linux `packaging/build-rade.sh`) und enthält die Modellgewichte; das Programm liegt nicht im Repo.
+Kommen und Gehen des Signals (entprellt: `snr_min`, `hold`), `freedv` außerdem `text` aus dem Textkanal. `rade` meldet im
+`sync` zusätzlich `foff` (Frequenzversatz des Signals in Hz, aus `rade_freq_offset`), am Ende einer Durchgabe ein `eoo` und,
+wenn der EOO-Rahmen ein gültiges Rufzeichen trägt (Format der FreeDV-App: LDPC HRA_56_56 + CRC-8, Modul
+`plugins/rade/eoo/EooCallsignCodec` aus peterbmarks/radae_decoder, LGPL 2.1, per C-Brücke `eoo_bridge.h`), ein `text` mit
+dem Rufzeichen. Die Sprachsynthese (FARGAN) beginnt bei jedem neuen Sync von vorn. `crab_rade` wird aus
+`plugins/rade/crab_rade.c` gebaut (`plugins/rade/build.sh`, C und C++; statisch für Linux `packaging/build-rade.sh`) und
+enthält die Modellgewichte; das Programm liegt nicht im Repo. Testsender `rade_eoo_tx` (`EOO_TX=1 build.sh`): Sprache
+16 kHz → RADE-Signal mit EOO-Rufzeichen, zum Prüfen des Decoders ohne Funkgerät.
 
 **Betriebsart DV** (`DecoderHub::ensure_dv`): auf der Hörerfrequenz (100-Hz-Raster) entsteht je lauffähigem DV-Plugin
 (`DV_PLUGINS` = `rade`, `freedv`; lauffähig = decoder.json mit `output` und alle `requires` vorhanden) ein flüchtiger

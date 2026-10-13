@@ -1,12 +1,14 @@
 #!/bin/sh
 # build.sh — crab_rade bauen (RADE-Decoder für die Betriebsart DV). Holt rade_c (BSD-2-Clause) und Opus mit FARGAN in
 # festgelegten Ständen, baut Opus wie rade_c/cmake/BuildOpus.cmake (mit den beiden nnet-Patches) und übersetzt crab_rade.c
-# zusammen mit den Bibliotheksquellen von rade_c zu einem einzigen Programm. Braucht: C-Compiler, make, autoconf, automake,
-# libtool, patch, curl, unzip, git (Debian: apt install build-essential autoconf automake libtool patch curl unzip git).
+# zusammen mit den Bibliotheksquellen von rade_c und dem EOO-Rufzeichen-Modul eoo/ (C++) zu einem einzigen Programm.
+# Braucht: C- und C++-Compiler, make, autoconf, automake, libtool, patch, curl, unzip, git
+# (Debian: apt install build-essential autoconf automake libtool patch curl unzip git).
 #   plugins/rade/build.sh [zielordner]            → <zielordner>/crab_rade (Standard: plugins/rade)
-# Umgebung:  CC (Compiler), HOST (Cross-Ziel für Opus-configure, z. B. aarch64-unknown-linux-musl; Compiler dann $HOST-gcc),
-#            STATIC=1 (statisch linken, Linux), JOBS (Parallelität), BUILD_DIR (Standard plugins/rade/build),
-#            RADE_C_DIR (vorhandenes rade_c statt Klon), OPUS_DIR (fertig gebautes Opus mit .libs/libopus.a statt Neubau)
+# Umgebung:  CC/CXX (Compiler), HOST (Cross-Ziel für Opus-configure, z. B. aarch64-unknown-linux-musl; Compiler dann
+#            $HOST-gcc und $HOST-g++), STATIC=1 (statisch linken, Linux), JOBS (Parallelität), BUILD_DIR (Standard
+#            plugins/rade/build), RADE_C_DIR (vorhandenes rade_c statt Klon), OPUS_DIR (fertig gebautes Opus mit
+#            .libs/libopus.a statt Neubau), EOO_TX=1 (zusätzlich den Testsender rade_eoo_tx nach $BUILD_DIR bauen)
 set -e
 cd "$(dirname "$0")"
 RADE_COMMIT=c8a3dc156045cae2cd251e1a4be0c304c9ddf2f9      # github.com/freedv/rade_c, 2026-10
@@ -14,7 +16,7 @@ OPUS_COMMIT=940d4e5af64351ca8ba8390df3f555484c567fbb      # github.com/xiph/opus
 OUT=${1:-$PWD}
 B=${BUILD_DIR:-$PWD/build}; mkdir -p "$B"
 JOBS=${JOBS:-4}
-if [ -n "$HOST" ]; then CC=${CC:-$HOST-gcc}; else CC=${CC:-cc}; fi
+if [ -n "$HOST" ]; then CC=${CC:-$HOST-gcc}; CXX=${CXX:-$HOST-g++}; else CC=${CC:-cc}; CXX=${CXX:-c++}; fi
 
 if [ -z "$RADE_C_DIR" ]; then
   RADE_C_DIR=$B/rade_c
@@ -46,14 +48,26 @@ LIBSRC="rade_api.c rade_enc.c rade_dec.c rade_enc_data.c rade_dec_data.c rade_ds
         rade_enc_v2.c rade_dec_v2.c rade_sync.c rade_enc_v2_data.c rade_dec_v2_data.c rade_sync_data.c rade_v2_ofdm.c rade_tx_v2.c rade_rx_v2.c"
 OBJ=$B/obj-${HOST:-native}; mkdir -p "$OBJ"
 CFLAGS="-O3 -DNDEBUG -std=gnu11 -I$SRC -I$OPUS_DIR/dnn -I$OPUS_DIR/celt -I$OPUS_DIR/include -I$OPUS_DIR"
-echo "== crab_rade übersetzen ($CC${STATIC:+, statisch})"
+CXXFLAGS="-O2 -DNDEBUG -std=c++11 -Ieoo"
+echo "== crab_rade übersetzen ($CC, $CXX${STATIC:+, statisch})"
 OBJS=""
 for f in $LIBSRC; do
   o=$OBJ/${f%.c}.o; OBJS="$OBJS $o"
   [ -f "$o" ] && [ "$o" -nt "$SRC/$f" ] && continue
   $CC $CFLAGS -c "$SRC/$f" -o "$o"
 done
+# EOO-Rufzeichen (LDPC/CRC, C++ aus peterbmarks/radae_decoder) mit C-Brücke; gelinkt wird deshalb mit dem C++-Compiler
+for f in EooCallsignCodec eoo_bridge; do
+  o=$OBJ/$f.o; OBJS="$OBJS $o"
+  [ -f "$o" ] && [ "$o" -nt "eoo/$f.cpp" ] && [ "$o" -nt "eoo/EooCallsignCodec.h" ] && continue
+  $CXX $CXXFLAGS -c "eoo/$f.cpp" -o "$o"
+done
 $CC $CFLAGS -c crab_rade.c -o "$OBJ/crab_rade.o"
 mkdir -p "$OUT"
-$CC ${STATIC:+-static} -o "$OUT/crab_rade" "$OBJ/crab_rade.o" $OBJS "$OPUS_DIR/.libs/libopus.a" -lm
+$CXX ${STATIC:+-static} -o "$OUT/crab_rade" "$OBJ/crab_rade.o" $OBJS "$OPUS_DIR/.libs/libopus.a" -lm
 ls -la "$OUT/crab_rade"
+if [ -n "$EOO_TX" ]; then   # Testsender (Sprache 16 kHz → RADE-Signal 8 kHz mit EOO-Rufzeichen), nur zum Prüfen
+  $CC $CFLAGS -c rade_eoo_tx.c -o "$OBJ/rade_eoo_tx.o"
+  $CXX ${STATIC:+-static} -o "$B/rade_eoo_tx" "$OBJ/rade_eoo_tx.o" $OBJS "$OPUS_DIR/.libs/libopus.a" -lm
+  ls -la "$B/rade_eoo_tx"
+fi
