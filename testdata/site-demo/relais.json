@@ -272,14 +272,14 @@
   "qth": "Nordenham"
  },
  {
-  "call": "DB0HEI",
+  "call": "DB0XH",
   "freq": 438225,
   "mode": "data",
   "system": "TETRA",
-  "locator": "JO44NE",
-  "qth": "Heide",
+  "locator": "",
+  "qth": "Hamburg",
   "shift": -7600,
-  "info": "TMO, MCC 901, MNC 9998, Spacing 1, DMR-ID nötig"
+  "info": "TETRA TMO"
  },
  {
   "call": "DB0FS",
