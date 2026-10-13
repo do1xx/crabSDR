@@ -17,6 +17,11 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
   erscheint, sobald die Station DV kann oder ein `rade`/`freedv`-Decoder läuft; Deep-Link `digi/?tab=freedv`.
   `/digi/freedv.json` liefert dafür `{status, decoders, calls}` statt nur der Plugin-Datei (nie 404).
 
+### Streams
+- **Ogg-Stream spielt jetzt auch im Browser:** Chrome legte für das eingebettete Stationsbild eine Videospur ohne Bilder an
+  und blieb stumm. Browser (User-Agent Mozilla) bekommen den Stream ohne Bild, Abspielprogramme weiter mit; `?pic=0|1`
+  erzwingt es. Beispiel-Adressen auf der Info-Seite nutzen die öffentliche Adresse der Station ([station] url).
+
 ### Info-Seite
 - **Impressum und Datenschutzerklärung neu gefasst:** sachlich, ohne Anrede, auf das beschränkt, was die Software
   tatsächlich verarbeitet; Chat-Haltegrenzen, Verbund und Verzeichnis kommen aus der Konfiguration. Neu `[station]`

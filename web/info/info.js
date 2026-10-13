@@ -54,7 +54,9 @@ crabReady(function (UI) {
 
   // Stream-Beispiele aus der Schnellwahl der Station (presets.json), als anklickbare, absolute Adressen
   (function () {
+    // Beispiel-Adressen mit der öffentlichen Adresse der Station ([station] url), nicht mit der gerade benutzten (alte Domains)
     var base = location.origin + location.pathname.replace(/info\/?(index\.html)?$/, '');
+    if (st.url && /^https?:\/\//.test(st.url)) base = st.url.replace(/\/+$/, '') + '/';
     var m3 = $('m3u'); if (m3) m3.href = base + 'stream/presets.m3u';
     var ex = $('exlink'); if (ex) { ex.href = base + '?tune=145500.000fm&sq=auto:6&ui=min'; ex.textContent = ex.href; }
     var x = new XMLHttpRequest(); x.open('GET', '../presets.json?' + Date.now());

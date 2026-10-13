@@ -52,6 +52,10 @@ pub struct StreamQuery {
     pub band: Option<String>,
     pub l: Option<String>,
     pub r: Option<String>,
+    /// Stationsbild in den OpusTags: 1 = mit, 0 = ohne. Ohne Angabe: mit für Abspielprogramme (VLC, mpv), ohne für Browser
+    /// (User-Agent „Mozilla/…“): Chrome legt für das eingebettete PNG eine Videospur an, die nie Bilder bekommt, und spielt
+    /// den Ton dann nicht ab
+    pub pic: Option<u8>,
 }
 
 /// Fehler als (Status, Text); erst am Ende zur Antwort gemacht (Clippy: große Err-Variante vermeiden)
@@ -209,7 +213,9 @@ pub async fn ogg(
     let rate = sp.rate;
     let name = q.name.clone().unwrap_or_else(|| "Stream".into());
     let mut tap = match attach(&state, &headers, peer, &q, &sp, &name).await { Ok(t) => t, Err(r) => return r.into_response() };
-    let (bitrate, station, picture) = { let c = state.config.read().await; (q.br.map(|b| b.clamp(8, if iq { 256 } else { 128 }) * 1000).unwrap_or(if iq { 160_000 } else { c.opus_bitrate }), c.station.name.clone(), station_picture(c.site_dir.as_deref())) };
+    let browser = headers.get(header::USER_AGENT).and_then(|v| v.to_str().ok()).is_some_and(|ua| ua.starts_with("Mozilla/"));
+    let with_pic = q.pic.map(|p| p != 0).unwrap_or(!browser);
+    let (bitrate, station, picture) = { let c = state.config.read().await; (q.br.map(|b| b.clamp(8, if iq { 256 } else { 128 }) * 1000).unwrap_or(if iq { 160_000 } else { c.opus_bitrate }), c.station.name.clone(), if with_pic { station_picture(c.site_dir.as_deref()) } else { None }) };
     let title = format!("{} {}{} · {}", fmt_khz(sp.freq), sp.mode.as_str().to_uppercase(), if iq { format!(" {} kHz", rate / 1000) } else { String::new() }, station);
     let tags = Tags { title: title.clone(), artist: format!("{} · crabSDR", station), picture };
     let (out_tx, out_rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(16);

@@ -38,6 +38,7 @@ auch für 4FSK (DMR) – Opus rundet die Flanken ab, PCM nicht.
 | `sq` | `auto` (6 dB über dem Rauschen), `auto:10` (eigener Abstand), `-85` (fest in dBFS), `off` | `auto` bei FM/Daten, sonst `off` |
 | `agc` | `fast`, `medium`, `slow`, `off` | `medium` |
 | `br` | Opus-Bitrate in kbit/s, 8–128 (nur `.ogg`) | Bitrate der Station (32) |
+| `pic` | `1` = Stationsbild in den OpusTags, `0` = ohne. Ohne Angabe: mit für Abspielprogramme, ohne für Browser (User-Agent Mozilla) – Chrome spielt Ogg mit eingebettetem Bild nicht ab |
 | `name` | Anzeigename in der Hörerliste | `Stream` |
 | `band` | Band-ID, nur wenn zwei Bänder die Frequenz abdecken | – |
 | `rate`, `bits` | nur `iq.wav`: 32000/48000 Hz, 8/16 bit | 48000, 16 |
