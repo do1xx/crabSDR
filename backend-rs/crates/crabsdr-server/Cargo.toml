@@ -22,6 +22,7 @@ tracing-subscriber = { workspace = true }
 bytes = { workspace = true }
 num-complex = { workspace = true }
 opus = { workspace = true }
+audiopus_sys = "0.2"
 rayon = { workspace = true }
 jpeg-encoder = "0.6"
 rumqttc = { version = "0.25", default-features = false }

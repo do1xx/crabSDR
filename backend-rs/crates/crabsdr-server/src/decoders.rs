@@ -233,6 +233,24 @@ impl DecoderHub {
 
     /// Gespeicherte Treffer einer Art (z. B. `text` = Rufzeichen) der Decoder dieser Plugins, neueste zuerst – auch von
     /// flüchtigen DV-Decodern, die schon beendet sind (der Ringpuffer behält sie)
+    /// Jüngstes Rufzeichen nahe einer Frequenz, für den Live-Titel des Ton-Streams: DV-Durchgaben (`rade`/`freedv`,
+    /// `kind: text`, ±3 kHz, bis 10 min alt) und APRS-Pakete (`src`, ±10 kHz, bis 90 s alt). Rechte wie bei `api/decoders/events`
+    pub async fn recent_call(&self, freq: u64, p: &crate::access::Principal) -> Option<String> {
+        let now = now_f();
+        let g = self.inner.lock().await;
+        g.events.iter().rev().find_map(|e| {
+            if !p.may_decoder(&e.id, e.public) { return None; }
+            let near = |hz: u64| (e.freq as i64 - freq as i64).unsigned_abs() <= hz;
+            let (field, max_age, hz) = match (e.plugin.as_str(), e.kind.as_str()) {
+                ("rade" | "freedv", "text") => ("text", 600.0, 3_000),
+                ("aprs", "position" | "packet") => ("src", 90.0, 10_000),
+                _ => return None,
+            };
+            if now - e.t > max_age || !near(hz) { return None; }
+            e.data.get(field).and_then(|v| v.as_str()).map(str::trim).filter(|v| !v.is_empty() && v.len() <= 16).map(str::to_string)
+        })
+    }
+
     pub async fn events_of(&self, plugins: &[&str], kind: &str, p: &crate::access::Principal, limit: usize) -> Vec<Event> {
         self.inner.lock().await.events.iter().rev().filter(|e| e.kind == kind && plugins.contains(&e.plugin.as_str()) && p.may_decoder(&e.id, e.public)).take(limit).cloned().collect()
     }

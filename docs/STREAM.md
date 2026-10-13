@@ -39,6 +39,8 @@ auch für 4FSK (DMR) – Opus rundet die Flanken ab, PCM nicht.
 | `agc` | `fast`, `medium`, `slow`, `off` | `medium` |
 | `br` | Opus-Bitrate in kbit/s, 8–128 (nur `.ogg`) | Bitrate der Station (32) |
 | `pic` | `1` = Stationsbild in den OpusTags, `0` = ohne. Ohne Angabe: mit für Abspielprogramme, ohne für Browser (User-Agent Mozilla) – Chrome spielt Ogg mit eingebettetem Bild nicht ab |
+| `live` | `1` = Live-Titel per Ogg-Kettung (siehe unten), `0` = ein fester Titel. Ohne Angabe: an für Abspielprogramme, aus für Browser |
+| `cover` | `wf` = alle 10 s der Wasserfall um die Frequenz als Titelbild (nur mit Live-Titeln, nur `.ogg`) |
 | `name` | Anzeigename in der Hörerliste | `Stream` |
 | `band` | Band-ID, nur wenn zwei Bänder die Frequenz abdecken | – |
 | `rate`, `bits` | nur `iq.wav`: 32000/48000 Hz, 8/16 bit | 48000, 16 |
@@ -46,6 +48,54 @@ auch für 4FSK (DMR) – Opus rundet die Flanken ab, PCM nicht.
 
 Bei `pair.wav` gelten `bw`, `sq` und `agc` für beide Kanäle. Bei geschlossener Rauschsperre wird Stille gesendet,
 nicht nichts, sonst beendet der Spieler die Verbindung.
+
+### Live-Titel: Pegel, Rauschsperre und Rufzeichen im Abspieler
+
+Der Ogg-Stream trägt für Abspielprogramme einen **lebenden Titel**: VLC, mpv und alles, was die Tags eines Webradios
+anzeigt (Auto-Radio über Bluetooth, Now-Playing-Anzeige des Handys), sehen statt eines festen Textes den aktuellen Zustand
+des Kanals.
+
+```
+145700 kHz FM · +18 dB              Rauschsperre offen, Signal 18 dB über dem Rauschen (6-dB-Stufen, 2 dB Hysterese)
+145700 kHz FM · Rauschsperre zu
+145700 kHz FM · DO1XX · +24 dB      Rufzeichen aus dem Decoder: RADE/FreeDV (Ende der Durchgabe, ±3 kHz, 10 min) oder
+144800 kHz DATA · DB0XYZ-10 · +12 dB APRS (Absender des letzten Pakets, ±10 kHz, 90 s)
+```
+
+ARTIST ist `<Station> · crabSDR`, ALBUM der Stationsname. Technik: der Server kettet Ogg-Ströme (RFC 3533 „chained“, wie
+Icecast beim Titelwechsel) – der laufende logische Strom endet mit einer EOS-Seite, ein neuer beginnt mit neuer
+Seriennummer, Granule 0, OpusHead und OpusTags. Der Titel wird mit jeder Pegel-Meldung (4× je s) geprüft und höchstens
+alle 5 s gewechselt; ohne Änderung bleibt der Strom ungekettet. Abspieler, die bei Kettung stolpern, bekommen mit
+`?live=0` den alten festen Titel; Browser (User-Agent Mozilla) nie eine Kettung, denn Chrome legt für jeden neuen Strom
+neue Spuren an.
+
+An der Naht geht kein Abtastwert verloren und nichts knackt: der alte Opus-Kodierer gibt mit einem letzten Rahmen seine
+Verzögerung (312 Werte) aus, der neue wird mit dem Rahmen vor der Naht angewärmt (Paket verworfen), sodass sein
+Pre-Skip genau die schon gesendeten Werte deckt, und sein erster Rahmen ist ohne Vorhersage kodiert (intra) – ein
+frischer Dekodierer (VLC, opusfile) wie ein weiterlaufender (ffmpeg, mpv) setzt nahtlos fort. Gemessen am 50-Hz-Ton
+(`cargo test kette_sinus` mit `CRAB_CHAIN_OUT=<datei>`): Fehler an der Naht ≤ −33 dB, wie das Codec-Rauschen sonst.
+
+| Abspieler | Titel | Cover | Ton an der Naht |
+|---|---|---|---|
+| VLC 3 (Mac/Windows/Linux/Android/iOS) | wechselt live, auch an Bluetooth/AVRCP und die Sperrbildschirm-Anzeige | ja (Titelbild) | kurzer Aussetzer (ein Rahmen, 20 ms): VLC 3 legt die Spur neu an, statt sie weiterzuverwenden (toter Zweig im Ogg-Demuxer, in VLC 4 behoben) |
+| mpv | wechselt live (`--display-tags`, OSD, Terminal-Zeile „Title“) | nein | lückenlos („Linearizing discontinuity“ im Log) |
+| ffmpeg/ffplay | wechselt live (Metadaten-Ereignis) | nein | lückenlos; beim Mitschnitt in eine Datei „Non-monotonic DTS“-Hinweise |
+| opusdec/opusfile | – | – | lückenlos |
+| Browser `<audio>` | fester Titel (`live` aus) | – | – |
+| Auto-Radio über Bluetooth (VLC am Handy) | Titel/Interpret/Album als Text | je nach Radio | wie VLC |
+
+**Wasserfall als Titelbild** (`?cover=wf`): alle 10 s (das erste nach 5 s) kommt im neuen Kettenglied ein JPEG 320 × 180 als
+`METADATA_BLOCK_PICTURE` – die letzten 18 s Wasserfall eines Ausschnitts von etwa 250–500 kHz um die Frequenz des Hörers
+(Zoomstufe als Zweierpotenz der Abtastrate, am Bandrand angeschlagen), neueste Zeile oben, Farben wie im Browser, der
+gehörte Kanal mit rotem Balken und Kantenlinien markiert. Das Bild liegt bei 3–25 kB (JPEG, Qualität 60), Rechenzeit
+unter 1 ms je Bild auf dem Mac (Release-Build), auf dem Pi 4 geschätzt 10–20 ms alle 10 s, also unter 0,2 % eines Kerns;
+die Wasserfall-Zeilen kommen aus dem Band wie für einen Browser-Hörer (10 je s, zstd). Jedes Kettenglied wiederholt das
+jeweils letzte Bild, damit es beim Titelwechsel nicht verschwindet.
+
+```
+https://df0hhh.crabsdr.de/stream/145700/fm.ogg?cover=wf     VLC: Titel lebt, Cover = Wasserfall
+https://df0hhh.crabsdr.de/stream/145700/fm.ogg?live=0       fester Titel, keine Kettung
+```
 
 ### Rechte, Zählung, Lastgrenzen
 

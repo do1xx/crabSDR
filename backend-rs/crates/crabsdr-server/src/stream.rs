@@ -10,7 +10,7 @@
 //! · `br` Opus-Bitrate 8–128 · `name` Anzeigename · `band` Band-ID · `token`.
 
 use crate::access;
-use crate::client::{Squelch, SquelchMode};
+use crate::client::{Squelch, SquelchMode, WaterfallSub};
 use crate::sdr_pipeline::{corrected_center, SdrPipeline};
 use crate::AppState;
 use axum::body::Body;
@@ -36,6 +36,8 @@ const FRAME: usize = (RATE / 50) as usize;
 const PER_PAGE: usize = 5;
 /// Mehr als 0,5 s wartender Ton wird verworfen, sonst wächst die Verzögerung bei Netzstau
 const MAX_BUFFER: usize = FRAME * 25;
+/// Vorlauf des Opus-Kodierers (Abtastwerte bei 48 kHz), die der Abspieler am Anfang jedes logischen Stroms verwirft
+const PRE_SKIP: u16 = 312;
 
 #[derive(Deserialize, Default)]
 pub struct StreamQuery {
@@ -56,6 +58,11 @@ pub struct StreamQuery {
     /// (User-Agent „Mozilla/…“): Chrome legt für das eingebettete PNG eine Videospur an, die nie Bilder bekommt, und spielt
     /// den Ton dann nicht ab
     pub pic: Option<u8>,
+    /// Live-Titel per Ogg-Kettung (TITLE wechselt mit Pegel, Rauschsperre, Rufzeichen): 1 = an, 0 = aus. Ohne Angabe: an für
+    /// Abspielprogramme, aus für Browser (die bekommen auch kein Bild)
+    pub live: Option<u8>,
+    /// `wf`: alle 10 s der Wasserfall um die Frequenz als Titelbild im neuen Kettenglied (nur mit Live-Titeln)
+    pub cover: Option<String>,
 }
 
 /// Fehler als (Status, Text); erst am Ende zur Antwort gemacht (Clippy: große Err-Variante vermeiden)
@@ -117,7 +124,7 @@ fn spec(freq_s: &str, mode_s: &str, q: &StreamQuery) -> Result<Spec, Fail> {
 }
 
 /// Ein laufender Kanal: beim Band angemeldet, PCM kommt über `rx`; beim Fallenlassen wird abgemeldet
-struct Tap { pipeline: Arc<SdrPipeline>, id: u64, rx: mpsc::Receiver<Vec<u8>> }
+struct Tap { pipeline: Arc<SdrPipeline>, id: u64, rx: mpsc::Receiver<Vec<u8>>, principal: access::Principal }
 
 impl Drop for Tap {
     fn drop(&mut self) {
@@ -173,7 +180,7 @@ async fn attach(state: &AppState, headers: &HeaderMap, peer: SocketAddr, q: &Str
         }
     }
     info!("[{}] Stream {} ({}): {} Hz {} bw {}", pipeline.id, id, name, sp.freq, sp.mode.as_str(), sp.bandwidth);
-    Ok(Tap { pipeline, id, rx })
+    Ok(Tap { pipeline, id, rx, principal: p })
 }
 
 /// PCM-Rahmen (Tag 0x02, s16le) in den Puffer; zu viel Rückstand wird verworfen
@@ -217,13 +224,25 @@ pub async fn ogg(
     let with_pic = q.pic.map(|p| p != 0).unwrap_or(!browser);
     let (bitrate, station, picture) = { let c = state.config.read().await; (q.br.map(|b| b.clamp(8, if iq { 256 } else { 128 }) * 1000).unwrap_or(if iq { 160_000 } else { c.opus_bitrate }), c.station.name.clone(), if with_pic { station_picture(c.site_dir.as_deref()) } else { None }) };
     let title = format!("{} {}{} · {}", fmt_khz(sp.freq), sp.mode.as_str().to_uppercase(), if iq { format!(" {} kHz", rate / 1000) } else { String::new() }, station);
-    let tags = Tags { title: title.clone(), artist: format!("{} · crabSDR", station), picture };
+    // Live-Titel (Ogg-Kettung) nur für Abspielprogramme und nur beim Ton; Browser bekommen weder Kettung noch Bild
+    let live_on = matches!(format, Format::Ogg) && !iq && q.live.map(|v| v != 0).unwrap_or(!browser);
+    let cover_on = live_on && q.cover.as_deref() == Some("wf");
+    let mut live = Live::new(sp.freq, sp.mode);
+    let mut tags = Tags { title: if live_on { live.title() } else { title.clone() }, artist: format!("{} · crabSDR", station), album: station.clone(), picture, pad: if browser { 48 * 1024 } else { 0 } };
+    let hub = state.decoders.clone();
+    let (freq, bandwidth) = (sp.freq, sp.bandwidth);
     let (out_tx, out_rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(16);
     let ctype = match format { Format::Ogg => "audio/ogg", Format::Wav => "audio/wav" };
     tokio::spawn(async move {
-        let mut enc = match format { Format::Ogg => Some(match Encoder::new(bitrate, channels, tap.id as u32, tags) { Some(e) => e, None => return }), Format::Wav => None };
+        let mut enc = match format { Format::Ogg => Some(match Encoder::new(bitrate, channels, tap.id as u32, tags.clone()) { Some(e) => e, None => return }), Format::Wav => None };
         let head = match &mut enc { Some(e) => e.headers(), None => wav_header(channels, rate, bits) };
         if out_tx.send(Ok(Bytes::from(head))).await.is_err() { return; }
+        let mut cover = if cover_on { Some(Cover::new(&tap.pipeline, freq)) } else { None };
+        if let Some(c) = &cover { tap.pipeline.clients.lock().await.set_waterfall(tap.id, Some(c.sub)); }
+        let now0 = tokio::time::Instant::now();
+        let mut cur_title = tags.title.clone();
+        // erster Titelwechsel sofort, sobald der Pegel bekannt ist; danach höchstens alle 5 s; Bild alle 10 s (erstes nach 5 s)
+        let (mut last_chain, mut next_cover, mut next_call) = (now0 - LIVE_MIN_GAP, now0 + Duration::from_secs(5), now0);
         let per_tick = (rate / 50) as usize * channels as usize;                          // Abtastwerte je 20 ms (verschränkt)
         let max_buf = (rate / 2) as usize * channels as usize;
         let mut buf = VecDeque::with_capacity(max_buf);
@@ -234,7 +253,15 @@ pub async fn ogg(
         let (mut started, start, mut n) = (false, tokio::time::Instant::now(), 0usize);
         loop {
             tokio::select! {
-                f = tap.rx.recv() => match f { Some(f) => push_pcm(&mut buf, &f, max_buf), None => break },
+                f = tap.rx.recv() => match f {
+                    Some(f) => match f.first() {
+                        Some(&protocol::TAG_AUDIO) => push_pcm(&mut buf, &f, max_buf),
+                        Some(&protocol::TAG_JSON) if live_on => live.feed(&f[1..]),
+                        Some(&protocol::TAG_WATERFALL) => if let Some(c) = &mut cover { c.feed(&f); },
+                        _ => {}
+                    },
+                    None => break,
+                },
                 _ = tick.tick() => {
                     // Anlauf mit 100 ms Vorrat, damit die DSP-Stöße (ein Rahmen je 50–60 ms) nicht lückeln
                     if !started { if buf.len() >= per_tick * 5 || start.elapsed() > Duration::from_millis(300) { started = true; } else { continue; } }
@@ -246,7 +273,26 @@ pub async fn ogg(
                     }
                     n += 1;
                     if n % PER_PAGE == 0 {
-                        let out = match &mut enc { Some(e) => e.flush(), None => std::mem::take(&mut block) };
+                        let out = match &mut enc {
+                            Some(e) if live_on => {
+                                let now = tokio::time::Instant::now();
+                                if now >= next_call { live.call = hub.recent_call(freq, &tap.principal).await; next_call = now + Duration::from_secs(2); }
+                                let want = live.title();
+                                let cover_due = cover.is_some() && now >= next_cover;
+                                if cover_due || (want != cur_title && now >= last_chain + LIVE_MIN_GAP) {
+                                    if let (true, Some(c)) = (cover_due, &mut cover) {
+                                        if c.retune(&tap.pipeline, freq) { tap.pipeline.clients.lock().await.set_waterfall(tap.id, Some(c.sub)); }
+                                        if let Some(jpg) = c.render(freq, bandwidth) { tags.picture = Some(("image/jpeg".into(), jpg)); }
+                                        next_cover = now + Duration::from_secs(10);
+                                    }
+                                    tags.title = want.clone(); cur_title = want; last_chain = now;
+                                    e.chain(&tags);
+                                }
+                                e.flush()
+                            }
+                            Some(e) => e.flush(),
+                            None => std::mem::take(&mut block),
+                        };
                         if out_tx.send(Ok(Bytes::from(out))).await.is_err() { break; }
                     }
                 }
@@ -326,7 +372,7 @@ pub async fn decoder(
     tokio::spawn(async move {
         let mut mux = OggOpus::new(client_id as u32 ^ 0x6465_6364, 1);
         let silence = { let mut e = crate::dsp_thread::OpusEnc::new(32_000, 5); e.as_mut().and_then(|e| e.encode(&vec![0i16; (crate::dsp_thread::OPUS_RATE / 50) as usize]).pop()).unwrap_or_else(|| vec![0xf8, 0xff, 0xfe]) };
-        if out_tx.send(Ok(Bytes::from(mux.headers(&Tags { title: title.clone(), artist: format!("{station} · crabSDR"), picture: None })))).await.is_err() { hub.unsubscribe_audio(client_id); return; }
+        if out_tx.send(Ok(Bytes::from(mux.headers(&Tags { title: title.clone(), artist: format!("{station} · crabSDR"), album: station.clone(), picture: None, pad: 0 })))).await.is_err() { hub.unsubscribe_audio(client_id); return; }
         let mut queue: VecDeque<Vec<u8>> = VecDeque::new();
         let mut tick = tokio::time::interval(Duration::from_millis(20));
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Burst);
@@ -342,6 +388,134 @@ pub async fn decoder(
         hub.unsubscribe_audio(client_id);
     });
     respond("audio/ogg", &title_resp, out_rx)
+}
+
+/// Kürzester Abstand zweier Kettenglieder (Titelwechsel)
+const LIVE_MIN_GAP: Duration = Duration::from_secs(5);
+
+/// Live-Titel eines Kanals aus den Pegel-Meldungen des DSP-Threads (`{"type":"level","db","floor","sq"}`, 4× je s) und
+/// dem jüngsten Rufzeichen eines Decoders: „145700 kHz FM · DO1XX · +18 dB“ bzw. „… · Rauschsperre zu“. Der Rauschabstand
+/// steht in 6-dB-Stufen mit 2 dB Hysterese, damit der Titel nicht bei jedem Zucken des Pegels wechselt
+struct Live { base: String, level: f32, floor: f32, sq: bool, known: bool, step: i32, call: Option<String> }
+
+impl Live {
+    fn new(freq: u64, mode: DemodMode) -> Self {
+        Self { base: format!("{} {}", fmt_khz(freq), mode.as_str().to_uppercase()), level: -200.0, floor: -200.0, sq: true, known: false, step: 0, call: None }
+    }
+    /// JSON-Meldung des DSP-Threads (ohne Tag-Byte); andere Typen werden übergangen
+    fn feed(&mut self, json: &[u8]) {
+        let Ok(v) = serde_json::from_slice::<serde_json::Value>(json) else { return };
+        if v.get("type").and_then(|t| t.as_str()) != Some("level") { return; }
+        if let Some(db) = v.get("db").and_then(|d| d.as_f64()) { self.level = db as f32; }
+        if let Some(fl) = v.get("floor").and_then(|d| d.as_f64()) { self.floor = fl as f32; }
+        self.sq = v.get("sq").and_then(|s| s.as_bool()).unwrap_or(true);
+        self.known = true;
+    }
+    /// Rauschabstand in 6-dB-Stufen, Wechsel erst 2 dB jenseits der Stufengrenze
+    fn snr_step(&mut self) -> i32 {
+        let snr = if self.level > -150.0 && self.floor > -150.0 { (self.level - self.floor).max(0.0) } else { 0.0 };
+        let (lo, hi) = (self.step as f32 - 2.0, self.step as f32 + 8.0);
+        if snr < lo || snr >= hi { self.step = (snr / 6.0).floor() as i32 * 6; }
+        self.step
+    }
+    fn title(&mut self) -> String {
+        let mut t = self.base.clone();
+        if let Some(c) = &self.call { t.push_str(" · "); t.push_str(c); }
+        if self.known {
+            if self.sq { let s = self.snr_step(); t.push_str(&format!(" · +{s} dB")); } else { t.push_str(" · Rauschsperre zu"); }
+        }
+        t
+    }
+}
+
+/// Breite und Höhe des Wasserfall-Titelbilds; 180 Zeilen = 18 s bei 10 Zeilen/s
+const COVER_W: usize = 320;
+const COVER_H: usize = 180;
+/// Gewünschter Ausschnitt um die Frequenz des Hörers (Hz); die Zoomstufe rundet auf eine Zweierpotenz der Abtastrate
+const COVER_SPAN: u32 = 250_000;
+
+/// Wasserfall-Titelbild: der Stream meldet sich wie ein Browser für einen Zoom-Ausschnitt an, sammelt die Zeilen
+/// (absolut oder Differenz zur vorigen, wie im Protokoll) und rendert daraus alle 10 s ein JPEG mit Kanalmarkierung
+struct Cover { sub: WaterfallSub, nb: usize, rate: u32, center: u64, prev: Option<Vec<u8>>, lines: VecDeque<Vec<u8>> }
+
+impl Cover {
+    fn new(p: &SdrPipeline, freq: u64) -> Self {
+        let (nb, rate, center) = Self::band(p);
+        Self { sub: cover_sub(nb, rate, center, freq), nb, rate, center, prev: None, lines: VecDeque::with_capacity(COVER_H + 1) }
+    }
+    fn band(p: &SdrPipeline) -> (usize, u32, u64) {
+        (p.fft_size, p.sample_rate.load(Ordering::Relaxed), corrected_center(p.center_freq.load(Ordering::Relaxed), p.corr_ppm))
+    }
+    /// Band umgestimmt oder Abtastrate geändert → neuer Ausschnitt (Aufrufer meldet ihn an), alte Zeilen weg
+    fn retune(&mut self, p: &SdrPipeline, freq: u64) -> bool {
+        let (nb, rate, center) = Self::band(p);
+        let sub = cover_sub(nb, rate, center, freq);
+        if (nb, rate, center, sub) == (self.nb, self.rate, self.center, self.sub) { return false; }
+        *self = Self { sub, nb, rate, center, prev: None, lines: VecDeque::with_capacity(COVER_H + 1) };
+        true
+    }
+    fn feed(&mut self, frame: &[u8]) {
+        let Some((zoom, start, delta, line)) = protocol::decode_waterfall(frame) else { return };
+        if zoom != self.sub.zoom || start != self.sub.start_bin || line.len() != crate::dsp_thread::WF_PX { return; }
+        let line = if delta {
+            let Some(prev) = &self.prev else { return };
+            prev.iter().zip(&line).map(|(&p, &d)| if d == 0 { p } else { (p as i16 + (d as i8) as i16).clamp(0, 255) as u8 }).collect()
+        } else { line };
+        self.prev = Some(line.clone());
+        self.lines.push_back(line);
+        if self.lines.len() > COVER_H { self.lines.pop_front(); }
+    }
+    /// Spalte (0 … COVER_W) einer Frequenz im Ausschnitt
+    fn column(&self, hz: u64) -> i64 {
+        let bin_hz = self.rate as f64 / self.nb as f64;
+        let bin = (hz as f64 - self.center as f64) / bin_hz + self.nb as f64 / 2.0;
+        let bpp = ((self.nb / crate::dsp_thread::WF_PX) >> self.sub.zoom).max(1) as f64;
+        ((bin - self.sub.start_bin as f64) / bpp * COVER_W as f64 / crate::dsp_thread::WF_PX as f64).round() as i64
+    }
+    /// JPEG COVER_W × COVER_H, neueste Zeile oben, Farbzuordnung je Zeile wie im Browser; der Kanal (Frequenz ± Bandbreite/2)
+    /// bekommt einen roten Balken am oberen Rand und zwei Kantenlinien
+    fn render(&self, freq: u64, bandwidth: u32) -> Option<Vec<u8>> {
+        if self.lines.is_empty() { return None; }
+        let pal = crate::dsp_thread::palette();
+        let mut rgb = vec![0u8; COVER_W * COVER_H * 3];
+        let mut row = vec![0u8; COVER_W];
+        for (r, line) in self.lines.iter().rev().take(COVER_H).enumerate() {
+            for (x, v) in row.iter_mut().enumerate() {
+                let (a, b) = (x * crate::dsp_thread::WF_PX / COVER_W, (x + 1) * crate::dsp_thread::WF_PX / COVER_W);
+                *v = *line[a..b].iter().max().unwrap_or(&0);
+            }
+            let mut sample: Vec<u8> = row.iter().step_by(4).cloned().collect();
+            sample.sort_unstable();
+            // Fenster wie der Browser-Look „Kontrast“ (28 dB über dem Rauschboden): auf dem kleinen Bild bleibt so auch ein
+            // leises Band lesbar, starke Signale laufen in Weiß
+            let lo0 = sample[sample.len() / 5] as f32 - 4.0;
+            for (x, &v) in row.iter().enumerate() {
+                let t = (((v as f32 - lo0) / 28.0 * 255.0).round()).clamp(0.0, 255.0) as usize;
+                let o = (r * COVER_W + x) * 3; rgb[o..o + 3].copy_from_slice(&pal[t]);
+            }
+        }
+        let (xl, xr) = (self.column(freq.saturating_sub(bandwidth as u64 / 2)), self.column(freq + bandwidth as u64 / 2));
+        let (xl, xr) = (xl.clamp(0, COVER_W as i64 - 1) as usize, xr.clamp(0, COVER_W as i64 - 1) as usize);
+        for x in xl..=xr { for r in 0..3 { let o = (r * COVER_W + x) * 3; rgb[o..o + 3].copy_from_slice(&[255, 70, 70]); } }
+        for x in [xl, xr] { for r in 3..COVER_H { let o = (r * COVER_W + x) * 3; for (k, c) in [255u8, 70, 70].iter().enumerate() { rgb[o + k] = ((rgb[o + k] as u16 + *c as u16) / 2) as u8; } } }
+        let mut out = Vec::with_capacity(24 * 1024);
+        let enc = jpeg_encoder::Encoder::new(&mut out, 60);
+        enc.encode(&rgb, COVER_W as u16, COVER_H as u16, jpeg_encoder::ColorType::Rgb).ok()?;
+        Some(out)
+    }
+}
+
+/// Zoom-Ausschnitt für das Titelbild: größte Zoomstufe, deren Breite (Abtastrate ≫ Stufe) noch COVER_SPAN deckt, höchstens so
+/// weit, wie der Server ohne eigene Zoom-FFT rechnet (1024 Pixel ≤ 1 Bin je Pixel); mittig um die Frequenz, am Bandrand angeschlagen
+fn cover_sub(nb: usize, rate: u32, center: u64, freq: u64) -> WaterfallSub {
+    let srv_max = (nb / crate::dsp_thread::WF_PX).max(1).ilog2();
+    let mut zoom = 0u32;
+    while zoom < srv_max && (rate >> (zoom + 1)) >= COVER_SPAN { zoom += 1; }
+    let w = (nb >> zoom) as i64;
+    let bin_hz = rate as f64 / nb as f64;
+    let center_bin = ((freq as f64 - center as f64) / bin_hz).round() as i64 + nb as i64 / 2;
+    let start = (center_bin - w / 2).clamp(0, nb as i64 - w);
+    WaterfallSub { zoom: zoom as u8, start_bin: start as u16 }
 }
 
 fn respond(ctype: &'static str, title: &str, out_rx: mpsc::Receiver<Result<Bytes, std::io::Error>>) -> Response {
@@ -399,29 +573,114 @@ pub async fn m3u(headers: HeaderMap, State(state): State<Arc<AppState>>) -> Resp
     ([(header::CONTENT_TYPE, "audio/x-mpegurl; charset=utf-8"), (header::CACHE_CONTROL, "no-store")], out).into_response()
 }
 
-/// Opus-Kodierer je Stream plus Ogg-Verpackung (RFC 3533 / RFC 7845): Kopfseiten OpusHead + OpusTags, dann Tonseiten
-struct Encoder { enc: opus::Encoder, mux: OggOpus, buf: Vec<u8>, channels: u16, tags: Tags }
+/// Opus-Kodierer je Stream plus Ogg-Verpackung (RFC 3533 / RFC 7845): Kopfseiten OpusHead + OpusTags, dann Tonseiten.
+/// Die Kettung (neuer logischer Strom mit neuen Tags) geschieht mit dem nächsten Rahmen, siehe `do_chain`
+struct Encoder {
+    enc: OpusRaw, mux: OggOpus, buf: Vec<u8>, channels: usize, tags: Tags,
+    /// noch nicht kodierte Abtastwerte (verschränkt); nach einer Kettung bleibt bis zu ein Rahmen liegen
+    fifo: VecDeque<i16>,
+    /// zuletzt kodierter Rahmen – zum Anwärmen des frischen Kodierers nach der Kettung
+    last: Vec<i16>,
+    /// gewünschte Kettung, ausgeführt beim nächsten `push`
+    chain_req: Option<Tags>,
+    /// fertige Seiten (EOS, neue Köpfe), die der nächste `flush` voranstellt
+    out: Vec<u8>,
+    /// der erste Rahmen des neuen Stroms wird ohne Vorhersage (intra) kodiert, damit ein frischer Dekodierer ihn sauber bekommt
+    fresh: bool,
+}
 
 impl Encoder {
     fn new(bitrate: u32, channels: u16, serial: u32, tags: Tags) -> Option<Self> {
-        let ch = if channels == 2 { opus::Channels::Stereo } else { opus::Channels::Mono };
-        let mut enc = opus::Encoder::new(RATE, ch, opus::Application::Audio).ok()?;
-        let _ = enc.set_bitrate(opus::Bitrate::Bits(bitrate as i32));
-        Some(Self { enc, mux: OggOpus::new(serial, channels), buf: vec![0u8; 4000], channels, tags })
+        let enc = OpusRaw::new(channels as i32, bitrate as i32)?;
+        Some(Self { enc, mux: OggOpus::new(serial, channels), buf: vec![0u8; 4000], channels: channels as usize, tags, fifo: VecDeque::with_capacity(FRAME * 3 * channels as usize), last: Vec::new(), chain_req: None, out: Vec::new(), fresh: false })
     }
     fn headers(&mut self) -> Vec<u8> { self.mux.headers(&self.tags) }
     /// ein 20-ms-Rahmen (mono: FRAME Werte, stereo: 2·FRAME verschränkt)
     fn push(&mut self, pcm: &[i16]) {
-        debug_assert_eq!(pcm.len(), FRAME * self.channels as usize);
-        let _ = self.channels;
-        if let Ok(n) = self.enc.encode(pcm, &mut self.buf) { self.mux.add(self.buf[..n].to_vec()); }
+        debug_assert_eq!(pcm.len(), FRAME * self.channels);
+        self.fifo.extend(pcm);
+        if let Some(t) = self.chain_req.take() { self.do_chain(t); }
+        let n = FRAME * self.channels;
+        while self.fifo.len() >= n {
+            let frame: Vec<i16> = self.fifo.drain(..n).collect();
+            self.encode(&frame, FRAME as u64);
+            self.last = frame;
+        }
     }
-    fn flush(&mut self) -> Vec<u8> { self.mux.flush() }
+    fn encode(&mut self, pcm: &[i16], samples: u64) {
+        if self.fresh { self.enc.prediction_disabled(true); }
+        if let Some(n) = self.enc.encode(pcm, &mut self.buf) { self.mux.add_samples(self.buf[..n].to_vec(), samples); }
+        if self.fresh { self.enc.prediction_disabled(false); self.fresh = false; }
+    }
+    /// Kettung anfordern (neue Tags); das Browser-Polster gehört nur in den ersten Kopf
+    fn chain(&mut self, tags: &Tags) { self.chain_req = Some(Tags { pad: 0, ..tags.clone() }); }
+    /// Nahtstelle ohne Verlust und ohne Sprung: der alte Kodierer bekommt noch einen ganzen Rahmen (960 Werte) und gibt
+    /// damit seine Verzögerung (PRE_SKIP = 312 Werte) plus 648 neue Werte aus; der alte Strom endet damit lückenlos. Die
+    /// 312 Werte, die in seiner Verzögerung stecken bleiben, wandern zurück in den Vorrat. Der frische Kodierer wird mit
+    /// dem letzten Rahmen vor der Naht angewärmt (Paket verworfen): seine Verzögerung enthält dann genau die Werte, die der
+    /// Pre-Skip des neuen Stroms verwirft, und die Ausgabe des Abspielers setzt beim nächsten Wert fort – für einen
+    /// frischen Dekodierer (VLC) dank intra-kodiertem erstem Rahmen, für einen weiterlaufenden (ffmpeg/mpv) dank
+    /// Pre-Skip-Schnitt je Strom. (Ein kürzerer 10-ms-Nachlauf wäre sparsamer, aber libopus liefert beim Wechsel der
+    /// Rahmenlänge 20 → 10 ms hörbaren Müll, gemessen am 50-Hz-Ton: Fehler −8 dB statt −38 dB)
+    fn do_chain(&mut self, tags: Tags) {
+        let (ch, n) = (self.channels, FRAME * self.channels);
+        let skip = PRE_SKIP as usize * ch;
+        if self.fifo.len() < n { self.chain_req = Some(tags); return; }
+        let tail: Vec<i16> = self.fifo.drain(..n).collect();
+        self.encode(&tail, FRAME as u64);
+        for v in tail[n - skip..].iter().rev() { self.fifo.push_front(*v); }
+        self.enc.reset();
+        if self.last.len() == n {
+            let mut prime = self.last[n - skip..].to_vec();
+            prime.extend_from_slice(&tail[..n - skip]);
+            let _ = self.enc.encode(&prime, &mut self.buf);
+        }
+        self.fresh = true;
+        self.tags = tags;
+        let bytes = self.mux.chain(&self.tags);
+        self.out.extend(bytes);
+    }
+    fn flush(&mut self) -> Vec<u8> {
+        let mut o = std::mem::take(&mut self.out);
+        o.extend(self.mux.flush());
+        o
+    }
+}
+
+/// libopus-Kodierer direkt über die C-Schnittstelle: die Hülle `opus` kennt `OPUS_SET_PREDICTION_DISABLED` nicht, das aber
+/// braucht der erste Rahmen nach einer Kettung
+struct OpusRaw { st: *mut audiopus_sys::OpusEncoder, channels: i32 }
+unsafe impl Send for OpusRaw {}
+
+impl OpusRaw {
+    fn new(channels: i32, bitrate: i32) -> Option<Self> {
+        let mut err = 0i32;
+        // SAFETY: Argumente gültig (48 kHz, 1–2 Kanäle); Zeiger wird nur hier gehalten und in Drop freigegeben
+        let st = unsafe { audiopus_sys::opus_encoder_create(RATE as i32, channels, audiopus_sys::OPUS_APPLICATION_AUDIO, &mut err) };
+        if st.is_null() || err != audiopus_sys::OPUS_OK { return None; }
+        let e = Self { st, channels };
+        unsafe { audiopus_sys::opus_encoder_ctl(e.st, audiopus_sys::OPUS_SET_BITRATE_REQUEST, bitrate); }
+        Some(e)
+    }
+    /// ein Rahmen (verschränkt) → Opus-Paket in `out`; None bei Fehler
+    fn encode(&mut self, pcm: &[i16], out: &mut [u8]) -> Option<usize> {
+        let frames = pcm.len() as i32 / self.channels;
+        // SAFETY: Puffer und Längen stammen aus den Slices
+        let n = unsafe { audiopus_sys::opus_encode(self.st, pcm.as_ptr(), frames, out.as_mut_ptr(), out.len() as i32) };
+        (n > 0).then_some(n as usize)
+    }
+    fn reset(&mut self) { unsafe { audiopus_sys::opus_encoder_ctl(self.st, audiopus_sys::OPUS_RESET_STATE); } }
+    /// an: nächster Rahmen ohne Vorhersage aus dem Vorgänger (CELT intra, SILK unabhängig)
+    fn prediction_disabled(&mut self, on: bool) { unsafe { audiopus_sys::opus_encoder_ctl(self.st, audiopus_sys::OPUS_SET_PREDICTION_DISABLED_REQUEST, on as i32); } }
+}
+
+impl Drop for OpusRaw {
+    fn drop(&mut self) { unsafe { audiopus_sys::opus_encoder_destroy(self.st); } }
 }
 
 /// Metadaten für die OpusTags-Seite
 #[derive(Clone, Default)]
-struct Tags { title: String, artist: String, picture: Option<(String, Vec<u8>)> }
+struct Tags { title: String, artist: String, album: String, picture: Option<(String, Vec<u8>)>, pad: usize }
 
 /// Stationsbild für VLC & Co.: `logo.png` oder `logo.jpg` im Stationsordner (site_dir), höchstens 512 kB
 fn station_picture(site_dir: Option<&std::path::Path>) -> Option<(String, Vec<u8>)> {
@@ -444,17 +703,17 @@ fn base64(data: &[u8]) -> String {
     out
 }
 
-struct OggOpus { serial: u32, seq: u32, granule: u64, channels: u16, pending: Vec<Vec<u8>> }
+struct OggOpus { serial: u32, seq: u32, granule: u64, channels: u16, pending: Vec<Vec<u8>>, pending_samples: u64 }
 
 impl OggOpus {
-    fn new(serial: u32, channels: u16) -> Self { Self { serial, seq: 0, granule: 0, channels, pending: Vec::new() } }
+    fn new(serial: u32, channels: u16) -> Self { Self { serial, seq: 0, granule: 0, channels, pending: Vec::new(), pending_samples: 0 } }
 
     fn headers(&mut self, t: &Tags) -> Vec<u8> {
         let mut head = Vec::new();
         head.extend_from_slice(b"OpusHead");
         head.push(1);                                              // Version
         head.push(self.channels as u8);
-        head.extend_from_slice(&312u16.to_le_bytes());             // Pre-Skip (Kodierer-Vorlauf)
+        head.extend_from_slice(&PRE_SKIP.to_le_bytes());           // Pre-Skip (Kodierer-Vorlauf)
         head.extend_from_slice(&RATE.to_le_bytes());
         head.extend_from_slice(&0i16.to_le_bytes());               // Verstärkung
         head.push(0);                                              // Kanalabbildung (1–2 Kanäle)
@@ -466,6 +725,7 @@ impl OggOpus {
         tags.extend_from_slice(&(vendor.len() as u32).to_le_bytes());
         tags.extend_from_slice(vendor);
         let mut comments: Vec<String> = vec![format!("TITLE={}", t.title), format!("ARTIST={}", t.artist), "ENCODER=crabSDR".into()];
+        if !t.album.is_empty() { comments.push(format!("ALBUM={}", t.album)); }
         if let Some((mime, data)) = &t.picture {
             let mut pic = Vec::with_capacity(32 + mime.len() + data.len());
             pic.extend_from_slice(&3u32.to_be_bytes());                       // Typ 3 = Titelbild
@@ -475,6 +735,9 @@ impl OggOpus {
             pic.extend_from_slice(&(data.len() as u32).to_be_bytes()); pic.extend_from_slice(data);
             comments.push(format!("METADATA_BLOCK_PICTURE={}", base64(&pic)));
         }
+        // Polster für Browser: Chrome prüft den Strom erst, wenn einige zehn Kilobyte angekommen sind – bei einem leisen
+        // Kanal (Opus-Ruhepakete, ~1,5 kB/s) dauerte das eine halbe Minute „Laden“. Ein langer Kommentar füllt den Puffer sofort
+        if t.pad > 0 { comments.push(format!("PADDING={}", " ".repeat(t.pad))); }
         tags.extend_from_slice(&(comments.len() as u32).to_le_bytes());
         for c in &comments { tags.extend_from_slice(&(c.len() as u32).to_le_bytes()); tags.extend_from_slice(c.as_bytes()); }
         let mut out = self.page(0x02, 0, &[head]);
@@ -482,36 +745,72 @@ impl OggOpus {
         out
     }
 
-    fn add(&mut self, packet: Vec<u8>) { self.pending.push(packet); }
+    /// ein 20-ms-Paket
+    fn add(&mut self, packet: Vec<u8>) { self.add_samples(packet, FRAME as u64); }
+    /// Paket mit so vielen gültigen Abtastwerten (48 kHz) – kürzere Rahmen oder ein getrimmter Nachlauf
+    fn add_samples(&mut self, packet: Vec<u8>, samples: u64) { self.pending.push(packet); self.pending_samples += samples; }
 
-    fn flush(&mut self) -> Vec<u8> {
-        if self.pending.is_empty() { return Vec::new(); }
+    fn flush(&mut self) -> Vec<u8> { self.flush_as(false) }
+
+    /// Wartende Pakete als Seite; `eos` schließt den logischen Strom (Kopf-Bit 0x04, notfalls als leere Seite)
+    fn flush_as(&mut self, eos: bool) -> Vec<u8> {
+        if self.pending.is_empty() && !eos { return Vec::new(); }
         let packets = std::mem::take(&mut self.pending);
-        self.granule += FRAME as u64 * packets.len() as u64;      // 48-kHz-Abtastwerte je Rahmen
-        self.page(0x00, self.granule, &packets)
+        self.granule += std::mem::take(&mut self.pending_samples); // 48-kHz-Abtastwerte
+        self.page(if eos { 0x04 } else { 0x00 }, self.granule, &packets)
+    }
+
+    /// Kettung (RFC 3533 „chained“, wie Icecast beim Titelwechsel): laufenden logischen Strom mit EOS beenden, neuen mit
+    /// neuer Seriennummer, OpusHead/OpusTags, Seitenzähler 0 und Granule 0 beginnen. VLC und mpv übernehmen die neuen
+    /// Tags als laufenden Titel. (Die Granule weiterlaufen zu lassen schien verlockend, aber VLC rechnet je Glied von 0
+    /// und verwarf dann Rahmen: „Could not convert timestamp“)
+    fn chain(&mut self, t: &Tags) -> Vec<u8> {
+        let mut out = self.flush_as(true);
+        self.serial = self.serial.wrapping_mul(0x9E37_79B9).wrapping_add(0x7F4A_7C15) | 1;
+        self.seq = 0;
+        self.granule = 0;
+        out.extend(self.headers(t));
+        out
     }
 
     fn page(&mut self, header_type: u8, granule: u64, packets: &[Vec<u8>]) -> Vec<u8> {
+        // Lacing: je Paket 255er-Werte und ein Abschluss < 255. Mehr als 255 Segmente passen nicht auf eine Seite (das
+        // Zählbyte ist 8 Bit) – dann wird auf mehrere Seiten verteilt, Folgeseiten tragen das Fortsetzungs-Flag, wenn ein
+        // Paket über die Seitengrenze läuft, und Granule −1, wenn auf ihnen kein Paket endet (Ogg-Regel). Vorher lief ein
+        // OpusTags-Kopf über 65 kB (Polster für Browser) in eine kaputte Seite mit falscher Prüfsumme (13.10.)
         let mut lacing = Vec::new();
         for p in packets {
             let mut n = p.len();
             while n >= 255 { lacing.push(255u8); n -= 255; }
             lacing.push(n as u8);                                  // letzter Wert < 255 schließt das Paket ab
         }
-        let mut out = Vec::with_capacity(27 + lacing.len() + packets.iter().map(|p| p.len()).sum::<usize>());
-        out.extend_from_slice(b"OggS");
-        out.push(0);
-        out.push(header_type);
-        out.extend_from_slice(&granule.to_le_bytes());
-        out.extend_from_slice(&self.serial.to_le_bytes());
-        out.extend_from_slice(&self.seq.to_le_bytes());
-        out.extend_from_slice(&[0, 0, 0, 0]);                      // CRC, kommt gleich
-        out.push(lacing.len() as u8);
-        out.extend_from_slice(&lacing);
-        for p in packets { out.extend_from_slice(p); }
-        let crc = ogg_crc(&out).to_le_bytes();
-        out[22..26].copy_from_slice(&crc);
-        self.seq = self.seq.wrapping_add(1);
+        let data: Vec<u8> = packets.concat();
+        let mut out = Vec::with_capacity(27 + lacing.len() + data.len() + 27 * (lacing.len() / 255));
+        let (mut li, mut di, mut continued) = (0usize, 0usize, false);
+        loop {
+            let take = (lacing.len() - li).min(255);
+            let seg = &lacing[li..li + take];
+            let bytes: usize = seg.iter().map(|&v| v as usize).sum();
+            let last = li + take >= lacing.len();
+            let ends_packet = seg.last().is_some_and(|&v| v < 255);
+            let g = if last || ends_packet { granule } else { u64::MAX };
+            let start = out.len();
+            out.extend_from_slice(b"OggS");
+            out.push(0);
+            out.push(header_type | if continued { 0x01 } else { 0 });
+            out.extend_from_slice(&g.to_le_bytes());
+            out.extend_from_slice(&self.serial.to_le_bytes());
+            out.extend_from_slice(&self.seq.to_le_bytes());
+            out.extend_from_slice(&[0, 0, 0, 0]);                  // CRC, kommt gleich
+            out.push(take as u8);
+            out.extend_from_slice(seg);
+            out.extend_from_slice(&data[di..di + bytes]);
+            let crc = ogg_crc(&out[start..]).to_le_bytes();
+            out[start + 22..start + 26].copy_from_slice(&crc);
+            self.seq = self.seq.wrapping_add(1);
+            li += take; di += bytes; continued = !ends_packet;
+            if last { break; }
+        }
         out
     }
 }
@@ -577,6 +876,168 @@ mod tests {
     }
 
     #[test]
+    fn ogg_grosser_kopf_auf_mehrere_seiten() {
+        // OpusTags mit 70 kB Polster: mehr als 255 Segmente → mehrere Seiten, alle mit gültiger Prüfsumme, Fortsetzungs-Flag
+        // auf den Folgeseiten, Granule −1 ohne Paketende, Seitenzähler fortlaufend
+        let mut m = OggOpus::new(9, 1);
+        let out = m.headers(&Tags { title: "T".into(), artist: "A".into(), album: String::new(), picture: None, pad: 70 * 1024 });
+        let (mut i, mut pages) = (0usize, Vec::new());
+        while i < out.len() {
+            assert_eq!(&out[i..i + 4], b"OggS");
+            let segs = out[i + 26] as usize; let body: usize = out[i + 27..i + 27 + segs].iter().map(|&v| v as usize).sum();
+            let end = i + 27 + segs + body;
+            let mut copy = out[i..end].to_vec(); copy[22..26].copy_from_slice(&[0, 0, 0, 0]);
+            assert_eq!(ogg_crc(&copy).to_le_bytes(), out[i + 22..i + 26], "Prüfsumme Seite {}", pages.len());
+            pages.push((out[i + 5], u64::from_le_bytes(out[i + 6..i + 14].try_into().unwrap()), u32::from_le_bytes(out[i + 18..i + 22].try_into().unwrap()), segs));
+            i = end;
+        }
+        assert!(pages.len() >= 3, "{:?}", pages);   // Kopf + 2 Tag-Seiten (255 × 255 B passen auf die erste)
+        assert_eq!(pages[0], (2, 0, 0, 1));                                  // OpusHead: BOS, ein Segment
+        assert_eq!((pages[1].0, pages[1].1, pages[1].3), (0, u64::MAX, 255));  // Tags, erste Seite: voll, kein Paketende
+        assert_eq!(pages[2].0 & 1, 1);                                       // Folgeseite: Fortsetzung
+        assert_eq!(pages.last().unwrap().1, 0);                              // letzte Kopfseite: Granule 0
+        for (k, p) in pages.iter().enumerate() { assert_eq!(p.2 as usize, k); }
+    }
+
+    /// Kettung: EOS-Seite schließt den ersten Strom, danach BOS mit neuer Seriennummer, Seitenzähler 0, Granule läuft weiter
+    #[test]
+    fn ogg_kettung_neuer_strom() {
+        let mut m = OggOpus::new(7, 1);
+        let _ = m.headers(&Tags { title: "eins".into(), ..Tags::default() });
+        for _ in 0..5 { m.add(vec![1u8; 100]); }
+        let _ = m.flush();
+        for _ in 0..5 { m.add(vec![2u8; 100]); }
+        let out = m.chain(&Tags { title: "zwei".into(), ..Tags::default() });
+        // 1. Seite: letzte Tonseite des alten Stroms mit EOS
+        assert_eq!(&out[0..4], b"OggS");
+        assert_eq!(out[5], 0x04, "EOS-Bit");
+        assert_eq!(u64::from_le_bytes(out[6..14].try_into().unwrap()), 10 * FRAME as u64);
+        assert_eq!(u32::from_le_bytes(out[14..18].try_into().unwrap()), 7, "alte Seriennummer");
+        assert_eq!(u32::from_le_bytes(out[18..22].try_into().unwrap()), 3, "Seitenzähler 3 (Kopf, Tags, Ton, EOS)");
+        assert_eq!(out[26], 5);
+        let eos_len = 27 + 5 + 500;
+        // 2. Seite: OpusHead des neuen Stroms, BOS, Seriennummer neu, Zähler 0, Granule 0
+        let h = &out[eos_len..];
+        assert_eq!(&h[0..4], b"OggS");
+        assert_eq!(h[5], 0x02, "BOS-Bit");
+        assert_eq!(u64::from_le_bytes(h[6..14].try_into().unwrap()), 0);
+        let serial = u32::from_le_bytes(h[14..18].try_into().unwrap());
+        assert_ne!(serial, 7); assert_eq!(serial, m.serial);
+        assert_eq!(u32::from_le_bytes(h[18..22].try_into().unwrap()), 0);
+        assert_eq!(&h[28..36], b"OpusHead");
+        // 3. Seite: OpusTags mit neuem Titel
+        let t = &h[28 + 19..];
+        assert_eq!(&t[0..4], b"OggS"); assert_eq!(t[5], 0x00); assert_eq!(&t[28..36], b"OpusTags");
+        assert!(t.windows(10).any(|w| w == b"TITLE=zwei"));
+        assert_eq!(u32::from_le_bytes(t[14..18].try_into().unwrap()), serial);
+        assert_eq!(u32::from_le_bytes(t[18..22].try_into().unwrap()), 1);
+        // Ton danach: Granule beginnt im neuen Strom bei 0 (5 Rahmen), Zähler 2, Prüfsumme stimmt
+        for _ in 0..5 { m.add(vec![3u8; 100]); }
+        let page = m.flush();
+        assert_eq!(u64::from_le_bytes(page[6..14].try_into().unwrap()), 5 * FRAME as u64);
+        assert_eq!(u32::from_le_bytes(page[18..22].try_into().unwrap()), 2);
+        let mut z = page.clone(); z[22..26].copy_from_slice(&[0; 4]);
+        assert_eq!(ogg_crc(&z).to_le_bytes(), page[22..26]);
+        // Kettung ohne wartende Pakete: leere EOS-Seite
+        let out = m.chain(&Tags::default());
+        assert_eq!(out[5], 0x04); assert_eq!(out[26], 0);
+    }
+
+    /// Live-Titel: Rauschsperre, 6-dB-Stufen mit Hysterese, Rufzeichen
+    #[test]
+    fn live_titel() {
+        let mut l = Live::new(145_700_000, DemodMode::Fm);
+        assert_eq!(l.title(), "145700 kHz FM");
+        l.feed(br#"{"type":"level","db":-80.0,"floor":-100.0,"sq":false}"#);
+        assert_eq!(l.title(), "145700 kHz FM · Rauschsperre zu");
+        l.feed(br#"{"type":"level","db":-80.0,"floor":-100.0,"sq":true}"#);
+        assert_eq!(l.title(), "145700 kHz FM · +18 dB");
+        l.feed(br#"{"type":"level","db":-77.0,"floor":-100.0,"sq":true}"#);   // 23 dB: noch in der Stufe 18 (bis < 26)
+        assert_eq!(l.title(), "145700 kHz FM · +18 dB");
+        l.feed(br#"{"type":"level","db":-73.0,"floor":-100.0,"sq":true}"#);   // 27 dB → 24
+        assert_eq!(l.title(), "145700 kHz FM · +24 dB");
+        l.feed(br#"{"type":"level","db":-77.0,"floor":-100.0,"sq":true}"#);   // 23 dB: bleibt 24 (Hysterese bis < 22)
+        assert_eq!(l.title(), "145700 kHz FM · +24 dB");
+        l.feed(br#"{"type":"squelch","x":1}"#);                              // anderer Typ: keine Änderung
+        l.call = Some("DO1XX".into());
+        assert_eq!(l.title(), "145700 kHz FM · DO1XX · +24 dB");
+    }
+
+    /// Wasserfall-Titelbild: Ausschnitt um die Frequenz, Zeilen (absolut + Delta) → JPEG unter 40 kB
+    #[test]
+    fn wasserfall_cover() {
+        let (nb, rate, center) = (4096usize, 2_048_000u32, 145_000_000u64);
+        let sub = cover_sub(nb, rate, center, 145_700_000);
+        assert_eq!(sub.zoom, 2, "2,048 MHz ≫ 2 = 512 kHz ≥ 250 kHz, Stufe 3 wäre über der Bin-Grenze");
+        let bin_hz = rate as f64 / nb as f64;
+        let w = nb >> 2;
+        let center_bin = ((145_700_000.0 - 145_000_000.0) / bin_hz).round() as usize + nb / 2;
+        assert_eq!(sub.start_bin as usize, center_bin - w / 2);
+        assert_eq!(cover_sub(nb, rate, center, 144_000_000).start_bin, 0, "am Bandrand angeschlagen");
+        let mut c = Cover { sub, nb, rate, center, prev: None, lines: VecDeque::new() };
+        assert_eq!(c.column(145_700_000), COVER_W as i64 / 2);
+        assert!(c.render(145_700_000, 12_500).is_none(), "ohne Zeilen kein Bild");
+        let line: Vec<u8> = (0..crate::dsp_thread::WF_PX).map(|i| 40 + (i % 7) as u8 + if (500..524).contains(&i) { 30 } else { 0 }).collect();
+        c.feed(&protocol::encode_waterfall(sub.zoom, sub.start_bin, false, &line));
+        let delta: Vec<u8> = (0..crate::dsp_thread::WF_PX).map(|i| if i == 512 { 10 } else { 0 }).collect();
+        c.feed(&protocol::encode_waterfall(sub.zoom, sub.start_bin, true, &delta));
+        let zero = vec![0u8; crate::dsp_thread::WF_PX];
+        for _ in 0..200 { c.feed(&protocol::encode_waterfall(sub.zoom, sub.start_bin, true, &zero)); }
+        assert_eq!(c.lines.len(), COVER_H);
+        assert_eq!(c.lines.back().unwrap()[512], line[512] + 10, "Delta auf die vorige Zeile, Null = unverändert");
+        c.feed(&protocol::encode_waterfall(sub.zoom + 1, sub.start_bin, false, &line));   // fremder Ausschnitt: ignoriert
+        assert_eq!(c.lines.len(), COVER_H);
+        let t0 = std::time::Instant::now();
+        let jpg = c.render(145_700_000, 12_500).expect("JPEG");
+        let dt = t0.elapsed();
+        assert_eq!(&jpg[0..2], &[0xFF, 0xD8]);
+        assert!(jpg.len() <= 40 * 1024, "Bild {} Byte", jpg.len());
+        eprintln!("Cover: {} Byte in {:?}", jpg.len(), dt);
+    }
+
+    /// Kodierer-Kettung: der Wechsel geschieht mit dem nächsten Rahmen – EOS-Seite mit dem Nachlaufrahmen (Granule 6 Rahmen),
+    /// neue Köpfe, und der neue Strom nimmt die 312 Werte aus der Verzögerung mit (kein Abtastwert geht verloren)
+    #[test]
+    fn kette_nachlauf() {
+        let mut e = Encoder::new(32_000, 1, 1, Tags::default()).expect("Opus-Kodierer");
+        let _ = e.headers();
+        for _ in 0..5 { e.push(&vec![100i16; FRAME]); }
+        let _ = e.flush();
+        e.chain(&Tags { title: "neu".into(), ..Tags::default() });
+        assert!(e.flush().is_empty(), "noch nichts: der Nachlauf braucht den nächsten Rahmen");
+        e.push(&vec![100i16; FRAME]);
+        let out = e.flush();
+        assert_eq!(out[5], 0x04, "EOS-Seite zuerst");
+        assert_eq!(u64::from_le_bytes(out[6..14].try_into().unwrap()), 6 * FRAME as u64);
+        assert_eq!(out[26], 1, "ein Paket: der Nachlauf");
+        let eos_len = 27 + 1 + out[27] as usize;
+        assert_eq!(&out[eos_len + 28..eos_len + 36], b"OpusHead");
+        assert!(out.windows(9).any(|w| w == b"TITLE=neu"));
+        assert_eq!(e.fifo.len(), PRE_SKIP as usize, "Übertrag aus der Verzögerung des alten Kodierers");
+        assert_eq!(e.mux.granule, 0, "neuer Strom beginnt bei 0");
+        e.push(&vec![100i16; FRAME]);
+        let page = e.flush();
+        assert_eq!(u64::from_le_bytes(page[6..14].try_into().unwrap()), FRAME as u64, "erster Tonrahmen des neuen Stroms");
+        assert!(!e.fresh);
+    }
+
+    /// Kettung mit echtem Ton: 50-Hz-Sinus, alle 1 s ein neues Glied – mit CRAB_CHAIN_OUT=<datei> als Ogg geschrieben,
+    /// zum Abhören und zur Prüfung auf Knacken/Lücken (ffmpeg → WAV → Sprünge zwischen Abtastwerten)
+    #[test]
+    fn kette_sinus() {
+        let mut e = Encoder::new(32_000, 1, 1, Tags { title: "Glied 0".into(), ..Tags::default() }).expect("Opus-Kodierer");
+        let mut out = e.headers();
+        for i in 0..250 {                                             // 5 s
+            let f: Vec<i16> = (0..FRAME).map(|k| ((2.0 * std::f64::consts::PI * 50.0 * (i * FRAME + k) as f64 / RATE as f64).sin() * 12000.0) as i16).collect();
+            e.push(&f);
+            if i % 50 == 49 { e.chain(&Tags { title: format!("Glied {}", (i + 1) / 50), ..Tags::default() }); }
+            if i % 5 == 4 { out.extend(e.flush()); }
+        }
+        assert!(out.len() > 5000);
+        if let Ok(p) = std::env::var("CRAB_CHAIN_OUT") { std::fs::write(p, &out).expect("schreiben"); }
+    }
+
+    #[test]
     fn ogg_crc_bekannter_wert() {
         assert_eq!(ogg_crc(b"123456789"), 0x89a1_897f);
     }
@@ -584,7 +1045,7 @@ mod tests {
     /// Kodierer: Stille und ein Ton ergeben gültige Opus-Pakete und Seiten mit wachsender Granule
     #[test]
     fn opus_kodierer_laeuft() {
-        let mut e = Encoder::new(32_000, 1, 1, Tags { title: "Test".into(), artist: "crabSDR".into(), picture: Some(("image/png".into(), vec![1, 2, 3])) }).expect("Opus-Kodierer");
+        let mut e = Encoder::new(32_000, 1, 1, Tags { title: "Test".into(), artist: "crabSDR".into(), album: String::new(), picture: Some(("image/png".into(), vec![1, 2, 3])), pad: 0 }).expect("Opus-Kodierer");
         let h = e.headers(); assert!(h.len() > 60);
         let silence = vec![0i16; FRAME];
         let tone: Vec<i16> = (0..FRAME).map(|i| ((i as f32 * 0.1).sin() * 8000.0) as i16).collect();

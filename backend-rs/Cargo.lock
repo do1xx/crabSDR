@@ -265,6 +265,7 @@ dependencies = [
 name = "crabsdr-server"
 version = "1.4.0"
 dependencies = [
+ "audiopus_sys",
  "axum",
  "bytes",
  "crabsdr-auth",

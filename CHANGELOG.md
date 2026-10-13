@@ -18,6 +18,22 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
   `/digi/freedv.json` liefert dafür `{status, decoders, calls}` statt nur der Plugin-Datei (nie 404).
 
 ### Streams
+- **Live-Titel im Ogg-Stream (Ogg-Kettung):** Abspielprogramme sehen statt eines festen Titels den Zustand des Kanals –
+  „145700 kHz FM · +18 dB“, „… · Rauschsperre zu“, mit Rufzeichen aus den Decodern (RADE/FreeDV-Durchgabe ±3 kHz, APRS-Absender
+  ±10 kHz): „145700 kHz FM · DO1XX · +24 dB“. Der Server kettet dafür Ogg-Ströme wie Icecast beim Titelwechsel (EOS-Seite,
+  neuer Strom mit neuer Seriennummer, Granule 0, OpusHead/OpusTags); Rauschabstand in 6-dB-Stufen mit Hysterese, Wechsel
+  höchstens alle 5 s. An der Naht geht kein Abtastwert verloren: der alte Kodierer gibt seine Verzögerung mit einem letzten
+  Rahmen aus, der neue wird angewärmt und kodiert seinen ersten Rahmen intra (dafür libopus direkt über `audiopus_sys`,
+  `OPUS_SET_PREDICTION_DISABLED`) – gemessen am 50-Hz-Ton bleibt der Fehler an der Naht unter −33 dB (`kette_sinus`).
+  VLC reicht den Titel an Bluetooth/AVRCP und die Sperrbildschirm-Anzeige weiter (VLC 3 setzt dabei einen Rahmen aus, weil
+  es die Spur neu anlegt; VLC 4 nicht), mpv und ffmpeg spielen lückenlos. `?live=0` schaltet die Kettung ab; Browser
+  bekommen sie nie. Neu auch `ALBUM=<Station>` in den Tags. docs/STREAM.md „Live-Titel“.
+- **Wasserfall als Titelbild:** `?cover=wf` legt alle 10 s ein JPEG 320 × 180 (letzte 18 s Wasserfall um die Frequenz, Kanal rot
+  markiert, 3–25 kB) als `METADATA_BLOCK_PICTURE` ins neue Kettenglied – VLC zeigt es als Cover.
+- **Ogg-Kopf über mehrere Seiten:** Pakete mit mehr als 255 Segmenten (große OpusTags, z. B. mit Bild) verteilt der Muxer jetzt
+  auf Fortsetzungsseiten (Flag 0x01, Granule −1); vorher überlief das Zählbyte und die Seite war ungültig. Für Browser
+  (User-Agent Mozilla) steht ein 48-kB-Polster (`PADDING`-Kommentar) im ersten Kopf, damit Chrome den Strom sofort prüft
+  statt bei leisem Kanal (3-Byte-Ruhepakete) eine halbe Minute zu „laden“.
 - **Ogg-Stream spielt jetzt auch im Browser:** Chrome legte für das eingebettete Stationsbild eine Videospur ohne Bilder an
   und blieb stumm. Browser (User-Agent Mozilla) bekommen den Stream ohne Bild, Abspielprogramme weiter mit; `?pic=0|1`
   erzwingt es. Beispiel-Adressen auf der Info-Seite nutzen die öffentliche Adresse der Station ([station] url).

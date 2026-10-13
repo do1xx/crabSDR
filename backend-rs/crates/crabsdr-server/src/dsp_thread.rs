@@ -21,7 +21,7 @@ use tracing::{info, warn};
 /// Opus-Eingangsrate und Bitrate (Ziel: ≤ 60 kbit/s je Hörer inkl. Wasserfall)
 pub const OPUS_RATE: u32 = 24000;
 /// Wasserfall: Pixel je Zeile (Oberfläche: 1024 px fest) und Zeilen je Sekunde
-const WF_PX: usize = 1024;
+pub(crate) const WF_PX: usize = 1024;
 const WF_LINES_PER_S: u32 = 10;
 /// Rauschsperre „auto“: Schwelle = Rauschboden + Abstand
 /// Ab so vielen Kanälen parallel (rayon) rechnen, darunter seriell
@@ -277,7 +277,7 @@ fn build_hist(hist: &std::collections::VecDeque<Vec<u8>>, sub: WaterfallSub, row
 }
 
 /// Farbtabelle wie im Browser (core.js `_crabPalette`): schwarz → dunkelblau → blau → türkis → gelb → orange → weiß
-fn palette() -> [[u8; 3]; 256] {
+pub(crate) fn palette() -> [[u8; 3]; 256] {
     let stops: [(f32, [f32; 3]); 7] = [(0.0, [0.0, 0.0, 0.0]), (0.18, [0.0, 0.0, 70.0]), (0.38, [0.0, 40.0, 170.0]), (0.55, [0.0, 190.0, 200.0]),
                                        (0.72, [230.0, 230.0, 0.0]), (0.88, [255.0, 90.0, 0.0]), (1.0, [255.0, 255.0, 255.0])];
     let mut p = [[0u8; 3]; 256];
