@@ -428,19 +428,24 @@ function showMarks(b) {
   var e = bi[b], lo_ = e.effcenterfreq - e.effsamplerate / 2, hi_ = e.effcenterfreq + e.effsamplerate / 2, html = '';
   // Linien für alle Marken; Beschriftungen nur, wo Platz ist (44 px): erst die wichtigen, dann Kanalraster wie LPD 1–69
   // (markers.json: "minor": true) in die Lücken – so verdeckt „LPD 5“ nicht „MeshCom“
-  var placed = [];
+  // Reihenfolge der Beschriftung: erst feste Marken (prio 0), dann Relais nach Entfernung (prio = km) – wird es eng,
+  // behalten die nahen Relais ihr Rufzeichen, die fernen nur die Linie (die Hover-Tafel geht an beiden)
+  var placed = [], order = marks.slice().sort(function (a, c) { return ((a.prio || 0) - (c.prio || 0)) || (a.freq - c.freq); });
   var free = function (x) { for (var k = 0; k < placed.length; k++) if (Math.abs(x - placed[k]) < 44) return false; return true; };
-  if (!hideMarks) for (var pass = 0; pass < 2; pass++) for (var i = 0; i < marks.length; i++) {
-    var m = marks[i]; if (m.freq < lo_ || m.freq > hi_) continue;
+  if (!hideMarks) for (var pass = 0; pass < 2; pass++) for (var i = 0; i < order.length; i++) {
+    var m = order[i]; if (m.freq < lo_ || m.freq > hi_) continue;
     if ((pass === 0) === !!m.minor) continue;
     var x = freq2x(m.freq, b), md = String(m.mode || 'FM').toUpperCase(), txt = m.text || '';
-    html += '<div class="dxl" style="left:' + x.toFixed(1) + 'px"></div>';
+    var click = ' onclick="setFreqMark(' + b + ',' + m.freq + ',\'' + md + '\')"';
+    var rel = m.rel != null ? ' onmouseenter="relHover(event,' + m.rel + ',1)" onmousemove="relHover(event,' + m.rel + ',2)" onmouseleave="relHover(event,' + m.rel + ',0)"' : '';
+    html += '<div class="dxl' + (m.rel != null ? ' rel' : '') + '" style="left:' + x.toFixed(1) + 'px"' + rel + (m.rel != null ? click : '') + '></div>';
     if (!free(x)) continue;
     placed.push(x);
-    html += '<div class="dxm" style="left:' + (x - 6).toFixed(1) + 'px" title="' + _crabEsc(txt) + ' ' + (m.freq / 1000).toFixed(4) + ' MHz ' + md + '" onclick="setFreqMark(' + b + ',' + m.freq + ',\'' + md + '\')">' + _crabEsc(txt) + '</div>';
+    html += '<div class="dxm' + (m.rel != null ? ' rel' : '') + '" style="left:' + (x - 6).toFixed(1) + 'px"' + (m.rel != null ? rel : ' title="' + _crabEsc(txt) + ' ' + (m.freq / 1000).toFixed(4) + ' MHz ' + md + '"') + click + '>' + _crabEsc(txt) + '</div>';
   }
   B.bar.innerHTML = html;
 }
+if (typeof window.relHover !== 'function') window.relHover = function () {};
 function loadMarks(b) { showMarks(b); }
 function showListeners() {
   var n = document.getElementById('numusers'); if (n) n.textContent = String(_crab.nlisteners != null ? _crab.nlisteners : lsNames.length);

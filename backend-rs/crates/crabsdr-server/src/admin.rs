@@ -322,6 +322,72 @@ pub async fn save_config(State(state): State<Arc<AppState>>, headers: HeaderMap,
     }
 }
 
+/// Dateien des Stationsordners (site_dir), die die Admin-Seite bearbeiten darf: Frequenzliste/Relais, Marker, Schnellwahl
+const SITE_FILES: &[&str] = &["relais.json", "markers.json", "presets.json"];
+
+async fn site_file(state: &AppState, name: &str) -> Result<std::path::PathBuf, Response> {
+    if !SITE_FILES.contains(&name) { return Err(err(StatusCode::NOT_FOUND, "Diese Datei lässt sich hier nicht bearbeiten")); }
+    let dir = state.config.read().await.site_dir.clone().ok_or_else(|| err(StatusCode::CONFLICT, "Kein Stationsordner (site_dir) konfiguriert"))?;
+    Ok(dir.join(name))
+}
+
+/// `GET /api/admin/site/{name}`: Inhalt (leer = `[]`), Prüfsumme und ob der Ordner beschreibbar ist
+pub async fn get_site(State(state): State<Arc<AppState>>, headers: HeaderMap, AxPath(name): AxPath<String>) -> Response {
+    let _p = admin!(state, headers);
+    let path = match site_file(&state, &name).await { Ok(p) => p, Err(r) => return r };
+    let text = std::fs::read_to_string(&path).unwrap_or_else(|_| "[]".into());
+    let dir = path.parent().map(|d| d.to_path_buf()).unwrap_or_default();
+    let writable = dir.is_dir() && dir_writable(&dir) && std::fs::metadata(&path).map(|m| !m.permissions().readonly()).unwrap_or(true);
+    ok(json!({"path": path, "hash": confedit::digest(&text), "text": text, "writable": writable}))
+}
+
+#[derive(Deserialize)]
+pub struct SiteReq { pub hash: String, pub text: String }
+
+/// `PUT /api/admin/site/{name}`: speichern mit Prüfsumme des gelesenen Stands; der Inhalt muss eine JSON-Liste sein.
+/// Vorher Sicherung nach `<data_dir>/site-backups/<name>.<Zeit>` (die letzten 20), dann atomar ersetzen. Die Oberfläche
+/// liest die Datei bei jedem Laden neu, ein Neustart ist nicht nötig
+pub async fn put_site(State(state): State<Arc<AppState>>, headers: HeaderMap, AxPath(name): AxPath<String>, Json(req): Json<SiteReq>) -> Response {
+    let p = admin!(state, headers);
+    let path = match site_file(&state, &name).await { Ok(p) => p, Err(r) => return r };
+    let v: Value = match serde_json::from_str(&req.text) { Ok(v) => v, Err(e) => return err(StatusCode::UNPROCESSABLE_ENTITY, format!("Kein gültiges JSON: {e}")) };
+    if !v.is_array() { return err(StatusCode::UNPROCESSABLE_ENTITY, "Erwartet wird eine Liste [ … ]"); }
+    if req.text.len() > 2 * 1024 * 1024 { return err(StatusCode::PAYLOAD_TOO_LARGE, "Datei zu groß (max. 2 MB)"); }
+    let _lock = state.config_lock.lock().await;
+    let current = std::fs::read_to_string(&path).unwrap_or_else(|_| "[]".into());
+    if confedit::digest(&current) != req.hash { return err(StatusCode::CONFLICT, "Die Datei wurde inzwischen geändert – bitte neu laden"); }
+    let bdir = state.config.read().await.data_dir.join("site-backups");
+    if path.exists() {
+        let _ = std::fs::create_dir_all(&bdir);
+        let stamp = chrono_like_stamp();
+        let _ = std::fs::copy(&path, bdir.join(format!("{name}.{stamp}")));
+        // nur die letzten 20 Sicherungen je Datei behalten
+        let mut old: Vec<_> = std::fs::read_dir(&bdir).into_iter().flatten().flatten().filter(|e| e.file_name().to_string_lossy().starts_with(&format!("{name}."))).map(|e| e.path()).collect();
+        old.sort();
+        while old.len() > 20 { if let Some(f) = old.first() { let _ = std::fs::remove_file(f); } old.remove(0); }
+    }
+    let pretty = serde_json::to_string_pretty(&v).unwrap_or(req.text.clone()) + "\n";
+    let tmp = path.with_extension("json.neu");
+    if let Err(e) = std::fs::write(&tmp, &pretty).and_then(|_| std::fs::rename(&tmp, &path)) {
+        let _ = std::fs::remove_file(&tmp);
+        return err(StatusCode::INTERNAL_SERVER_ERROR, format!("{}: {}", path.display(), e));
+    }
+    info!("Admin „{}“: {} gespeichert ({} Einträge)", p.username, path.display(), v.as_array().map(|a| a.len()).unwrap_or(0));
+    ok(json!({"ok": true, "hash": confedit::digest(&pretty), "text": pretty}))
+}
+
+/// Zeitstempel für Sicherungsnamen (UTC, ohne Abhängigkeit): JJJJMMTT-HHMMSS
+fn chrono_like_stamp() -> String {
+    let s = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let (days, rem) = (s / 86_400, s % 86_400);
+    // Tage seit 1970 → Datum (Algorithmus nach Howard Hinnant)
+    let z = days as i64 + 719_468; let era = z.div_euclid(146_097); let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365; let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1; let m = if mp < 10 { mp + 3 } else { mp - 9 }; let y = if m <= 2 { y + 1 } else { y };
+    format!("{y:04}{m:02}{d:02}-{:02}{:02}{:02}", rem / 3600, rem % 3600 / 60, rem % 60)
+}
+
 pub async fn get_backup(State(state): State<Arc<AppState>>, headers: HeaderMap, AxPath(name): AxPath<String>) -> Response {
     let _p = admin!(state, headers);
     match confedit::backup_path(&backup_dir(&state).await, &name).and_then(|p| std::fs::read_to_string(p).ok()) {

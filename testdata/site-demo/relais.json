@@ -1,0 +1,497 @@
+[
+ {
+  "call": "DO0RAM",
+  "freq": 145575,
+  "mode": "fm",
+  "locator": "JO53AI",
+  "qth": "Ramelsloh, Seevetal",
+  "shift": -600,
+  "tone": "79,7 Hz",
+  "info": "TX-CTCSS=79,7 Hz, aber Relais ist trägergesteuert -12,5 kHz Bandbreite (± 2,5 kHz Hub )"
+ },
+ {
+  "call": "DB0DWL",
+  "freq": 145587.5,
+  "mode": "fm",
+  "locator": "JO53IU",
+  "qth": "Lübeck",
+  "shift": -600,
+  "info": "FM Funknetz: Talkgroup 23552 - FM narrow - trägergesteuert"
+ },
+ {
+  "call": "DB0DAN",
+  "freq": 145600,
+  "mode": "fm",
+  "locator": "JO53KB",
+  "qth": "Zernien",
+  "shift": -600,
+  "tone": "1750 Hz",
+  "info": "CTCSS deaktiviert, Rufton 1750 Hz"
+ },
+ {
+  "call": "DB0BHV",
+  "freq": 145600,
+  "mode": "fm",
+  "locator": "JO43HO",
+  "qth": "Bremerhaven",
+  "shift": -600,
+  "tone": "74,4 Hz",
+  "info": "74,4 Hz – zu öffnen auch mit 1750 Hz"
+ },
+ {
+  "call": "DB0WU",
+  "freq": 145625,
+  "mode": "fm",
+  "locator": "JO43JB",
+  "qth": "Bremen",
+  "shift": -600,
+  "tone": "1750 Hz",
+  "info": "Der 1750-Hz-Ton muss ca. 4 Sekunden gehalten werden"
+ },
+ {
+  "call": "DB0ZA",
+  "freq": 145625,
+  "mode": "fm",
+  "locator": "JO44UK",
+  "qth": "Aschberg",
+  "shift": -600,
+  "info": "Sept. 26: offline"
+ },
+ {
+  "call": "DB0FA",
+  "freq": 145650,
+  "mode": "fm",
+  "locator": "JO52CV",
+  "qth": "Faßberg",
+  "shift": -600,
+  "tone": "67,0 Hz",
+  "info": "CTCSS 67.0 Hz"
+ },
+ {
+  "call": "DB0MVP",
+  "freq": 145650,
+  "mode": "fm",
+  "locator": "JO53QP",
+  "qth": "Schwerin",
+  "shift": -600,
+  "tone": "88 Hz",
+  "info": "24 Std – CTCSS 88,5 öffnen per HF (trägergesteuert)"
+ },
+ {
+  "call": "DB0HEI",
+  "freq": 145687.5,
+  "mode": "fm",
+  "locator": "JO44NE",
+  "qth": "Heide",
+  "shift": 285762.5,
+  "info": "setzt um von 70 cm auf 2 m"
+ },
+ {
+  "call": "DB0MAR",
+  "freq": 145700,
+  "mode": "fm",
+  "locator": "JO54JA",
+  "qth": "Timmendorf",
+  "shift": -600,
+  "tone": "1750 Hz",
+  "info": "1750 Hz erforderlich"
+ },
+ {
+  "call": "DB0RH",
+  "freq": 145700,
+  "mode": "fm",
+  "locator": "JO42WU",
+  "qth": "Heiderelais",
+  "shift": -600
+ },
+ {
+  "call": "DB0NAS",
+  "freq": 145712.5,
+  "mode": "fm",
+  "locator": "JO53HO",
+  "qth": "Niendorf a.d.St.",
+  "shift": -600,
+  "tone": "123 Hz",
+  "info": "CTCSS 123Hz"
+ },
+ {
+  "call": "DM0NDR",
+  "freq": 145725,
+  "mode": "fm",
+  "locator": "JO53BM",
+  "qth": "Hamburg Billwerder / Moorfleet",
+  "shift": -600,
+  "tone": "79,7 Hz",
+  "info": "Echo Link ID #505114 - FM Narrow - Es wird ein 79,7Hz CTCSS Ton bei geöffneter Rauschsperre vom Relais mit ausgesendet"
+ },
+ {
+  "call": "DO0RAM",
+  "freq": 438400,
+  "mode": "fm",
+  "locator": "JO53AI",
+  "qth": "Ramelsloh, Seevetal",
+  "shift": -7600,
+  "tone": "79,7 Hz",
+  "info": "TX-CTCSS=79,7 Hz, aber Relais ist trägergesteuert"
+ },
+ {
+  "call": "DB0HEW",
+  "freq": 438550,
+  "mode": "fm",
+  "locator": "JO53EJ",
+  "qth": "Geesthacht",
+  "shift": -7600,
+  "tone": "91,5 Hz",
+  "info": "CTCSS Ausgabe 91,5 Hz - Verbunden mit dem fm-funknetz.de"
+ },
+ {
+  "call": "DB0AGM",
+  "freq": 438575,
+  "mode": "fm",
+  "locator": "JO53GG",
+  "qth": "Lüneburg",
+  "shift": -7600,
+  "info": "Multimode, Packet Radio, RTTY, SSTV"
+ },
+ {
+  "call": "DB0WOT",
+  "freq": 438600,
+  "mode": "fm",
+  "locator": "JO43MR",
+  "qth": "Wingst",
+  "shift": -7600
+ },
+ {
+  "call": "DB0FA",
+  "freq": 438600,
+  "mode": "fm",
+  "locator": "JO52CV",
+  "qth": "Faßberg",
+  "shift": -7600,
+  "tone": "94,8 Hz",
+  "info": "CTCSS 94.8 Hz, Echolink 281537"
+ },
+ {
+  "call": "DB0DAN",
+  "freq": 438650,
+  "mode": "fm",
+  "locator": "JO53KB",
+  "qth": "Zernien",
+  "shift": -7600,
+  "info": "Ab 19. August versuchsweise für etwa vier Wochen DMR statt FM"
+ },
+ {
+  "call": "DB0PI",
+  "freq": 438662.5,
+  "mode": "fm",
+  "locator": "JO43TS",
+  "qth": "Elmshorn",
+  "shift": -7600,
+  "tone": "1750 Hz",
+  "info": "1750 Hz-Rufton oder DTMF 5"
+ },
+ {
+  "call": "DB0SFA",
+  "freq": 438675,
+  "mode": "fm",
+  "locator": "JO42UV",
+  "qth": "Dorfmark",
+  "shift": -7600
+ },
+ {
+  "call": "DF0HHH",
+  "freq": 438700,
+  "mode": "fm",
+  "locator": "JO43WJ",
+  "qth": "Rosengarten",
+  "shift": -7600
+ },
+ {
+  "call": "DB0BNV",
+  "freq": 438725,
+  "mode": "fm",
+  "locator": "JO43HE",
+  "qth": "Bremen-Vegesack",
+  "shift": -7600,
+  "tone": "110,9 Hz",
+  "info": "110,9 Hz Pilotton, SVXReflector FM-Funknetz.de"
+ },
+ {
+  "call": "DB0DI",
+  "freq": 438750,
+  "mode": "fm",
+  "locator": "JO53DW",
+  "qth": "Bad Segeberg",
+  "shift": -7600
+ },
+ {
+  "call": "DB0NI",
+  "freq": 438775,
+  "mode": "fm",
+  "locator": "JO53FF",
+  "qth": "Lüneburg",
+  "shift": -7600,
+  "tone": "1750 Hz",
+  "info": "Mit 1750Hz öffnen"
+ },
+ {
+  "call": "DB0XJ",
+  "freq": 438800,
+  "mode": "fm",
+  "locator": "JO43RO",
+  "qth": "Stade",
+  "shift": -7600,
+  "tone": "88,5 Hz",
+  "info": "CTCSS 88,5 Hz - Der Repeater ist wieder voll funktionsfähig."
+ },
+ {
+  "call": "DB0OZ",
+  "freq": 438825,
+  "mode": "fm",
+  "locator": "JO43JC",
+  "qth": "Bremen",
+  "shift": -7600
+ },
+ {
+  "call": "DO0TPB",
+  "freq": 438837.5,
+  "mode": "fm",
+  "locator": "JO53HJ",
+  "qth": "Basedow",
+  "shift": -7600,
+  "tone": "94,8 Hz",
+  "info": "Multimode DMR DSTAR YSF Analog Echolink #272360, 94.8Hz"
+ },
+ {
+  "call": "DB0FS",
+  "freq": 438850,
+  "mode": "fm",
+  "locator": "JO43XO",
+  "qth": "Hamburg - Lokstedt",
+  "shift": -7600,
+  "tone": "88,5 Hz",
+  "info": "TX CTCSS 88,5 Hz oder mit DTMF * öffnen, kein Tonruf, RX-Squelch: CTCSS 88,5 Hz"
+ },
+ {
+  "call": "DB0TUH",
+  "freq": 438875,
+  "mode": "fm",
+  "locator": "JO43XL",
+  "qth": "TU Harburg,Gebäude b",
+  "shift": -7600,
+  "info": "trägergesteuert"
+ },
+ {
+  "call": "DB0HFT",
+  "freq": 438875,
+  "mode": "fm",
+  "locator": "JO43JB",
+  "qth": "Bremen",
+  "shift": -7600,
+  "tone": "74,4 Hz",
+  "info": "1750 Hz oder CTCSS 74,4 Hz"
+ },
+ {
+  "call": "DB0XL",
+  "freq": 438900,
+  "mode": "fm",
+  "locator": "JO53HV",
+  "qth": "Lübeck",
+  "shift": -7600,
+  "tone": "100 Hz",
+  "info": "CTCSS 100Hz"
+ },
+ {
+  "call": "DM0NDR",
+  "freq": 438925,
+  "mode": "fm",
+  "locator": "JO53BM",
+  "qth": "Hamburg Billwerder / Moorfleet",
+  "shift": -7600,
+  "tone": "79,7 Hz",
+  "info": "Bei geöffneter Rauschsperre wird ein 79,7 Hz Ton ausgesendet"
+ },
+ {
+  "call": "DB0TG",
+  "freq": 438975,
+  "mode": "fm",
+  "locator": "JO43JG",
+  "qth": "Teufelsmoor",
+  "shift": -7600
+ },
+ {
+  "call": "DM0KIL",
+  "freq": 439000,
+  "mode": "fm",
+  "locator": "JO54BH",
+  "qth": "Kiel",
+  "shift": -7600,
+  "info": "trägergesteuert"
+ },
+ {
+  "call": "DB0REH",
+  "freq": 439025,
+  "mode": "fm",
+  "locator": "JO53BC",
+  "qth": "Rehlingen / Amelinghausen",
+  "shift": -7600,
+  "info": "Multimode FM + C4FM, Ausgabe immer FM"
+ },
+ {
+  "call": "DB0QC",
+  "freq": 439025,
+  "mode": "fm",
+  "locator": "JO43GN",
+  "qth": "Bremerhaven",
+  "shift": -7600,
+  "tone": "1750 Hz",
+  "info": "Rufton 1750 Hz, öffnet auch ohne Rufton"
+ },
+ {
+  "call": "DB0HEI",
+  "freq": 439050,
+  "mode": "fm",
+  "locator": "JO44NE",
+  "qth": "Heide",
+  "shift": -7600,
+  "tone": "67 Hz",
+  "info": "67 Hz im RX einrichten, um C4FM zu unterdrücken"
+ },
+ {
+  "call": "DB0PC",
+  "freq": 439100,
+  "mode": "fm",
+  "locator": "JO54IF",
+  "qth": "Bungsberg",
+  "shift": -7600
+ },
+ {
+  "call": "DB0HT",
+  "freq": 439125,
+  "mode": "fm",
+  "locator": "JO43UG",
+  "qth": "Tostedt",
+  "shift": -7600
+ },
+ {
+  "call": "DB0EWB",
+  "freq": 439175,
+  "mode": "fm",
+  "locator": "JO43ML",
+  "qth": "Oerel-Barchel",
+  "shift": -7600,
+  "tone": "74,4 Hz",
+  "info": "C4FM/FM, Echolink 47666 zeitweise, ID 17209 Raum 27209, CTCSS 74,4 Hz nur TX – Solar/Notstrom"
+ },
+ {
+  "call": "DB0OHB",
+  "freq": 439262.5,
+  "mode": "fm",
+  "locator": "JO43KC",
+  "qth": "Bremen",
+  "shift": -7600,
+  "info": "APRS auf 144.800 MHz – DAPNET auf 439.9875 MHz"
+ },
+ {
+  "call": "DO0BAB",
+  "freq": 439275,
+  "mode": "fm",
+  "locator": "JO53JN",
+  "qth": "Gudow",
+  "shift": -7600,
+  "info": "DO0GUD und DO0BAB am gleichen Standort (Mühlenweg 7, Gudow): Hotspot D-STAR/C4FM (DO0GUD) und FM-Relais (DO0BAB)"
+ },
+ {
+  "call": "DB0PR",
+  "freq": 439350,
+  "mode": "fm",
+  "locator": "JO43WX",
+  "qth": "Armstedt",
+  "shift": -7600
+ },
+ {
+  "call": "DB0CU",
+  "freq": 439375,
+  "mode": "fm",
+  "locator": "JO43IU",
+  "qth": "Cuxhaven",
+  "shift": -7600,
+  "tone": "67,0 Hz",
+  "info": "Echolink 7048 (DL0CUX), 67,0 Hz"
+ },
+ {
+  "call": "DB0RNG",
+  "freq": 439387.5,
+  "mode": "fm",
+  "locator": "JO43UA",
+  "qth": "Drögenbostel",
+  "shift": -7600
+ },
+ {
+  "call": "DB0HZL",
+  "freq": 439400,
+  "mode": "fm",
+  "locator": "JO53JQ",
+  "qth": "Ratzeburg",
+  "shift": -7600,
+  "tone": "123 Hz",
+  "info": "CTCSS 123 TX/RX oder Rufton/trägergesteuert"
+ },
+ {
+  "call": "DB0IL",
+  "freq": 439437.5,
+  "mode": "fm",
+  "locator": "JO54CH",
+  "qth": "Kiel",
+  "shift": -7600,
+  "tone": "67 Hz",
+  "info": "TSQL 67 Hz, um C4FM-Aussendungen zu unterdrücken"
+ },
+ {
+  "call": "DM0ROL",
+  "freq": 439462.5,
+  "mode": "fm",
+  "locator": "JO53NV",
+  "qth": "Rolofshagen",
+  "shift": -7600,
+  "tone": "88 Hz",
+  "info": "CTCSS 88.5"
+ },
+ {
+  "call": "DB0LWL",
+  "freq": 439475,
+  "mode": "fm",
+  "locator": "JO53OC",
+  "qth": "Gusborn",
+  "shift": -7600,
+  "tone": "88,5 Hz",
+  "info": "CTCSS 88,5 Hz zum Öffnen"
+ },
+ {
+  "call": "DO0BSH",
+  "freq": 439900,
+  "mode": "fm",
+  "locator": "JO43XN",
+  "qth": "Hamburg - St. Pauli",
+  "shift": -9400,
+  "info": "FM/C4FM"
+ },
+ {
+  "call": "DM0TR",
+  "freq": 439912.5,
+  "mode": "fm",
+  "locator": "JO54CB",
+  "qth": "Trappenkamp",
+  "shift": -9400,
+  "tone": "123 Hz",
+  "info": "FM-Funknetz.de, CTCSS 123 Hz"
+ },
+ {
+  "call": "DB0FS",
+  "freq": 439987.5,
+  "mode": "data",
+  "locator": "JO43XO",
+  "qth": "Hamburg - Lokstedt",
+  "info": "DAPNET Sender"
+ }
+]

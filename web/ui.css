@@ -481,3 +481,10 @@ body.min.hoeren .panel { box-shadow: none; }
 
 /* In DV (dekodierte Sprache) wirken Bandbreite und AGC nicht: ausgegraut, nicht klickbar */
 body.dvmode .bwpresets .btn, body.dvmode #agccontrol, body.dvmode .bwrow .btn { opacity: .35; pointer-events: none; }
+
+/* Relais-Marken: breitere Linie zum Anfassen, Hover-Tafel mit Locator, Entfernung, Richtung */
+.dxl.rel { width: 3px; margin-left: -1px; background: #2f8f6a; cursor: pointer; }
+.dxl.rel:hover { background: #5fd9a8; }
+body.look-crab .dxl.rel { background: #3c6; }
+.relpanel { position: fixed; z-index: 60; max-width: 300px; background: rgba(16, 20, 26, .96); color: #ddd; border: 1px solid #3d5a6a; border-radius: 6px; padding: 6px 9px; font: 12px/1.45 system-ui, sans-serif; pointer-events: none; box-shadow: 0 4px 16px rgba(0, 0, 0, .5); }
+.relpanel .muted { color: #9ab; }

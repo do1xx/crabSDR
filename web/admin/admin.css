@@ -53,3 +53,7 @@ body.admin { min-height: 100vh; background: var(--bg); }
 .adm-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 50; background: var(--bg); border: 1px solid var(--accent); color: var(--text); padding: 8px 14px; border-radius: 6px; font-size: 13px; max-width: 90vw; box-shadow: 0 6px 24px rgba(0,0,0,.4); }
 .adm-toast.bad { border-color: #f87171; }
 @media (max-width: 700px) { .adm-main { padding: 10px; } .adm-tabs { padding: 0 6px; } .adm-tabs button { padding: 8px 8px; } }
+
+/* Tabellen-Editor (Relais) */
+.adm-edit td { padding: 2px 3px; }
+.adm-edit input { width: 100%; min-width: 3.5em; box-sizing: border-box; font: 12px system-ui, sans-serif; padding: 3px 5px; background: var(--bg); color: var(--text); border: 1px solid var(--line2); border-radius: 3px; }

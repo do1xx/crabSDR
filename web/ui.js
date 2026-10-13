@@ -350,20 +350,78 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(both).then(ok, function () { window.prompt('Link', url); });
     else window.prompt('Link', url);
   }
-  // Marker: eigene markers.json statt Server-Abfrage; showMarks() aus base.js zeichnet sie unter dem Wasserfall
-  var markers = [];
+  // Marker: markers.json (feste Marken) und relais.json (Relais mit Locator/QTH – daraus Marker samt Hover-Tafel,
+  // Eingabefrequenz als kleine Marke „↑“); showMarks() aus core.js zeichnet sie unter dem Wasserfall
+  var markers = [], relaisRaw = [], relais = [];
   function loadMarkers() {
     var x = new XMLHttpRequest(); x.open('GET', 'markers.json?' + Date.now());
     x.onload = function () { try { markers = JSON.parse(x.responseText); } catch (e) { markers = []; } for (var i = 0; i < nWaterfalls; i++) loadMarks(id2band(i)); };
     x.send();
+    var y = new XMLHttpRequest(); y.open('GET', 'relais.json?' + Date.now());
+    y.onload = function () { try { relaisRaw = JSON.parse(y.responseText); } catch (e) { relaisRaw = []; } for (var i = 0; i < nWaterfalls; i++) loadMarks(id2band(i)); };
+    y.send();
+  }
+  /* Maidenhead-Locator (4 oder 6 Stellen) → Mitte des Feldes [lat, lon] */
+  function locToLatLon(l) {
+    var L = String(l || '').trim().toUpperCase(); if (L.length < 4) return null;
+    var lon = (L.charCodeAt(0) - 65) * 20 - 180 + (+L[2]) * 2, lat = (L.charCodeAt(1) - 65) * 10 - 90 + (+L[3]);
+    if (L.length >= 6) { lon += (L.charCodeAt(4) - 65) * 2 / 24 + 1 / 24; lat += (L.charCodeAt(5) - 65) / 24 + 1 / 48; } else { lon += 1; lat += 0.5; }
+    return (isNaN(lat) || isNaN(lon)) ? null : [lat, lon];
+  }
+  function distBearing(a, b) {
+    var R = 6371, k = Math.PI / 180, dLat = (b[0] - a[0]) * k, dLon = (b[1] - a[1]) * k, la1 = a[0] * k, la2 = b[0] * k;
+    var hh = Math.pow(Math.sin(dLat / 2), 2) + Math.cos(la1) * Math.cos(la2) * Math.pow(Math.sin(dLon / 2), 2);
+    var y = Math.sin(dLon) * Math.cos(la2), x = Math.cos(la1) * Math.sin(la2) - Math.sin(la1) * Math.cos(la2) * Math.cos(dLon);
+    return [2 * R * Math.asin(Math.sqrt(hh)), (Math.atan2(y, x) * 180 / Math.PI + 360) % 360];
+  }
+  function compass(deg) { return ['N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'][Math.round(deg / 22.5) % 16]; }
+  function stationPos() { var st = ui.station || {}; return (st.lat != null && st.lon != null) ? [st.lat, st.lon] : locToLatLon(st.locator); }
+  function fmtMhz(k) { var t = (k / 1000).toFixed(4).replace(/0+$/, ''); if (t.split('.')[1].length < 3) t = (k / 1000).toFixed(3); return t.replace('.', ','); }
+  /* relais.json-Einträge vereinheitlichen; Entfernung/Richtung aus dem Locator relativ zur Station */
+  function normRelais(list) {
+    var home = stationPos();
+    return (Array.isArray(list) ? list : []).map(function (r) {
+      var khz = Number(r.freq || r.khz); if (!khz) return null;
+      var o = { khz: khz, call: r.call || '', qth: r.qth || '', locator: r.locator || '', info: r.info || '', shift: (r.shift != null && r.shift !== '') ? Number(r.shift) : null, tone: r.tone || '', mode: (r.mode || 'fm').toLowerCase(), km: r.km != null ? Number(r.km) : null, deg: null };
+      var pos = locToLatLon(o.locator);
+      if (pos && home) { var db = distBearing(home, pos); o.km = Math.round(db[0]); o.deg = Math.round(db[1]); }
+      return o;
+    }).filter(Boolean);
   }
   window.loadMarks = function (b) {
     var e = bi[b]; if (!e) return;
     var lo_ = e.effcenterfreq - e.effsamplerate / 2, hi_ = e.effcenterfreq + e.effsamplerate / 2;
-    marks = markers.filter(function (m) { return m.freq >= lo_ && m.freq <= hi_; })
-                 .sort(function (a, c) { return a.freq - c.freq; })
-                 .map(function (m) { return { freq: m.freq, mode: (m.mode || 'fm').toUpperCase(), text: m.text, minor: !!m.minor }; });
+    var list = markers.filter(function (m) { return m.freq >= lo_ && m.freq <= hi_; })
+                      .map(function (m) { return { freq: m.freq, mode: (m.mode || 'fm').toUpperCase(), text: m.text, minor: !!m.minor, prio: 25 }; });   // feste Marken: wie ein Relais in 25 km – nähere Relais gewinnen die Beschriftung
+    relais = normRelais(relaisRaw);
+    // Relais: Ausgabe als Marke mit Rufzeichen (Beschriftung nach Entfernung: die nahen zuerst, wenn es eng wird; feste
+    // Marken zählen wie 25 km),
+    // Eingabe als kleine Marke „↑“ – wer die Eingabe hört, hört die Station direkt
+    relais.forEach(function (r, i) {
+      var prio = r.km != null ? r.km : 9999, md = r.mode.toUpperCase();
+      if (r.khz >= lo_ && r.khz <= hi_) list.push({ freq: r.khz, mode: md, text: r.call, rel: i, prio: prio });
+      if (r.shift) { var inp = r.khz + r.shift; if (inp >= lo_ && inp <= hi_) list.push({ freq: inp, mode: md, text: r.call + ' ↑', rel: i, input: true, minor: true, prio: prio }); }
+    });
+    marks = list.sort(function (a, c) { return a.freq - c.freq; });
     showMarks(b);
+  };
+  /* Hover-Tafel zu einer Relais-Marke: on = 1 zeigen, 2 nur nachführen, 0 weg */
+  window.relHover = function (ev, i, on) {
+    var p = $('relpanel'); if (!p) return;
+    if (!on) { p.hidden = true; return; }
+    var r = relais[i]; if (!r) return;
+    if (on === 1) {
+      var de = lang === 'de', rows = ['<b>' + escapeHtml(r.call) + '</b> · ' + fmtMhz(r.khz) + ' MHz ' + r.mode.toUpperCase()];
+      if (r.shift) rows.push((de ? 'Eingabe ' : 'Input ') + fmtMhz(r.khz + r.shift) + ' MHz (' + (r.shift > 0 ? '+' : '−') + fmtMhz(Math.abs(r.shift)) + ' MHz)');
+      if (r.tone) rows.push((de ? 'Ton ' : 'Tone ') + escapeHtml(r.tone));
+      if (r.qth || r.locator) rows.push(escapeHtml(r.qth) + (r.locator ? (r.qth ? ' · ' : '') + escapeHtml(r.locator) : ''));
+      if (r.km != null) rows.push(r.km + ' km' + (r.deg != null ? ' · ' + r.deg + '° ' + compass(r.deg) : '') + (de ? ' von hier' : ' from here'));
+      if (r.info) rows.push('<span class="muted">' + escapeHtml(r.info) + '</span>');
+      p.innerHTML = rows.join('<br>'); p.hidden = false;
+    }
+    var x = ev.clientX + 14, y = ev.clientY + 16;
+    p.style.left = Math.max(4, Math.min(x, window.innerWidth - p.offsetWidth - 8)) + 'px';
+    p.style.top = Math.max(4, Math.min(y, window.innerHeight - p.offsetHeight - 8)) + 'px';
   };
   // Logbuch
   // Sysop
@@ -634,17 +692,17 @@
     function render() {
       var rows = [], seen = {};
       function add(r) { var k = Math.round(r.khz * 10); if (seen[k] && r.src !== 'own') return; if (bandOf(r.khz) < 0) return; seen[k] = true; rows.push(r); }
-      (data.own || []).forEach(function (r) { add({ khz: Number(r.freq || r.khz), call: r.call || '', info: r.info || r.qth || '', shift: r.shift != null ? String(r.shift) : '', tone: r.tone || '', km: r.km, mode: (r.mode || 'fm').toLowerCase(), src: 'own' }); });
+      normRelais(data.own || []).forEach(function (r) { add({ khz: r.khz, call: r.call, info: r.qth ? r.qth + (r.info ? ' – ' + r.info : '') : r.info, shift: r.shift != null ? String(r.shift) : '', tone: r.tone, km: r.km, deg: r.deg, mode: r.mode, src: 'own' }); });
       (data.aprs || []).forEach(function (r) { add({ khz: r.khz, call: r.call, info: r.comment, shift: r.offset, tone: r.tone, km: r.km, mode: 'fm', src: 'aprs' }); });
       markers.forEach(function (m) { add({ khz: m.freq, call: '', info: m.text, shift: '', tone: '', km: null, mode: (m.mode || 'fm').toLowerCase(), src: 'marker' }); });
       rows.sort(function (a, b) { return a.khz - b.khz; });
       var html = '', lastBand = -1, de = lang === 'de';
       rows.forEach(function (r) {
         var b = bandOf(r.khz);
-        if (b !== lastBand) { lastBand = b; var m = BANDMETA[bi[b].name]; html += '<tr class="band"><td colspan="7">' + escapeHtml(m ? m[lang] + ' · ' + m.range : bi[b].name) + '</td></tr>'; }
-        html += '<tr data-khz="' + r.khz + '" data-mode="' + r.mode + '"><td class="mhz">' + (r.khz / 1000).toFixed(4).replace('.', ',') + '</td><td>' + escapeHtml(r.call) + '</td><td class="info">' + escapeHtml(r.info) + '</td><td>' + shift(r.shift) + '</td><td>' + escapeHtml(r.tone) + '</td><td>' + (r.km != null ? r.km : '') + '</td><td class="src">' + (r.src === 'aprs' ? 'APRS' : r.src === 'own' ? (de ? 'Liste' : 'list') : (de ? 'Marker' : 'marker')) + '</td></tr>';
+        if (b !== lastBand) { lastBand = b; var m = BANDMETA[bi[b].name]; html += '<tr class="band"><td colspan="8">' + escapeHtml(m ? m[lang] + ' · ' + m.range : bi[b].name) + '</td></tr>'; }
+        html += '<tr data-khz="' + r.khz + '" data-mode="' + r.mode + '"><td class="mhz">' + (r.khz / 1000).toFixed(4).replace('.', ',') + '</td><td>' + escapeHtml(r.call) + '</td><td class="info">' + escapeHtml(r.info) + '</td><td>' + shift(r.shift) + '</td><td>' + escapeHtml(r.tone) + '</td><td>' + (r.km != null ? r.km : '') + '</td><td>' + (r.deg != null ? r.deg + '° ' + compass(r.deg) : '') + '</td><td class="src">' + (r.src === 'aprs' ? 'APRS' : r.src === 'own' ? (de ? 'Liste' : 'list') : (de ? 'Marker' : 'marker')) + '</td></tr>';
       });
-      body.innerHTML = html || '<tr><td colspan="7">' + (de ? 'Noch keine Einträge.' : 'No entries yet.') + '</td></tr>';
+      body.innerHTML = html || '<tr><td colspan="8">' + (de ? 'Noch keine Einträge.' : 'No entries yet.') + '</td></tr>';
     }
     function open_() { box.hidden = false; get('relais.json', function (d) { data.own = Array.isArray(d) ? d : []; render(); }); get('digi/relais.json', function (d) { data.aprs = d && d.relais || []; render(); }); render(); }
     $('flistbtn').onclick = open_;

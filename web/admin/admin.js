@@ -123,7 +123,7 @@
     S.tab = tab;
     document.querySelectorAll('#tabs button').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === tab); });
     var v = clear($('view')); v.appendChild(h('p', { cls: 'muted', text: 'lädt…' }));
-    ({ overview: overview, station: station, bands: bands, decoders: decoders, users: users, chat: chat, config: configText, devices: devices })[tab](v);
+    ({ overview: overview, station: station, bands: bands, decoders: decoders, relais: relais, users: users, chat: chat, config: configText, devices: devices })[tab](v);
   }
   function restartPending(on) { $('restartbar').hidden = !on; }
   function restart() {
@@ -489,6 +489,70 @@
       var t2 = h('tbody');
       r.log.forEach(function (m) { var tr = h('tr'); [when(m.t), m.name || '', m.call || '', m.freq ? (m.freq / 1000).toFixed(3).replace('.', ',') : '', m.loc || '', m.comment || ''].forEach(function (x) { tr.appendChild(h('td', { text: x })); }); tr.appendChild(h('td', null, del('log', m.id, tr))); t2.appendChild(tr); });
       v.appendChild(r.log.length ? h('div', { cls: 'adm-tablewrap' }, h('table', { cls: 'adm-table' }, h('thead', null, h('tr', null, ['Zeit', 'von', 'Rufzeichen', 'MHz', 'Locator', 'Bemerkung', ''].map(function (x) { return h('th', { text: x }); }))), t2)) : h('p', { cls: 'muted', text: 'leer' }));
+    });
+  }
+
+  /* ---------- Relais und Marker: relais.json und markers.json im Stationsordner ---------- */
+  function relais(v) {
+    api('GET', 'admin/site/relais.json', undefined, function (code, r) {
+      clear(v);
+      if (code !== 200) { v.appendChild(h('p', { cls: 'bad', text: r.error || ('Fehler ' + code) })); return; }
+      var list; try { list = JSON.parse(r.text); } catch (e) { list = []; } if (!Array.isArray(list)) list = [];
+      var hash = r.hash;
+      var COLS = [['call', 'Rufzeichen', 8], ['freq', 'Ausgabe kHz', 9], ['shift', 'Ablage kHz', 8], ['mode', 'Mode', 4], ['tone', 'Ton', 8], ['locator', 'Locator', 6], ['qth', 'QTH', 16], ['info', 'Info', 36]];
+      var tb = h('tbody');
+      function row(e) {
+        var tr = h('tr');
+        COLS.forEach(function (c) { var inp = h('input', { type: 'text', size: String(c[2]) }); inp.value = e[c[0]] != null ? String(e[c[0]]) : ''; inp.dataset.k = c[0]; tr.appendChild(h('td', null, inp)); });
+        tr.appendChild(h('td', null, h('button', { cls: 'btn btn-ghost', type: 'button', text: '✕', title: 'Zeile löschen', onclick: function () { tr.remove(); } })));
+        tb.appendChild(tr);
+      }
+      list.forEach(row);
+      function collect() {
+        var out = [];
+        tb.querySelectorAll('tr').forEach(function (tr) {
+          var e = {};
+          tr.querySelectorAll('input').forEach(function (i) { var k = i.dataset.k, val = i.value.trim(); if (val === '') return; e[k] = (k === 'freq' || k === 'shift') ? Number(val.replace(',', '.')) : val; });
+          if (e.freq) out.push(e);
+        });
+        out.sort(function (a, b) { return a.freq - b.freq; });
+        return out;
+      }
+      var ta = h('textarea', { cls: 'adm-editor', spellcheck: 'false', wrap: 'off' }); ta.value = r.text;
+      function save(text) {
+        api('PUT', 'admin/site/relais.json', { hash: hash, text: text }, function (c2, r2) {
+          if (c2 === 200) { hash = r2.hash; ta.value = r2.text; toast('Gespeichert – die Oberfläche zeigt es beim nächsten Laden'); return; }
+          if (c2 === 409) { toast('Inzwischen geändert – bitte neu laden', true); return; }
+          toast(r2.error || 'Nicht gespeichert', true);
+        });
+      }
+      v.appendChild(h('div', { cls: 'adm-card' },
+        h('div', { cls: 'adm-cardhead' }, h('h3', { text: 'Relais und Frequenzen' }), h('small', { cls: 'muted', text: r.path })),
+        h('p', { cls: 'muted small', text: 'Aus dieser Liste entstehen die Marker im Wasserfall (Rufzeichen an der Ausgabe, „↑“ an der Eingabe), die Hover-Tafel und die Liste hinter dem Knopf „Liste“. Ausgabe = die Frequenz, die hier zu hören ist (kHz, z. B. 438700). Ablage = Eingabe − Ausgabe in kHz (z. B. −7600; leer = kein Relais). Entfernung und Richtung rechnet die Oberfläche aus dem Locator (4 oder 6 Stellen) und dem Standort der Station. Wird es im Wasserfall eng, behalten die nahen Relais ihre Beschriftung, die fernen nur die Linie.' }),
+        r.writable ? null : h('p', { cls: 'warn', text: 'Der Stationsordner ist nicht beschreibbar – Änderungen lassen sich hier nicht speichern.' }),
+        h('div', { cls: 'adm-tablewrap' }, h('table', { cls: 'adm-table adm-edit' }, h('thead', null, h('tr', null, COLS.map(function (c) { return h('th', { text: c[1] }); }).concat([h('th')]))), tb)),
+        h('div', { cls: 'adm-row' },
+          h('button', { cls: 'btn', type: 'button', text: 'Zeile hinzufügen', onclick: function () { row({ mode: 'fm' }); } }),
+          h('button', { cls: 'btn btn-accent', type: 'button', text: 'Speichern', disabled: !r.writable, onclick: function () { save(JSON.stringify(collect())); } }),
+          h('button', { cls: 'btn btn-ghost', type: 'button', text: 'Neu laden', onclick: function () { show('relais'); } })),
+        h('details', null, h('summary', { text: 'Als Text (JSON) – zum Einfügen ganzer Listen' }), ta,
+          h('div', { cls: 'adm-row' },
+            h('button', { cls: 'btn', type: 'button', text: 'Text in die Tabelle übernehmen', onclick: function () { try { var l = JSON.parse(ta.value); if (!Array.isArray(l)) throw 0; clear(tb); l.forEach(row); toast('Übernommen – noch nicht gespeichert'); } catch (e) { toast('Kein gültiges JSON (Liste erwartet)', true); } } }),
+            h('button', { cls: 'btn btn-accent', type: 'button', text: 'Text speichern', disabled: !r.writable, onclick: function () { save(ta.value); } })))));
+      markersCard(v);
+    });
+  }
+  function markersCard(v) {
+    api('GET', 'admin/site/markers.json', undefined, function (code, r) {
+      if (code !== 200) return;
+      var hash = r.hash, ta = h('textarea', { cls: 'adm-editor', spellcheck: 'false', wrap: 'off' }); ta.value = r.text;
+      v.appendChild(h('div', { cls: 'adm-card' },
+        h('div', { cls: 'adm-cardhead' }, h('h3', { text: 'Weitere Marker' }), h('small', { cls: 'muted', text: r.path })),
+        h('p', { cls: 'muted small', text: 'Feste Marken ohne Relais-Daten: [{"freq": kHz, "text": "…", "mode": "fm", "minor": true}] – minor für dichte Kanalraster (Linie immer, Beschriftung nur bei Platz).' }),
+        ta,
+        h('div', { cls: 'adm-row' }, h('button', { cls: 'btn btn-accent', type: 'button', text: 'Marker speichern', disabled: !r.writable, onclick: function () {
+          api('PUT', 'admin/site/markers.json', { hash: hash, text: ta.value }, function (c2, r2) { if (c2 === 200) { hash = r2.hash; ta.value = r2.text; toast('Gespeichert'); } else toast(r2.error || 'Nicht gespeichert', true); });
+        } }))));
     });
   }
 

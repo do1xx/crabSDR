@@ -165,6 +165,7 @@ async fn main() {
         .route("/api/admin/config", get(admin::get_config).put(admin::save_config))
         .route("/api/admin/config/check", post(admin::check_config))
         .route("/api/admin/config/backups/{name}", get(admin::get_backup))
+        .route("/api/admin/site/{name}", get(admin::get_site).put(admin::put_site))
         .route("/api/admin/restart", post(admin::restart))
         .route("/api/admin/bands/{id}/gain", post(admin::live_gain))
         .route("/api/admin/chat", get(admin::list_chat))

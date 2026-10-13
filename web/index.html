@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="{{STATION_NAME}}">
-<link rel="stylesheet" href="ui.css?v=60">
+<link rel="stylesheet" href="ui.css?v=61">
 <link rel="stylesheet" href="account.css?v=1">
 <script>
 // Einstellungen der Vorversion übernehmen (Schlüssel gartow_… und 1xx_… werden zu crab_…)
@@ -28,7 +28,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </script>
 <script>(function(){var t=null;try{t=localStorage.getItem('crab_token')}catch(e){}document.write('<script src="bandinfo.js?_=' + Date.now() + (t ? '&token=' + encodeURIComponent(t) : '') + '"><\/script>');})();</script>
 <script>window.STATION_NAME = '{{STATION_NAME_JS}}';</script>
-<script src="core.js?v=92"></script>
+<script src="core.js?v=93"></script>
 </head>
 <body class="hoeren">
 
@@ -250,13 +250,14 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </aside>
 
 <!-- Frequenzliste: Relais (eigene Liste + per APRS gehört) und Marker -->
+<div id="relpanel" class="relpanel" hidden></div>
 <div class="keyhelp flist" id="flist" hidden>
   <div class="keyhelp-box flist-box" role="dialog" aria-label="Frequenzliste">
     <div class="flist-head"><b data-de="Relais und Frequenzen" data-en="Repeaters and frequencies">Relais und Frequenzen</b>
       <button class="btn btn-ghost btn-icon" type="button" id="flistclose" aria-label="Schließen">✕</button></div>
     <p class="hint" data-de="Klick stimmt ab." data-en="Click to tune.">Klick stimmt ab.</p>
     <div class="flist-scroll"><table class="flist-table"><thead><tr>
-      <th>MHz</th><th data-de="Rufzeichen" data-en="Call">Rufzeichen</th><th data-de="Info" data-en="Info">Info</th><th data-de="Ablage" data-en="Shift">Ablage</th><th data-de="Ton" data-en="Tone">Ton</th><th>km</th><th data-de="Quelle" data-en="Source">Quelle</th>
+      <th>MHz</th><th data-de="Rufzeichen" data-en="Call">Rufzeichen</th><th data-de="Info" data-en="Info">Info</th><th data-de="Ablage" data-en="Shift">Ablage</th><th data-de="Ton" data-en="Tone">Ton</th><th>km</th><th data-de="Richtung" data-en="Bearing">Richtung</th><th data-de="Quelle" data-en="Source">Quelle</th>
     </tr></thead><tbody id="flistbody"></tbody></table></div>
   </div>
 </div>
@@ -304,7 +305,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </div>
 </div>
 
-<script src="ui.js?v=77"></script>
+<script src="ui.js?v=78"></script>
 <script src="account.js?v=1"></script>
 </body>
 </html>

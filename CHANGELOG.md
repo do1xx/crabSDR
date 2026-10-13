@@ -5,6 +5,15 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 ## Unveröffentlicht
 
 ### Oberfläche
+- **Relais-Marker mit Hover-Tafel.** `relais.json` im Stationsordner trägt jetzt `locator` und `qth`; daraus entstehen Marker im
+  Wasserfall (Rufzeichen an der Ausgabe, kleine Marke „↑“ an der Eingabe, wo das Band sie zeigt) und beim Überfahren eine
+  Tafel mit Ausgabe/Eingabe/Ablage, Ton, QTH, Locator, Entfernung und Richtung von der Station (aus `[station]` locator
+  bzw. lat/lon). Bei Gedränge behalten die nahen Relais ihre Beschriftung, die fernen nur die (jetzt breitere, anklickbare)
+  Linie – die Tafel geht an beiden. Die Liste hinter „Liste“ zeigt zusätzlich die Richtung.
+- **Admin-Seite: Reiter „Relais & Marker“.** `relais.json` als Tabelle (Zeilen hinzufügen/löschen, Speichern) oder als Text,
+  `markers.json` als Text; Endpunkte `GET/PUT /api/admin/site/{relais,markers,presets}.json` mit Prüfsumme gegen
+  Überschreiben, Sicherungen unter `data_dir/site-backups/` (die letzten 20). Die Oberfläche liest die Dateien bei jedem
+  Laden neu, kein Neustart nötig.
 - **RADE-Rufzeichen sichtbar.** Das Rufzeichen, das `crab_rade` am Ende jeder Durchgabe aus dem EOO-Rahmen meldet
   (`{"kind":"text",…}`), erscheint jetzt als Marke neben dem Knopf „DV“ (Tooltip: Mode, SNR, „vor n min“; grau nach
   10 min, weg nach 1 h) – für die gehörte DV-Gruppe, sonst für eine DV-Gruppe auf der eingestellten Frequenz (±3 kHz);
