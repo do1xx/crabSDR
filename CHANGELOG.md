@@ -2,7 +2,10 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## Unveröffentlicht
+## 1.5.0 – 2026-10-15
+
+RADE-Rufzeichen, SSTV-Korrektur, neuestes Bild als feste Adresse, Rechtstexte, Rauschsperre ohne Fahne, FM-Klang,
+Ogg-Stream im Browser und im Auto, Ton auf iPhone, Handy-Ansicht mit Querformat.
 
 ### Handy-Ansicht (iPhone und Android)
 - **Querformat ist jetzt eine Handy-Ansicht.** Ein Handy quer (850–930 px breit, nur 350–400 px hoch) landete bisher in der
