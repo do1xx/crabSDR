@@ -63,5 +63,9 @@ body:not(.dec-aprs) .aprsonly { display: none; }
 body:not(.dec-reichweite) .rwonly { display: none; }
 
 body.dec-nomap .card-map { display: none; }
+/* Pager/FreeDV ohne Karte: Listen füllen die Höhe des Fensters statt 200 px */
+body.dec-nomap .stations, body.dec-nomap .packets { max-height: calc(100vh - 330px); min-height: 320px; }
+.pk.ric { cursor: pointer; } .pk.ric:hover { background: var(--bg2); } .pk.ric.active { background: var(--bg2); outline: 1px solid var(--accent); border-radius: 4px; padding-left: 4px; }
+.pk.ricfilter { background: var(--bg2); border-radius: 4px; padding: 4px 6px; margin-bottom: 4px; } .ricclear { font-size: 11px; padding: 1px 8px; margin-left: auto; }
 
 .pk .ok { color: var(--ok); } .pk .warn { color: var(--warn); }

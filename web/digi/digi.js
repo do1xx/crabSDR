@@ -118,18 +118,32 @@ crabReady(function (UI) {
     return true;
   }
   function setDec(d) { dec = d; document.body.classList.toggle('dec-nomap', d === 'pocsag' || d === 'freedv'); document.body.classList.toggle('dec-aprs', d === 'aprs'); document.body.classList.toggle('dec-reichweite', d === 'reichweite'); renderReichweite.fitted = false; ensureRange(); try { localStorage.setItem('crab_dec', d); } catch (e) {} var bs = document.querySelectorAll('.band[data-dec]'); for (var i = 0; i < bs.length; i++) bs[i].classList.toggle('active', bs[i].dataset.dec === d); document.body.classList.toggle('sstv', d === 'sstv'); $('gallery').hidden = d !== 'sstv'; load(); }
+  $('packets').addEventListener('click', function (ev) {
+    var r = ev.target.closest ? ev.target.closest('[data-ric]') : null; if (!r || dec !== 'pocsag') return;
+    pocsagRic = String(r.dataset.ric) === String(pocsagRic) ? null : r.dataset.ric; if (pocsagLast) renderPocsag(pocsagLast);
+  });
+  $('stations').addEventListener('click', function (ev) {
+    var c = ev.target.closest ? ev.target.closest('[data-ricclear]') : null; if (!c) return;
+    pocsagRic = null; if (pocsagLast) renderPocsag(pocsagLast);
+  });
   function wireTabs() { var bs = document.querySelectorAll('.band[data-dec]'); for (var i = 0; i < bs.length; i++) { bs[i].onclick = function () { setDec(this.dataset.dec); }; bs[i].classList.toggle('active', bs[i].dataset.dec === dec); } }
 
   // Pager: Liste der Rufe (RIC, Funktion, Text), keine Karte
+  // Pager: Klick auf einen RIC rechts zeigt links nur dessen Rufe (nochmal klicken oder × hebt es auf); bleibt über Aktualisierungen
+  var pocsagRic = null, pocsagLast = null;
   function renderPocsag(d) {
-    var pg = d.pages || [];
-    $('sttitle').textContent = 'Rufe'; $('pktitle').textContent = 'Zuletzt'; $('stcount').textContent = pg.length ? '(' + pg.length + ')' : ''; $('pkcount').textContent = '';
-    var byRic = {}; pg.forEach(function (p) { byRic[p.ric] = (byRic[p.ric] || 0) + 1; });
-    $('stations').innerHTML = pg.length ? pg.slice(0, 200).map(function (p) {
+    pocsagLast = d;
+    var all = d.pages || [], pg = pocsagRic == null ? all : all.filter(function (p) { return String(p.ric) === String(pocsagRic); });
+    $('sttitle').textContent = 'Rufe'; $('pktitle').textContent = 'RICs'; $('stcount').textContent = pg.length ? '(' + pg.length + (pocsagRic != null ? ' von ' + all.length : '') + ')' : ''; $('pkcount').textContent = '';
+    var byRic = {}; all.forEach(function (p) { byRic[p.ric] = (byRic[p.ric] || 0) + 1; });
+    var head = pocsagRic != null ? '<div class="pk ricfilter"><b>RIC ' + esc(String(pocsagRic)) + '</b> <small>' + (byRic[pocsagRic] || 0) + ' Rufe</small> <button type="button" class="btn ricclear" data-ricclear="1">× alle zeigen</button></div>' : '';
+    $('stations').innerHTML = head + (pg.length ? pg.slice(0, 300).map(function (p) {
       return '<div class="pk"><span class="tm">' + new Date(p.t * 1000).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + '</span> <b>' + p.ric + '</b> <small>F' + p.func + ' · ' + p.baud + ' Bd</small><br>' + (p.text ? esc(p.text) : '<span class="muted">' + (p.type === 'numeric' ? 'numerisch' : 'Tonruf') + '</span>') + '</div>';
-    }).join('') : '<span class="muted">noch kein Ruf empfangen – die Lauscher warten auf ' + freqs(DECS.pocsag) + ' MHz</span>';
-    var top = Object.keys(byRic).sort(function (a, b) { return byRic[b] - byRic[a]; }).slice(0, 20);
-    $('packets').innerHTML = top.length ? '<div class="muted">häufigste RICs</div>' + top.map(function (r) { return '<div class="pk"><b>' + r + '</b> <small>' + byRic[r] + '×</small></div>'; }).join('') : '';
+    }).join('') : '<span class="muted">' + (pocsagRic != null ? 'keine Rufe für diesen RIC' : 'noch kein Ruf empfangen – die Lauscher warten auf ' + freqs(DECS.pocsag) + ' MHz') + '</span>');
+    var top = Object.keys(byRic).sort(function (a, b) { return byRic[b] - byRic[a] || Number(a) - Number(b); }).slice(0, 60);
+    $('packets').innerHTML = top.length ? '<div class="muted">häufigste RICs · anklicken filtert</div>' + top.map(function (r) {
+      return '<div class="pk ric' + (String(r) === String(pocsagRic) ? ' active' : '') + '" data-ric="' + esc(r) + '" title="nur Rufe an ' + esc(r) + ' zeigen"><b>' + esc(r) + '</b> <small>' + byRic[r] + '×</small></div>';
+    }).join('') : '';
     $('status').innerHTML = '<span>Pager ' + freqs(DECS.pocsag) + ' · multimon-ng</span><span class="' + (Date.now() / 1000 - d.ts < 300 ? 'ok' : 'warn') + '">Stand ' + ago(d.ts) + '</span>';
   }
   // FreeDV: Rufzeichen aus freedv.json (RADE: EOO-Rahmen am Ende der Durchgabe, Codec 2: Textkanal) und die Decoder, keine Karte
