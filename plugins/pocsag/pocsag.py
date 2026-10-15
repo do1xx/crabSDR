@@ -3,6 +3,8 @@
 multimon-ng POCSAG 512/1200/2400 dekodieren und meldet jeden Ruf als JSON auf stdout (kind "page": ric, func, baud,
 type alpha|numeric|tone, text). Übersicht pocsag.json (letzte KEEP Rufe) und Protokoll pocsag.jsonl im Datenordner.
 Optionen: keep (300), baud (z. B. "1200" oder "512,1200,2400", Standard alle drei), charset (multimon-ng -C, z. B. DE).
+DAPNET-Rubriken (RIC 4520, Skyper-Format: Zeichen 1 = Rubrik + 0x1F, Zeichen 2 = Nummer + 0x1F, Rest um eins verschoben,
+Umlaute nach ISO 646 DE) werden lesbar gemacht: text = "Rubrik <r>/<n>: …". Steuerzeichen-Marken von multimon-ng (<NUL> …) fallen weg.
 """
 import json, os, re, subprocess, sys, threading, time
 DATA = os.environ.get("CRAB_DATA", "."); RATE = os.environ.get("CRAB_RATE", "22050")
@@ -12,6 +14,18 @@ CHARSET = os.environ.get("CRAB_OPT_CHARSET", "")
 OUT = os.path.join(DATA, "pocsag.json"); LOG = os.path.join(DATA, "pocsag.jsonl")
 os.makedirs(DATA, exist_ok=True)
 RX = re.compile(r"^POCSAG(512|1200|2400):\s+Address:\s*(\d+)\s+Function:\s*(\d)(?:\s+(Alpha|Numeric):\s*(.*))?\s*$")
+CTRL = re.compile(r"<(NUL|SOH|STX|ETX|EOT|ENQ|ACK|BEL|BS|HT|LF|VT|FF|CR|SO|SI|DLE|DC[1-4]|NAK|SYN|ETB|CAN|EM|SUB|ESC|FS|GS|RS|US|DEL)>")
+RUBRIC_RIC = 4520   # DAPNET/Skyper: Rubriken (DX-Cluster, Pegel, Nachrichten …)
+DE = str.maketrans("[\\]{|}~", "ÄÖÜäöüß")   # ISO 646 DE, wie multimon-ng -C DE
+
+def clean(ric, text):
+    """Steuerzeichen-Marken weg; DAPNET-Rubrik (RIC 4520) entschlüsseln: Rubrik/Nummer aus den ersten zwei Zeichen, Rest −1."""
+    text = CTRL.sub("", text)
+    if ric == RUBRIC_RIC and len(text) >= 2 and all(0x20 <= ord(c) < 0x7f for c in text[:2]):
+        rubric, nr = ord(text[0]) - 0x1f, ord(text[1]) - 0x1f
+        body = "".join(chr(ord(c) - 1) if 0x21 <= ord(c) < 0x80 else c for c in text[2:]).translate(DE)
+        return "Rubrik %d/%d: %s" % (rubric, nr, body.strip())
+    return text.strip()
 lock = threading.Lock(); pages = []
 
 def load():
@@ -38,7 +52,7 @@ for line in mm.stdout:
         continue
     baud, ric, func, kind, text = m.groups()
     ev = {"kind": "page", "t": int(time.time()), "baud": int(baud), "ric": int(ric), "func": int(func),
-          "type": (kind or "tone").lower(), "text": (text or "").strip()}
+          "type": (kind or "tone").lower(), "text": clean(int(ric), text or "")}
     with lock:
         pages.insert(0, ev); del pages[KEEP:]
         try:
