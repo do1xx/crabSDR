@@ -90,6 +90,7 @@ Vor dem Neustart prüfen: `crabsdr-server --check /etc/crabsdr/config.toml`. All
 | `aprs` | direwolf | Pakete, Stationen, optional RX-iGate zu APRS-IS |
 | `ft8` | jt9 (WSJT-X) | Dekodierungen, Stationen über 90 Tage |
 | `sstv` | python3-numpy, python3-pil | Bilder (Martin, Scottie, Robot, PD) |
+| `pocsag` | multimon-ng | Pager-Rufe (RIC, Funktion, Text), Vorgabe DAPNET 439,9875 MHz |
 
 Ein Decoder ist ein Ordner in `plugins/` mit einer `decoder.json` und einem Programm, das Ton von stdin liest und
 JSON-Zeilen ausgibt ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)). Mitgeliefert: APRS (direwolf), FT8 (jt9), SSTV,

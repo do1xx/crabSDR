@@ -164,7 +164,7 @@ erscheinen auf der Seite **Digital** und unter `/api/decoders`.
 | Schlüssel | Voreinstellung | Bedeutung |
 |---|---|---|
 | `plugin` | – (Pflicht) | `aprs`, `ft8`, `sstv`, `pocsag`, `freedv`, `rade` (mitgeliefert; `freedv` und `rade` liefern Ton zurück, sie laufen auch ohne Eintrag flüchtig über die Betriebsart DV) |
-| `freq` | – (Pflicht) | Frequenz in Hz; das Band ergibt sich daraus |
+| `freq` | Vorgabe des Plugins | Frequenz in Hz; das Band ergibt sich daraus. Pflicht, außer das Plugin nennt eine Vorgabe (`freq` in `decoder.json`): `pocsag` = 439 987 500 (DAPNET) |
 | `band` | automatisch | Band-`id`, falls sich Bänder überlappen |
 | `id` | `<plugin>-<kHz>` | Kennung, zugleich Datenordner `data_dir/decoders/<id>` |
 | `label` | Name des Plugins | Anzeige |
@@ -185,6 +185,19 @@ Rechenzeit), `days` (Stationen der letzten n Tage, 90), `keep` (Decodes in der L
 
 **SSTV** (braucht `python3-numpy`, `python3-pil`): `keep` (Bilder im Index, 500). Erkennt Martin, Scottie,
 Robot 36/72, PD 50–290 (ISS: PD 120).
+
+**Pager/POCSAG** (braucht `multimon-ng`, Betriebsart `data` = flacher FM-Diskriminator): ohne `freq` hört es auf
+**439,9875 MHz** (DAPNET, der Amateurfunk-Pagerdienst; die Frequenz muss in einem Band liegen, sonst meldet `--check`
+„liegt in keinem Band“). Optionen: `baud` (`"1200"` oder `"512,1200,2400"`, Standard alle drei), `keep` (Rufe in der
+Übersicht `/digi/pocsag.json`, 300), `charset` (Zeichensatz von multimon-ng, z. B. `DE`). Jeder Ruf ist ein Ereignis
+`kind = "page"` mit `ric`, `func`, `baud`, `type` (`alpha`, `numeric`, `tone`) und `text`; die Übersicht zeigt die
+Digital-Seite (Reiter „Pager“) und die Decoder-Karte im Menü.
+
+```toml
+[[decoders]]
+plugin = "pocsag"
+label = "DAPNET 439,9875"
+```
 
 Plugins bekommen Umgebung: `CRAB_FREQ`, `CRAB_RATE`, `CRAB_MODE`, `CRAB_BAND`, `CRAB_ID`, `CRAB_LABEL`, `CRAB_DATA`,
 `CRAB_STATION_NAME`, `CRAB_STATION_LOCATOR`, `CRAB_STATION_LAT`, `CRAB_STATION_LON` und `CRAB_OPT_<OPTION>`.

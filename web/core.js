@@ -1113,6 +1113,7 @@ function _crabDecText(e) {
   var d = e.data || {};
   if (e.plugin === 'aprs') return (d.src || '') + (d.direct ? '' : ' (über ' + (d.digi || 'Digi') + ')') + (d.comment || d.status ? ' · ' + (d.comment || d.status) : '');
   if (e.plugin === 'ft8') return (d.msg || '') + (d.snr != null ? '  ' + d.snr + ' dB' : '');
+  if (e.plugin === 'pocsag') return 'RIC ' + (d.ric != null ? d.ric : '?') + (d.func != null ? ' F' + d.func : '') + (d.baud ? ' · ' + d.baud + ' Bd' : '') + ' · ' + (d.text ? d.text : d.type === 'numeric' ? 'numerisch' : 'Tonruf');
   if (e.plugin === 'sstv') return e.kind === 'vis' ? 'Bild beginnt: ' + (d.mode || '') : 'Bild ' + (d.mode || '') + (d.lines ? ' · ' + d.lines + '/' + d.of + ' Zeilen' : '');
   if (e.plugin === 'rade' || e.plugin === 'freedv') {
     var snr = d.snr != null ? ' · ' + Math.round(d.snr) + ' dB' : '';

@@ -42,8 +42,8 @@ mode = "fm"                   # Betriebsart beim Start: fm, am, usb, lsb, cw
 # center_freq = 433500000
 
 # ---- Decoder (optional): Plugin + Frequenz, das Band ergibt sich aus der Frequenz ----
-# Brauchen Programme: APRS direwolf, FT8 jt9 (Paket wsjtx), SSTV python3-numpy + python3-pil (im vollen Docker-Image
-# enthalten). Ergebnisse erscheinen auf der Seite „Digital“.
+# Brauchen Programme: APRS direwolf, FT8 jt9 (Paket wsjtx), SSTV python3-numpy + python3-pil, Pager multimon-ng (im
+# vollen Docker-Image enthalten). Ergebnisse erscheinen auf der Seite „Digital“.
 # [[decoders]]
 # plugin = "aprs"
 # freq = 144800000
@@ -55,6 +55,11 @@ mode = "fm"                   # Betriebsart beim Start: fm, am, usb, lsb, cw
 # [[decoders]]
 # plugin = "sstv"
 # freq = 145800000
+#
+# Pager (POCSAG, multimon-ng): ohne freq = DAPNET 439,9875 MHz – das 70-cm-Band muss diese Frequenz abdecken
+# [[decoders]]
+# plugin = "pocsag"
+# label = "DAPNET 439,9875"
 
 # ---- Oberfläche (optional): alles ist an, solange es etwas zu zeigen gibt ----
 # [ui]

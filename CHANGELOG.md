@@ -6,6 +6,7 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 
 ### Decoder
 - APRS-iGate kann ein zusätzliches Objekt melden (`object_name`, `object_comment`, …), z. B. den Clubabend als eigenen Punkt auf der APRS-Karte.
+- **Pager/POCSAG live:** Plugins können eine Vorgabefrequenz nennen (`freq` in `decoder.json`); ein `[[decoders]]`-Eintrag ohne `freq` übernimmt sie, ohne Vorgabe meldet die Prüfung „freq fehlt“. `pocsag` bringt 439,9875 MHz (DAPNET) mit – `plugin = "pocsag"` genügt, wenn das 70-cm-Band die Frequenz abdeckt. Die Decoder-Karte im Menü zeigt Rufe lesbar (RIC, Funktion, Baudrate, Text bzw. „numerisch“/„Tonruf“; vorher nur der Text, bei Tonrufen rohes JSON). Doku: CONFIG.md (Optionen `baud`, `keep`, `charset`), READMEs, config.example.toml.
 
 ## 1.5.0 – 2026-10-15
 

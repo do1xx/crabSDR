@@ -90,6 +90,7 @@ Check before restarting: `crabsdr-server --check /etc/crabsdr/config.toml`. All 
 | `aprs` | direwolf | packets, stations, optional RX iGate to APRS-IS |
 | `ft8` | jt9 (WSJT-X) | decodes, stations over 90 days |
 | `sstv` | python3-numpy, python3-pil | images (Martin, Scottie, Robot, PD) |
+| `pocsag` | multimon-ng | pager calls (RIC, function, text), default DAPNET 439.9875 MHz |
 
 A decoder is a folder in `plugins/` with a `decoder.json` and a program that reads audio on stdin and prints JSON
 lines ([docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)).

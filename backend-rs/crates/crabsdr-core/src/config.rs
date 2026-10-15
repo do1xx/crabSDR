@@ -176,7 +176,9 @@ pub fn locator_to_latlon(loc: &str) -> Option<(f64, f64)> {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DecoderInstanceConfig {
     pub plugin: String,
-    /// Frequenz in Hz
+    /// Frequenz in Hz; fehlt sie (0), gilt die Vorgabe des Plugins (`freq` in decoder.json, z. B. pocsag = 439 987 500,
+    /// DAPNET) – ohne Vorgabe ist das ein Fehler
+    #[serde(default)]
     pub freq: u64,
     /// Kennung (Standard: `<plugin>-<kHz>`), Datenverzeichnis `data_dir/decoders/<id>`
     #[serde(default)]
@@ -598,6 +600,12 @@ pub fn config_candidates(explicit: Option<&Path>) -> Vec<PathBuf> {
     v
 }
 
+/// Vorgabefrequenz eines Plugins (`freq` in `plugin_dir/<plugin>/decoder.json`), falls das Plugin eine nennt
+pub fn plugin_default_freq(plugin_dir: &Path, plugin: &str) -> Option<u64> {
+    let s = std::fs::read_to_string(plugin_dir.join(plugin).join("decoder.json")).ok()?;
+    serde_json::from_str::<serde_json::Value>(&s).ok()?.get("freq")?.as_u64().filter(|f| *f > 0)
+}
+
 /// Alte Schlüsselnamen → neue (nur Hinweis, beide gelten)
 const RENAMED: &[(&str, &str)] = &[("sdrs", "bands"), ("sdr_driver", "driver"), ("sdr_device", "device"), ("sdr_tcp_host", "host"), ("sdr_tcp_port", "port"), ("default_mode", "mode")];
 
@@ -674,6 +682,10 @@ impl ServerConfig {
     /// Nach dem Lesen: Pfade ergänzen, FFT-Größe automatisch, veraltete [smeter_cal]-Tabelle in die Bänder übernehmen
     fn finish(&mut self, warnings: &mut Vec<String>) {
         self.resolve_paths();
+        // Decoder ohne freq: Vorgabe aus plugin_dir/<plugin>/decoder.json ("freq"), z. B. pocsag = DAPNET 439,9875 MHz
+        for d in self.decoders.iter_mut().filter(|d| d.freq == 0) {
+            if let Some(f) = plugin_default_freq(&self.plugin_dir, &d.plugin) { d.freq = f; }
+        }
         for b in self.sdrs.iter_mut() {
             if b.fft_size == 0 { b.fft_size = auto_fft_size(b.sample_rate); }
             else if !b.fft_size.is_power_of_two() || b.fft_size < 256 {
@@ -751,6 +763,7 @@ impl ServerConfig {
         for d in &self.decoders {
             let id = d.id.clone().unwrap_or_else(|| format!("{}-{}", d.plugin, d.freq / 1000));
             if !dids.insert(id.clone()) { err.push(format!("Decoder „{}“ doppelt – id = \"…\" setzen", id)); }
+            if d.freq == 0 { err.push(format!("Decoder „{}“: freq fehlt und das Plugin „{}“ bringt keine Vorgabe (freq in decoder.json)", id, d.plugin)); continue; }
             let inside = |b: &SdrInstanceConfig| { let h = b.sample_rate as u64 / 2; d.freq + h > b.center_freq && d.freq < b.center_freq + h };
             match &d.band {
                 Some(bid) => match self.sdrs.iter().find(|b| &b.id == bid) {
@@ -886,6 +899,17 @@ mod tests {
         assert_eq!(err.len(), 1);
         assert!(err[0].contains("432"));
         assert!(!l.config.db_path.as_os_str().is_empty() && !l.config.frontend_dir.as_os_str().is_empty());
+    }
+
+    #[test]
+    fn decoder_vorgabefrequenz_aus_plugin() {
+        // pocsag nennt in decoder.json freq = 439 987 500 (DAPNET); ohne freq in der Konfiguration gilt sie
+        let pd = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../plugins");
+        let l = load_str("decfreq", &format!("plugin_dir = {:?}\n[[bands]]\nid = \"70cm\"\ncenter_freq = 439000000\n[[decoders]]\nplugin = \"pocsag\"\n[[decoders]]\nplugin = \"aprs\"\n", pd.to_string_lossy())).unwrap();
+        assert_eq!(l.config.decoders[0].freq, 439_987_500);
+        let (err, _) = l.config.validate();
+        assert_eq!(err.len(), 1, "{:?}", err);
+        assert!(err[0].contains("aprs") && err[0].contains("freq fehlt"));
     }
 
     #[test]

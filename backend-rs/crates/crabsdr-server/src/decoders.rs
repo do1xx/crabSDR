@@ -64,6 +64,11 @@ pub struct Manifest {
     /// Programme, die im PATH (oder im Plugin-Verzeichnis) vorhanden sein müssen
     #[serde(default)]
     pub requires: Vec<String>,
+    /// Vorgabefrequenz in Hz, gilt für `[[decoders]]`-Einträge ohne `freq` (z. B. pocsag: DAPNET 439 987 500);
+    /// ausgewertet beim Laden der Konfiguration (crabsdr-core)
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub freq: Option<u64>,
     /// Liefert der Decoder Ton zurück (z. B. FreeDV: dekodierte Sprache)? Dann ist stdout rohes s16le mono mit `rate`,
     /// Treffer kommen als JSON-Zeilen auf stderr (Zeilen, die mit `{` beginnen). crabSDR verteilt den Ton als Opus an
     /// Hörer, die `listen_decoder` gewählt haben, und unter /stream/decoder/<id>.ogg.
