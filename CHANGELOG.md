@@ -4,6 +4,12 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 
 ## Unveröffentlicht
 
+### iPhone und iPad
+- **Ton auf iOS zuverlässig:** der Stummschalter machte Web-Audio lautlos (eine stille Tonschleife hält die Sitzung jetzt in
+  der Wiedergabe-Kategorie), nach Anruf, Siri, Sperre oder App-Wechsel blieb der Ton aus (Zustand „interrupted“ wird jetzt
+  bei jeder Berührung und beim Zurückkommen fortgesetzt), und nach einem Anruf lief der Ton mit falscher Abtastrate (Context
+  wird neu angelegt).
+
 ### Oberfläche
 - **Relais-Marker mit Hover-Tafel.** `relais.json` im Stationsordner trägt jetzt `locator` und `qth`; daraus entstehen Marker im
   Wasserfall (Rufzeichen an der Ausgabe; die Eingabe als gedimmte Marke „↑ Rufzeichen“, wo das Band sie zeigt) und beim Überfahren eine

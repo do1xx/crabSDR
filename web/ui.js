@@ -713,13 +713,42 @@
     var mt = $('mtext'); if (mt) mt.textContent = '+' + Math.round(snr) + ' dB SNR' + (abs ? ' · ' + abs : '');
   }
 
-  /* ================= Ton freischalten ================= */
+  /* ================= Ton freischalten =================
+     iPhone/iPad (Safari): drei Fallen, alle hier abgefangen.
+     1. Der Stummschalter am Gerät macht Web-Audio lautlos (Kategorie „ambient“). Ein unsichtbares <audio>-Element, das in
+        der ersten Berührung eine Schleife aus Stille abspielt, schaltet die Tonsitzung auf „playback“ – dann spielt Web-Audio
+        auch bei umgelegtem Schalter (bekannter Kniff, wie unmute.js).
+     2. Nach Anruf, Siri, Sperrbildschirm oder App-Wechsel steht der AudioContext auf „interrupted“, nicht „suspended“; ein
+        resume() nur bei „suspended“ ließ ihn stumm. Jetzt bei jedem Zustand außer „running“, auch beim Zurückkommen.
+     3. Nach einem Anruf kann iOS die Abtastrate des Geräts ändern; dann meldet der Context eine andere Rate als 48000 –
+        wir legen ihn neu an, sonst klingt es falsch oder gar nicht. */
+  var IOS = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var silentEl = null;
   function audioState() { return document.ct ? document.ct.state : 'none'; }
+  function keepSessionPlayback() {
+    if (!IOS) return;
+    if (!silentEl) {
+      // 0,1 s Stille als WAV (44 Byte Kopf + 800 Byte), als Schleife – hält die Tonsitzung in der Wiedergabe-Kategorie
+      var n = 800, b = new Uint8Array(44 + n), v = new DataView(b.buffer), w = function (o, t) { for (var i = 0; i < t.length; i++) b[o + i] = t.charCodeAt(i); };
+      w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
+      for (var k = 0; k < n; k++) b[44 + k] = 128;
+      silentEl = document.createElement('audio'); silentEl.setAttribute('playsinline', ''); silentEl.loop = true; silentEl.volume = 0.01;
+      silentEl.src = URL.createObjectURL(new Blob([b], { type: 'audio/wav' })); silentEl.style.display = 'none'; document.body.appendChild(silentEl);
+    }
+    if (silentEl.paused) { var p = silentEl.play(); if (p && p.catch) p.catch(function () {}); }
+  }
   function unlockAudio() {
-    if (document.ct && document.ct.state === 'suspended') document.ct.resume().then(updateAudioBtn, updateAudioBtn);
+    keepSessionPlayback();
+    var c = document.ct;
+    if (c && c.sampleRate && c.sampleRate !== 48000 && typeof _crabAudioRebuild === 'function') { console.warn('AudioContext mit ' + c.sampleRate + ' Hz – lege neu an'); _crabAudioRebuild(); c = document.ct; }
+    if (c && c.state !== 'running' && c.state !== 'closed') c.resume().then(updateAudioBtn, updateAudioBtn);
     else updateAudioBtn();
   }
   function updateAudioBtn() { document.body.classList.toggle('audio-ready', audioState() === 'running'); }
+  // Zurück aus Sperre, Anruf oder anderer App: Context weiterlaufen lassen (iOS meldet „interrupted“)
+  ['visibilitychange', 'pageshow', 'focus'].forEach(function (ev) { window.addEventListener(ev, function () { if (document.hidden) return; var c = document.ct; if (c && c.state !== 'running' && c.state !== 'closed') c.resume().then(updateAudioBtn, updateAudioBtn); }); });
+  setInterval(function () { var c = document.ct; if (c && c.state === 'running' && silentEl && silentEl.paused && IOS) keepSessionPlayback(); updateAudioBtn(); }, 2000);
 
   /* ================= Frequenzliste: eigene Relais (relais.json), per APRS gehörte Relais, Marker ================= */
   function initFreqList() {

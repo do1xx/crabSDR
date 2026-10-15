@@ -553,10 +553,19 @@ var _crabWORKLET = `class J extends AudioWorkletProcessor {
 }
 registerProcessor('jcrab', J);`;
 var _crabOPUSHEAD = new Uint8Array([0x4f, 0x70, 0x75, 0x73, 0x48, 0x65, 0x61, 0x64, 1, 1, 0x38, 0x01, 0x80, 0xbb, 0, 0, 0, 0, 0]);
+/* Context neu anlegen (iOS nach Anruf: Abtastrate des Geräts hat sich geändert) – Worklet, Decoder und Lautstärke kommen mit */
+function _crabAudioRebuild() {
+  var old = document.ct; if (!old) return;
+  try { old.close(); } catch (e) {}
+  document.ct = null; var A = _crab.audio; A.node = null; A.gain = null; if (A.decoder) { try { A.decoder.close(); } catch (e) {} A.decoder = null; }
+  _crabAudioInit(); if (document.ct && document.ct.onstatechange === null) document.ct.onstatechange = old.onstatechange;
+}
 function _crabAudioInit() {
   if (document.ct) return;
   var C = window.AudioContext || window.webkitAudioContext; if (!C) return;
   var ctx = new C({ sampleRate: 48000 }); document.ct = ctx;
+  if (ctx.sampleRate !== 48000) console.warn('AudioContext läuft mit ' + ctx.sampleRate + ' Hz statt 48000');
+  ctx.onstatechange = function () { if (ctx.state === 'interrupted') console.info('Ton unterbrochen (Anruf/App-Wechsel), wird bei Berührung fortgesetzt'); };
   var A = _crab.audio;
   A.gain = ctx.createGain(); A.gain.gain.value = A.muted ? 0 : A.volume; A.gain.connect(ctx.destination);
   if (ctx.audioWorklet) {
