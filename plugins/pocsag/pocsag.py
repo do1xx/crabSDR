@@ -3,8 +3,9 @@
 multimon-ng POCSAG 512/1200/2400 dekodieren und meldet jeden Ruf als JSON auf stdout (kind "page": ric, func, baud,
 type alpha|numeric|tone, text). Übersicht pocsag.json (letzte KEEP Rufe) und Protokoll pocsag.jsonl im Datenordner.
 Optionen: keep (300), baud (z. B. "1200" oder "512,1200,2400", Standard alle drei), charset (multimon-ng -C, z. B. DE).
-DAPNET-Rubriken (RIC 4520, Skyper-Format: Zeichen 1 = Rubrik + 0x1F, Zeichen 2 = Nummer + 0x1F, Rest um eins verschoben,
-Umlaute nach ISO 646 DE) werden lesbar gemacht: text = "Rubrik <r>/<n>: …". Steuerzeichen-Marken von multimon-ng (<NUL> …) fallen weg.
+DAPNET-Rubriken (Skyper-Format: Zeichen 1 = Rubrik + 0x1F, Zeichen 2 = Nummer + 0x1F, Rest um eins verschoben, Umlaute nach
+ISO 646 DE) werden lesbar gemacht: text = "Rubrik <r>/<n>: …" – auf RIC 4520 immer, auf anderen RICs (Rubrik an Abonnenten),
+wenn der Rest verschoben aussieht (mehr „!“ als Leerzeichen, mindestens zwei). Steuerzeichen-Marken von multimon-ng (<NUL> …) fallen weg.
 """
 import json, os, re, subprocess, sys, threading, time
 DATA = os.environ.get("CRAB_DATA", "."); RATE = os.environ.get("CRAB_RATE", "22050")
@@ -18,10 +19,14 @@ CTRL = re.compile(r"<(NUL|SOH|STX|ETX|EOT|ENQ|ACK|BEL|BS|HT|LF|VT|FF|CR|SO|SI|DL
 RUBRIC_RIC = 4520   # DAPNET/Skyper: Rubriken (DX-Cluster, Pegel, Nachrichten …)
 DE = str.maketrans("[\\]{|}~", "ÄÖÜäöüß")   # ISO 646 DE, wie multimon-ng -C DE
 
+def looks_shifted(body):
+    """Verschobener Text: Leerzeichen werden zu „!“ – mindestens zwei „!“ und mehr „!“ als Leerzeichen (Klartext „Test 73!“ nicht)."""
+    return body.count("!") >= 2 and body.count("!") > body.count(" ")
+
 def clean(ric, text):
-    """Steuerzeichen-Marken weg; DAPNET-Rubrik (RIC 4520) entschlüsseln: Rubrik/Nummer aus den ersten zwei Zeichen, Rest −1."""
+    """Steuerzeichen-Marken weg; DAPNET-Rubrik (Skyper-Format) entschlüsseln: Rubrik/Nummer aus den ersten zwei Zeichen, Rest −1."""
     text = CTRL.sub("", text)
-    if ric == RUBRIC_RIC and len(text) >= 2 and all(0x20 <= ord(c) < 0x7f for c in text[:2]):
+    if len(text) >= 2 and all(0x20 <= ord(c) < 0x7f for c in text[:2]) and (ric == RUBRIC_RIC or looks_shifted(text[2:])):
         rubric, nr = ord(text[0]) - 0x1f, ord(text[1]) - 0x1f
         body = "".join(chr(ord(c) - 1) if 0x21 <= ord(c) < 0x80 else c for c in text[2:]).translate(DE)
         return "Rubrik %d/%d: %s" % (rubric, nr, body.strip())
