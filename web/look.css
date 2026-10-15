@@ -75,8 +75,8 @@ body.look-crab .foot { border-top: 0; padding: 2px 16px 4px; }
 body.look-crab .chatdrawer { background: var(--bg); }
 body.look-crab .chathead { border-bottom-color: var(--line2); }
 
-/* Handy */
-@media (max-width: 700px) {
+/* Handy (dieselbe Abfrage wie ui.css: schmal, oder flach mit Touch = Handy quer) */
+@media (max-width: 700px), (max-height: 500px) and (pointer: coarse) {
   body.look-crab .bands { padding: 0 6px; flex-wrap: nowrap; overflow-x: auto; }
   body.look-crab .band { flex: 0 0 auto; padding: 8px 10px 7px; white-space: nowrap; }
   body.look-crab .band b small { display: none; }

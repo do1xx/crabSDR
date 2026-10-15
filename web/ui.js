@@ -19,6 +19,9 @@
   var SOON = [];   // Bänder ohne Empfänger stehen in ui.json bands_off (ausgegraut), nicht mehr hier
   var MODEFILTER = { fm: [-6, 6], am: [-4, 4], usb: [0.3, 2.7], lsb: [-2.7, -0.3], cw: [-0.95, -0.55] };
   var PHONE_MAX = 700;          // darunter: ein Band, Handy-Bedienleiste
+  // Handy auch im Querformat: ein iPhone quer ist 850–930 px breit, aber nur ~350–400 px hoch – mit Touch zählt das als Handy.
+  // Dieselbe Abfrage steht in ui.css und look.css (@media), damit CSS und Skript nie auseinanderlaufen.
+  var PHONE_MQ = '(max-width: ' + PHONE_MAX + 'px), (max-height: 500px) and (pointer: coarse)';
   var MARKROW = 22;            // Streifen über der ersten Skala für Hörer-Marken (ui.css .rx-wrap padding-top)
   var PHONE_ZOOM = 2;           // Startzoom auf dem Handy (2 = Viertel des Bandes sichtbar)
 
@@ -33,14 +36,19 @@
 
   function $(id) { return document.getElementById(id); }
   var CHAT_SIDE_MIN = 1100;   // ab dieser Fensterbreite sitzt der Chat rechts neben dem Wasserfall, darunter unter ihm
-  function isPhone() { return window.innerWidth < PHONE_MAX; }
+  function isPhone() { try { return window.matchMedia(PHONE_MQ).matches; } catch (e) { return window.innerWidth < PHONE_MAX; } }
+  function isLand() { return window.innerWidth > window.innerHeight && window.innerHeight < 500; }   // Handy quer (flach)
   // Wasserfallhöhe auf dem Handy: der Empfänger wird auf Bildschirmbreite verkleinert (1024 px → ~350 px), deshalb die
   // Canvas-Höhe so wählen, dass auf dem Bildschirm etwa 230 px übrig bleiben (vorher fest 200 Canvas-Pixel = ~70 px)
   function phoneWf() {
-    var sc = Math.max(0.2, (window.innerWidth - 20) / 1024);
-    var top = document.querySelector('.top'), bd = document.querySelector('.bands'), mb = $('mbar');
-    var used = (top ? top.offsetHeight : 0) + (bd ? bd.offsetHeight : 0) + (mb ? mb.offsetHeight : 60) + MARKROW + 30;   // 30: Skala + Ränder
-    var avail = Math.max(160, window.innerHeight - used);
+    var host = wrap ? wrap.parentNode : null, cs = host ? getComputedStyle(host) : null;
+    var w = host ? host.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) : window.innerWidth - 20;
+    var sc = Math.max(0.2, w / 1024);
+    var hh = function (q) { var e = document.querySelector(q); return (e && e.getClientRects().length) ? e.offsetHeight : 0; };   // feste Leiste hat keinen offsetParent
+    var land = document.body.classList.contains('land');
+    // hochkant: Kopf, Reiter, Bandleiste oben und die feste Leiste unten; quer: nur die Bandleiste (Leiste steht rechts)
+    var used = (land ? 0 : hh('.top') + hh('.tabs.phonetabs') + hh('#mbar')) + hh('.bands') + MARKROW + 30 + 8;   // 30: Skala + Ränder
+    var avail = Math.max(120, window.innerHeight - used);
     return Math.round(Math.min(2000, avail / sc));
   }
   /* Handy: Einstellungen als Menü von unten, Name/Chat/Fuß ziehen mit hinein; Leiste unten bekommt SQ/Stumm/Menü */
@@ -61,9 +69,43 @@
     var tb = $('themebtn'); if (tb) sf.appendChild(tb);
     panel.appendChild(sf);
     var back = document.createElement('div'); back.className = 'sheetback'; back.onclick = function () { openSheet(false); }; document.body.appendChild(back);
+    // Querformat: Kopf und Reiter sind weg – Reiter (Logbuch, Info …) und Sprache stehen dann oben im Menü
+    var nav = document.createElement('div'); nav.className = 'sheetnav';
+    if (tabs) Array.prototype.forEach.call(tabs.querySelectorAll('a'), function (a) { if (a.style.display !== 'none') nav.appendChild(a.cloneNode(true)); });
+    var lb = document.createElement('button'); lb.type = 'button'; lb.className = 'btn'; lb.textContent = $('langbtn').textContent; lb.onclick = function () { $('langbtn').click(); lb.textContent = $('langbtn').textContent; }; nav.appendChild(lb);
+    head.parentNode.insertBefore(nav, head.nextSibling);
+    // Decoder-Menü wie auf dem Desktop (dort baut core.js es in die Leiste; hier als aufklappbare Karte im Menü)
+    setTimeout(function () {   // erst nach crabStart(): dann sind die Stationsmerkmale (features) bekannt
+    if (typeof _crabDecLoad === 'function' && !(_crab.features && _crab.features.decoders === false) && !$('mdec')) {
+      var dc = document.createElement('details'); dc.className = 'card'; dc.id = 'mdec';
+      dc.innerHTML = '<summary>Decoder <small data-de="Treffer, hören" data-en="hits, listen">Treffer, hören</small></summary><div class="x1pop" id="x1decpop"><div class="x1popempty">lädt …</div></div>';
+      dc.addEventListener('toggle', function () { if (dc.open) _crabDecLoad(); });
+      dc.addEventListener('click', function (ev) {
+        var a = ev.target.closest ? ev.target.closest('[data-decaudio]') : null;
+        if (a) { ev.preventDefault(); _crabListenDecoder(a.dataset.decaudio, a.dataset.band, Number(a.dataset.freq)); openSheet(false); return; }
+        var b = ev.target.closest ? ev.target.closest('[data-tune]') : null; if (!b) return;
+        ev.preventDefault(); _crabTuneTo(Number(b.dataset.tune), b.dataset.mode); openSheet(false);
+      });
+      setInterval(function () { if (dc.open && document.body.classList.contains('sheet-open')) _crabDecLoad(); }, 5000);
+      panel.insertBefore(dc, sf);
+    }
+    }, 0);
     $('mset').onclick = function () { openSheet(); };
     $('msq').onclick = function () { setSquelch(!_crab.squelchOn); };
     $('mmute').onclick = function () { setMute(); };
+    $('mdown').onclick = function () { freqStep(-1); };
+    $('mup').onclick = function () { freqStep(1); };
+    $('mchat').onclick = function () { if (chatShow) chatShow(!document.body.classList.contains('chat-open')); };
+    // Tastatur (Frequenz, Name, Chat): das feste Menü an den sichtbaren Ausschnitt heften, sonst liegt das Feld hinter der Tastatur (iOS)
+    if (window.visualViewport) {
+      var vv = window.visualViewport, kb = function () {
+        var off = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)), p = document.querySelector('.panel'), cd = $('chatdrawer');
+        p.style.bottom = off ? off + 'px' : ''; p.style.maxHeight = off ? Math.max(160, vv.height - 24) + 'px' : '';
+        if (cd) { cd.style.bottom = off ? (off + 8) + 'px' : ''; cd.style.height = off ? Math.max(140, vv.height - 32) + 'px' : ''; }
+        document.body.classList.toggle('kbd', off > 0);
+      };
+      vv.addEventListener('resize', kb); vv.addEventListener('scroll', kb);
+    }
   }
   function phoneBar() {
     if (!phone) return;
@@ -82,6 +124,7 @@
     wrap.style.height = (Math.round(rx.offsetHeight * scale) + MARKROW) + 'px';   // + Streifen für Hörer-Marken (ui.css)
     renderScales(true);
     try { var tp = document.querySelector('.top'), bd = document.querySelector('.bands'), pn = document.querySelector('.panel'); document.documentElement.style.setProperty('--top-h', (tp.offsetHeight + bd.offsetHeight) + 'px'); document.documentElement.style.setProperty('--panel-h', (pn.offsetHeight + document.querySelector('.foot').offsetHeight) + 'px'); } catch (e) {}
+    try { if (phone) document.documentElement.style.setProperty('--mbar-h', $('mbar').offsetHeight + 'px'); } catch (e) {}
     fillHeight(24);   // große Hysterese: Layout-Rundungen (z. B. Scrollleiste) dürfen keine Neuberechnung auslösen
   }
   /* Wasserfallhöhe „Bildschirm füllen": Empfänger soll den sichtbaren Bereich der Mitte genau ausfüllen (Desktop). */
@@ -113,13 +156,53 @@
   }
   function overrideCore() {
     window.mouseFreq = function (e) { e = e || window.event; return toRx(e.pageX, e.pageY); };
+    // core.js ruft touchFreq beim Aufsetzen des Fingers. Früher stimmte das sofort ab; jetzt merken wir uns nur den Punkt:
+    // ein kurzes Tippen stimmt beim Loslassen ab, ein Ziehen mit einem Finger verschiebt den sichtbaren Ausschnitt
+    // (wie auf einer Karte), zwei Finger zoomen (core.js _crabPinch). Desktop (Maus) ist davon unberührt.
+    var tch = null;   // { x0, y0, x, moved, pinch }
     window.touchFreq = function (ev) {
       ev.preventDefault();
-      for (var i = 0; i < ev.touches.length; i++) {
-        var p = toRx(ev.touches[i].pageX, 0);
-        setFreq((p.x - 512) * khzPerPx + centerfreq - (hi + lo) / 2);
-      }
+      if (ev.touches.length !== 1) { if (tch) tch.pinch = true; return; }
+      var t = ev.touches[0]; tch = { x0: t.pageX, y0: t.pageY, x: t.pageX, moved: false, pinch: false };
     };
+    function panSend() { clearTimeout(tch && tch.timer); try { _crabSendWf(band); } catch (e) {} }
+    // Ausschnitt um dx Seitenpixel verschieben (Finger nach rechts = tiefere Frequenzen rücken ins Bild).
+    // Zeichnet die vorhandenen Zeilen mit, der Server liefert zum neuen Ausschnitt den Verlauf nach.
+    function panBy(dxPage) {
+      var e = bi[band]; if (!e || !e.zoom) return false;   // ganzes Band sichtbar: nichts zu verschieben
+      var bpp = _crabBpp(e.zoom, e), sc = _crabScale(e.zoom, e), span = 1024 * bpp / sc;
+      var ns = Math.max(0, Math.min(e.fft - span, e.start - dxPage / scale * bpp / sc));
+      var dBins = ns - e.start; if (Math.abs(dBins) < bpp / sc) return false;
+      var shift = Math.round(-dBins * sc / bpp);   // Canvas-Pixel
+      e.start = ns; _crabGeom(band);
+      var B = _crab.bands[band];
+      if (B && B.ctx && shift) {
+        var c = B.canvas; B.ctx.drawImage(c, shift, 0); B.ctx.fillStyle = '#000';
+        if (shift > 0) B.ctx.fillRect(0, 0, shift, c.height); else B.ctx.fillRect(c.width + shift, 0, -shift, c.height);
+      }
+      if (B) { B.prev = null; B.liveSinceHist = 0; B.clearOnNext = false; }
+      drawPassband(); renderScales(true); try { loadMarks(band); } catch (err) { try { showMarks(band); } catch (e2) {} }
+      return true;
+    }
+    var wfc = $('waterfalls');
+    wfc.addEventListener('touchstart', function (ev) { if (tch && ev.touches.length > 1) tch.pinch = true; });   // zweiter Finger: kein Tippen mehr
+    wfc.addEventListener('touchmove', function (ev) {
+      if (tch && ev.touches.length > 1) { tch.pinch = true; return; }
+      if (!tch || ev.touches.length !== 1 || tch.pinch) return;
+      var t = ev.touches[0], dx = t.pageX - tch.x;
+      if (!tch.moved && Math.hypot(t.pageX - tch.x0, t.pageY - tch.y0) < 10) return;   // Wackeln beim Tippen ist kein Ziehen
+      tch.moved = true; tch.x = t.pageX; ev.preventDefault();
+      if (panBy(dx)) { clearTimeout(tch.timer); tch.timer = setTimeout(panSend, 120); }   // Server gebündelt nachführen
+    }, { passive: false });
+    wfc.addEventListener('touchend', function (ev) {
+      if (!tch) return;
+      var t = tch; tch = null;
+      if (t.moved) { clearTimeout(t.timer); panSend(); return; }
+      if (t.pinch || ev.touches.length) return;
+      var p = toRx(t.x0, 0);
+      setFreq((p.x - 512) * khzPerPx + centerfreq - (hi + lo) / 2);
+    });
+    wfc.addEventListener('touchcancel', function () { if (tch && tch.moved) panSend(); tch = null; });
     if (window.touchPassband) window.touchPassband = function (ev) {
       ev.preventDefault();
       if (ev.touches.length !== 1) return;
@@ -666,7 +749,11 @@
     for (var i = 0; i < mb.length; i++) mb[i].classList.toggle('active', mb[i].dataset.dec ? !!_crab.decAudio : (mb[i].dataset.mode === mode && !_crab.decAudio));   // in DV leuchtet nur DV
     document.body.classList.toggle('dvmode', !!_crab.decAudio);
     var bb = document.querySelectorAll('#bandbar .band[data-band]');
-    for (var j = 0; j < bb.length; j++) bb[j].classList.toggle('active', Number(bb[j].dataset.band) === band);
+    for (var j = 0; j < bb.length; j++) {
+      var on = Number(bb[j].dataset.band) === band, was = bb[j].classList.contains('active');
+      bb[j].classList.toggle('active', on);
+      if (phone && on && !was && bb[j].scrollIntoView) try { bb[j].scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+    }
     var ms = $('mmode'); if (ms.value !== mode.toLowerCase()) ms.value = mode.toLowerCase();
     renderScales(false);
     applyWfLevels();
@@ -915,10 +1002,15 @@
   /* ================= Handy / Desktop ================= */
   function applyLayout() {
     var p = isPhone();
-    if (p === phone) { fit(); if (phone) setWfHeight(phoneWf()); return; }
+    if (p) document.body.classList.toggle('land', isLand());
+    if (p === phone) {
+      fit();
+      if (phone) { setWfHeight(phoneWf()); fit(); setTimeout(function () { setWfHeight(phoneWf()); fit(); }, 350); }   // Drehen: iOS meldet die neue Höhe erst nach dem Umbruch
+      return;
+    }
     if (layoutInit) { location.reload(); return; }   // Wechsel Handy ↔ Desktop nach dem Start: sauber neu aufbauen
     phone = p;
-    document.body.classList.toggle('phone', phone);
+    document.body.classList.toggle('phone', phone); document.body.classList.toggle('land', phone && isLand());
     if (phone) {
       initPhoneSheet();
       applyView();
@@ -957,7 +1049,7 @@
       x.onerror = function () { cb(0, null); };
       x.send(data ? JSON.stringify(data) : null);
     }
-    function setBadge() { badge.textContent = unread > 99 ? '99+' : String(unread); badge.hidden = !unread || open; }
+    function setBadge() { badge.textContent = unread > 99 ? '99+' : String(unread); badge.hidden = !unread || open; var mb = $('mchatbadge'); if (mb) { mb.textContent = badge.textContent; mb.hidden = badge.hidden; } }
     function add(r) {
       var d = document.createElement('div');
       // Verbund-Chat: fremde Zeilen tragen das Kürzel ihrer Station
@@ -978,7 +1070,7 @@
       });
     }
     function show(o) {
-      open = o; drawer.hidden = !o; btn.classList.toggle('open', o); document.body.classList.toggle('chat-open', o);
+      open = o; drawer.hidden = !o; btn.classList.toggle('open', o); document.body.classList.toggle('chat-open', o); var mc = $('mchat'); if (mc) mc.classList.toggle('open', o);
       if (o) { unread = 0; list.scrollTop = list.scrollHeight; if (!phone && !restoring) setTimeout(function () { drawer.querySelector('input').focus({ preventScroll: true }); }, 50); }
       setBadge(); if (!restoring) try { localStorage.setItem('crab_chat', o ? '1' : '0'); } catch (e) {}
     }
@@ -1050,7 +1142,7 @@
   window.addEventListener('load', function () {
     rx = $('rx'); wrap = $('rxwrap'); scalesBox = $('scales'); lmarks = $('lmarks');
     rx.style.transformOrigin = '0 0';
-    phone = isPhone(); document.body.classList.toggle('phone', phone); if (phone) initPhoneSheet();
+    phone = isPhone(); document.body.classList.toggle('phone', phone); document.body.classList.toggle('land', phone && isLand()); if (phone) initPhoneSheet();
     createCookie('view', targetView(), 3652);
     createCookie('usejava', 'nn', 3652);
     buildBandBar();                        // muss VOR crabStart() laufen: base.js greift auf freqform.group0 zu
@@ -1111,6 +1203,7 @@
     scalesBox.addEventListener('pointermove', function (ev) { if (scalesBox._down) scalePointer(ev); });
     ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (n) { scalesBox.addEventListener(n, function () { scalesBox._down = false; }); });
     var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(applyLayout, 150); });
+    window.addEventListener('orientationchange', function () { clearTimeout(rt); rt = setTimeout(applyLayout, 250); });
     // Handy: Kurzleiste nur zeigen, solange das volle Bedienfeld nicht im Bild ist
     if (window.IntersectionObserver) new IntersectionObserver(function (es) { document.body.classList.toggle('panel-visible', es[0].isIntersecting); }, { threshold: 0.15 }).observe(document.querySelector('.strip'));
     if (window.ResizeObserver) { var ro = new ResizeObserver(function () { fit(); }); ro.observe(rx); ro.observe($('main')); ro.observe(document.querySelector('.panel')); }   // main: Leiste/Fuß/Fonts ändern die freie Höhe nachträglich

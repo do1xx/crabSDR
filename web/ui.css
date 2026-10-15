@@ -331,7 +331,8 @@ body.sticky.allbands .rx-host { position: sticky; top: 0; z-index: 40; backgroun
 .mbar { display: none; }
 
 @media (max-width: 1100px) { .grp-sig { max-width: none; } }
-@media (max-width: 700px) {
+/* Handy = schmal (< 700 px) ODER flach mit Touch (< 500 px hoch: Handy im Querformat). ui.js (PHONE_MQ) nutzt dieselbe Abfrage. */
+@media (max-width: 700px), (max-height: 500px) and (pointer: coarse) {
   body { padding-bottom: calc(60px + var(--sab)); }
   .top { padding: 6px 10px; gap: 6px; }
   .brand h1 { font-size: 14px; } .logo { width: 28px; height: 28px; } .sub { display: none; }
@@ -360,17 +361,19 @@ body.sticky.allbands .rx-host { position: sticky; top: 0; z-index: 40; backgroun
   .grp-freq label.snap { margin-left: 8px; }
   .logform { grid-template-columns: 1fr; } .myname { width: 110px; }
   .mbar {
-    display: grid; grid-template-columns: 1fr auto 40px 40px 40px 40px; gap: 4px; align-items: center;
+    display: grid; grid-template-columns: 1fr auto 44px 44px 44px 44px; gap: 6px; align-items: center;
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; padding: 6px 8px calc(6px + var(--sab));
-    background: var(--barbg); border-top: 1px solid var(--line); backdrop-filter: blur(8px);
+    background: var(--barbg); border-top: 1px solid var(--line); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
-  .mbar .btn { min-width: 40px; padding: 6px 0; font-size: 16px; }
-  .mfreq { background: var(--bg2); color: var(--accent); border: 1px solid var(--line); border-radius: var(--radius); font: 700 18px/1 "JetBrains Mono", monospace; padding: 9px 8px; text-align: left; min-height: 40px; }
-  .mmode { min-width: 70px; }
-  .mrow { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; }
-  .mmeter { flex: 1; position: relative; height: 3px; background: var(--bg2); border-radius: 2px; overflow: hidden; }
+  .mbar .btn { min-width: 44px; min-height: 44px; padding: 0; font-size: 17px; line-height: 1; }   /* Fingerziele ≥ 44 px (Apple HIG) */
+  .mfreq { background: var(--bg2); color: var(--accent); border: 1px solid var(--line); border-radius: var(--radius); font: 700 20px/1 "JetBrains Mono", monospace; padding: 0 8px; text-align: left; min-height: 44px; font-variant-numeric: tabular-nums; }
+  .mmode { min-width: 74px; min-height: 44px; font-size: 14px; font-weight: 600; }
+  .mrow { grid-column: 1 / -1; display: flex; align-items: center; gap: 6px; }
+  .mrow .mstep { font-size: 20px; font-weight: 600; }
+  .mmeter { flex: 1; position: relative; height: 4px; background: var(--line2); border-radius: 2px; overflow: hidden; }
   .mtext { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .audio-ready .mbar { grid-template-columns: 1fr auto 40px 40px 40px; }
+  .mchat.open { border-color: var(--accent); color: var(--accent); }
+  .audio-ready .mbar { grid-template-columns: 1fr auto 44px 44px 44px; }
 }
 
 /* Aufnahme */
@@ -420,46 +423,110 @@ body.sticky.allbands .rx-host { position: sticky; top: 0; z-index: 40; backgroun
 .sharebtn { white-space: nowrap; }
 @media (max-width: 1400px) and (min-width: 700px) { .sharebtn span { display: none; } }
 
-/* ===== Handy-Aufbau (ui.js setzt body.phone): Wasserfall füllt den Bildschirm, feste Leiste unten, Einstellungen als
-   Menü von unten (body.sheet-open). Kopf nur Logo, Name der Station, Ton, Sprache und Reiter. ===== */
-@media (max-width: 700px) {
-  body.phone { padding-bottom: 0; overflow: hidden; height: 100dvh; }
-  body.phone .top #myname, body.phone .top .users, body.phone .top #chatbtn, body.phone .top #themebtn { display: none; }
-  body.phone .top { flex-wrap: nowrap; padding-top: calc(4px + env(safe-area-inset-top, 0px)) !important; }   /* PWA: Statusleiste des Handys nicht überdecken (look.css setzt padding, deshalb !important) */
-  body.phone .sheetback, body.phone .chatdrawer { top: auto; }
-  body.phone .top #audiobtn { display: none; }   /* Ton-Knopf gibt es unten in der Leiste */
-  body.phone .top .topright { flex-wrap: nowrap; }
-  body.phone .tabs.phonetabs { display: flex; gap: 2px; padding: 0 8px 4px; border-bottom: 1px solid var(--line2); }
-  body.phone .tabs.phonetabs .btn { flex: 1; text-align: center; padding: 5px 4px; font-size: 12px; }
-  body.phone .rx-host { flex: 1 1 auto; min-height: 0; padding-top: 4px; padding-bottom: 0; }
-  body.phone .foot { display: none; }
-  /* Einstellungen: Menü von unten */
-  body.phone .panel {
-    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; max-height: min(82dvh, 100dvh - 60px); overflow-y: auto; -webkit-overflow-scrolling: touch;
-    background: var(--bg); border-top: 1px solid var(--line); border-radius: 12px 12px 0 0; box-shadow: 0 -8px 24px rgba(0,0,0,.45);
-    transform: translateY(102%); transition: transform .22s ease-out; padding: 0 12px calc(12px + var(--sab));
-  }
-  body.phone.sheet-open .panel { transform: none; }
-  body.phone .sheetback { display: none; position: fixed; inset: 0; z-index: 55; background: rgba(0,0,0,.45); }
-  body.phone.sheet-open .sheetback { display: block; }
-  .sheethead { display: flex; align-items: center; gap: 8px; padding: 10px 0 8px; position: sticky; top: 0; background: var(--bg); z-index: 1; border-bottom: 1px solid var(--line2); margin-bottom: 8px; }
-  .sheethead .sheettitle { display: none; }
-  .sheethead .myname { flex: 1 1 auto; min-width: 0; width: auto; }
-  .sheethead .users { white-space: nowrap; font-size: 11px; color: var(--muted); }
-  .sheethead .btn { flex: 0 0 auto; }
-  .sheetfoot { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--line2); font-size: 10px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; }
-  body.phone .panel .strip { gap: 10px 12px; }
-  body.phone .panel .grp-vol, body.phone .panel .grp-sig { flex: 1 1 100%; }
-  /* Leiste unten */
-  body.phone .mbar { grid-template-columns: 1fr auto 40px 40px 40px 40px; }
-  body.phone.audio-ready .mbar { grid-template-columns: 1fr auto 40px 40px 40px; }
-  body.phone .mbar .btn { font-size: 14px; }
-  body.phone .mbar .msq.active { border-color: var(--accent); color: var(--accent); font-weight: 700; }
-  body.phone .mbar .msq.open { background: var(--accent-dim); }
-  body.phone .mbar .mmute.active { border-color: #f87171; color: #f87171; }
-  /* Chat als Fenster über der Leiste */
-  body.phone .chatdrawer { position: fixed; left: 8px; right: 8px; bottom: calc(66px + var(--sab)); height: 48vh; margin: 0; z-index: 58; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); box-shadow: 0 -8px 24px rgba(0,0,0,.45); }
+/* ===== Handy-Aufbau (ui.js setzt body.phone, im Querformat zusätzlich body.land): Wasserfall füllt den Bildschirm, feste
+   Leiste unten (quer: schmale Spalte rechts), Einstellungen als Menü von unten (body.sheet-open). Kopf nur Logo, Name der
+   Station, Sprache und Reiter. Die Regeln hängen an body.phone, nicht an der Breite – ein Handy quer ist 850–930 px breit. ===== */
+body.phone { padding-bottom: 0; overflow: hidden; height: 100dvh; overscroll-behavior: none; -webkit-touch-callout: none; }
+body.phone .top #myname, body.phone .top .users, body.phone .top #chatbtn, body.phone .top #themebtn { display: none; }
+body.phone .top { flex-wrap: nowrap; padding-top: calc(4px + env(safe-area-inset-top, 0px)) !important; padding-left: calc(8px + env(safe-area-inset-left, 0px)); padding-right: calc(8px + env(safe-area-inset-right, 0px)); }   /* PWA: Statusleiste des Handys nicht überdecken (look.css setzt padding, deshalb !important) */
+body.phone .top .btn { min-height: 38px; }
+body.phone .sheetback, body.phone .chatdrawer { top: auto; }
+body.phone .top #audiobtn { display: none; }   /* Ton-Knopf gibt es unten in der Leiste */
+body.phone .top .topright { flex-wrap: nowrap; }
+body.phone .tabs.phonetabs { display: flex; gap: 2px; padding: 0 8px 0; border-bottom: 1px solid var(--line2); }
+body.phone .tabs.phonetabs .btn { flex: 1; text-align: center; justify-content: center; padding: 8px 4px; min-height: 40px; font-size: 12px; }
+body.phone .bands { padding: 0 6px; gap: 0; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; scroll-snap-type: x proximity; }
+body.phone .bands::-webkit-scrollbar { display: none; }
+body.phone .band { flex: 0 0 auto; min-height: 40px; padding: 9px 12px 8px; white-space: nowrap; scroll-snap-align: center; }
+body.phone .band > small, body.phone .band b small { display: none; }
+body.phone .main { display: contents; }
+body.phone .rx-host { flex: 1 1 auto; min-height: 0; padding: 4px 10px 0; }
+body.phone .rx { -webkit-user-select: none; user-select: none; }
+body.phone .foot, body.phone.land .foot { display: none !important; }   /* look.css: display:flex */
+body.phone .mbar { display: grid; }
+body.phone .toast { top: auto; bottom: calc(var(--mbar-h, 104px) + 14px + var(--sab)); max-width: calc(100% - 24px); }
+/* Einstellungen: Menü von unten */
+body.phone .panel {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; max-height: min(84dvh, 100dvh - 56px); overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  background: var(--bg); border-top: 1px solid var(--line); border-radius: 12px 12px 0 0; box-shadow: 0 -8px 24px rgba(0,0,0,.45);
+  transform: translateY(102%); transition: transform .22s ease-out; padding: 0 calc(12px + env(safe-area-inset-right, 0px)) calc(12px + var(--sab)) calc(12px + env(safe-area-inset-left, 0px));
 }
+body.phone.sheet-open .panel { transform: none; }
+body.phone .sheetback { display: none; position: fixed; inset: 0; z-index: 55; background: rgba(0,0,0,.45); }
+body.phone.sheet-open .sheetback { display: block; }
+.sheethead { display: flex; align-items: center; gap: 8px; padding: 8px 0 8px; position: sticky; top: 0; background: var(--bg); z-index: 1; border-bottom: 1px solid var(--line2); margin-bottom: 8px; }
+.sheethead::before { content: ""; position: absolute; left: 50%; top: 3px; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--line); }   /* Griff */
+.sheethead .sheettitle { display: none; }
+.sheethead .myname { flex: 1 1 auto; min-width: 0; width: auto; }
+.sheethead .users { white-space: nowrap; font-size: 11px; color: var(--muted); }
+.sheethead .btn { flex: 0 0 auto; }
+.sheetnav { display: none; gap: 4px; margin: -4px 0 10px; }
+.sheetnav .btn { flex: 1; text-align: center; }
+body.phone.land .sheetnav { display: flex; }
+.sheetfoot { margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--line2); font-size: 10px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+body.phone .panel .strip { display: flex; flex-wrap: wrap; gap: 12px 12px; }
+body.phone .panel .grp-vol, body.phone .panel .grp-sig { flex: 1 1 100%; }
+/* Fingerziele im Menü: alles mindestens 40 px hoch (look.css setzt 30 px), Schieberegler mit größerem Griff */
+body.phone .panel .btn, body.phone .panel select, body.phone .panel input[type=text], body.phone .panel .toggle span, body.phone .panel .memories input[type=button] { min-height: 40px; }
+body.phone .panel .bwpresets .btn { min-height: 40px; padding: 2px 4px; }
+body.phone .panel .steps .btn, body.phone .panel .bw .btn, body.phone .panel .wfbtns .btn { min-width: 44px; }
+body.phone .panel .freqform input[name=frequency] { font-size: 16px; }   /* iOS zoomt bei Feldern unter 16 px hinein */
+body.phone .panel input[type=range] { min-height: 32px; flex: 1; min-width: 100px; }
+body.phone .panel #volumecontrol2 { min-height: 36px; }
+body.phone .panel .sqrow { flex: 1 1 100%; }
+body.phone .panel .toggles { gap: 6px; }
+body.phone .panel .presetrow { flex-wrap: wrap; gap: 6px; }
+body.phone .panel .presetrow .presetsel { flex: 1 1 180px; min-width: 0; max-width: none; }
+body.phone .panel .presetrow #flistbtn { flex: 0 0 auto; }
+body.phone .panel .presetrow .segsel { flex: 1 1 100%; max-width: none; margin: 0; }
+body.phone .panel .toggles .sqrow { order: 5; }   /* Squelch und Stumm nebeneinander, der Regler darunter */
+body.phone .panel details.card { margin-top: 4px; }
+body.phone .panel .x1pop { display: block; position: static; min-width: 0; max-width: none; max-height: none; box-shadow: none; border: 0; padding: 0; background: transparent; }
+body.phone .panel .x1pophead { display: none; }
+/* Leiste unten */
+body.phone .mbar { grid-template-columns: 1fr auto 44px 44px 44px 44px; padding-left: calc(8px + env(safe-area-inset-left, 0px)); padding-right: calc(8px + env(safe-area-inset-right, 0px)); }
+body.phone.audio-ready .mbar { grid-template-columns: 1fr auto 44px 44px 44px; }
+body.phone .mbar .btn { font-size: 15px; min-height: 44px; padding: 0; }   /* look.css setzt 30 px */
+body.phone .mbar .mmode { min-height: 44px; padding: 0 4px; }
+body.phone .mbar .mstep { font-size: 20px; }
+body.phone .mbar .msq.active { border-color: var(--accent); color: var(--accent); font-weight: 700; }
+body.phone .mbar .msq.open { background: var(--accent-dim); }
+body.phone .mbar .mmute.active { border-color: #f87171; color: #f87171; }
+/* Chat als Fenster über der Leiste */
+body.phone .chatdrawer { position: fixed; left: 8px; right: 8px; bottom: calc(var(--mbar-h, 104px) + 6px + var(--sab)); height: 48vh; height: 48dvh; margin: 0; z-index: 58; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); box-shadow: 0 -8px 24px rgba(0,0,0,.45); }
+body.phone .chatdrawer .chatgrip { display: none; }
+body.phone .chatform input[name=chat] { font-size: 16px; }
+
+/* Querformat (body.land): Kopf und Reiter weg, Bandleiste oben, Wasserfall füllt die Höhe, Leiste als Spalte rechts
+   (zwei Knöpfe je Zeile). Links/rechts bleibt Platz für Notch und Rand (safe-area). Reiter, Sprache und Hell/Dunkel
+   stehen dann im Menü. */
+body.phone.land { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr); padding-left: env(safe-area-inset-left, 0px); }
+body.phone.land .top, body.phone.land .tabs.phonetabs, body.phone.land #x1banner { display: none; }
+body.phone.land .bands { grid-column: 1; grid-row: 1; padding: 0 4px; }
+body.phone.land .band { min-height: 34px; padding: 6px 10px 5px; }
+body.phone.land .rx-host { grid-column: 1; grid-row: 2; padding: 2px 6px 4px; min-height: 0; }
+body.phone.land .mbar {
+  position: static; grid-column: 2; grid-row: 1 / 3; align-self: stretch; align-content: start;
+  display: grid; grid-template-columns: 1fr 1fr; grid-auto-rows: 38px; gap: 5px; width: 122px; overflow-y: auto; scrollbar-width: none;
+  padding: 5px calc(5px + env(safe-area-inset-right, 0px)) calc(5px + var(--sab)) 5px; border-top: 0; border-left: 1px solid var(--line); backdrop-filter: none;
+}
+body.phone.land .mbar::-webkit-scrollbar { display: none; }
+body.phone.land .mbar .btn { min-width: 0; min-height: 38px; }
+body.phone.land .mfreq, body.phone.land .mmode, body.phone.land .mrow { grid-column: 1 / -1; }
+body.phone.land .mfreq { font-size: 16px; text-align: center; padding: 0 2px; min-height: 38px; }
+body.phone.land .mmode { min-height: 38px; }
+body.phone.land.audio-ready .mset { grid-column: 1 / -1; }
+body.phone.land .mrow { display: contents; }   /* Kinder sitzen direkt im Spaltenraster: − + nebeneinander, Pegel, Chat */
+body.phone.land .mrow .mdown { order: 1; } body.phone.land .mrow .mup { order: 2; }
+body.phone.land .mrow .mmeter { order: 3; grid-column: 1 / -1; height: 4px; align-self: center; }
+body.phone.land .mrow .mtext { display: none; }
+body.phone.land .mrow .mchat { order: 4; grid-column: 1 / -1; }
+body.phone.land .mbar > .mrow + * { order: 5; }
+body.phone.land .fscale { height: 22px; } body.phone.land .fscale b { font-size: 10px; top: 3px; }
+body.phone.land .panel { max-height: calc(100dvh - 6px); border-radius: 10px 10px 0 0; }
+body.phone.land .chatdrawer { left: calc(8px + env(safe-area-inset-left, 0px)); right: calc(130px + env(safe-area-inset-right, 0px)); top: 8px; bottom: 8px; height: auto; }
+body.phone.land .toast { bottom: 16px; left: calc(50% - 61px); }
+body.phone.land .keyhelp-box.flist-box { max-height: calc(100dvh - 16px); }
 
 /* ===== Minimal-Ansicht (?ui=min): nur Frequenz, Betriebsart, Bandbreite, Pegel – für viele Tabs nebeneinander ===== */
 body.min #bandbar, body.min #waterfalls, body.min #scales, body.min .x1row.x1tools, body.min #chatdrawer, body.min #chatbtn,

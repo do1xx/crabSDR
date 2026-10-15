@@ -407,7 +407,7 @@ function _crabPinch(ev, start) {
   var a = ev.touches[0], b = ev.touches[1], d = Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY);
   if (start || !_crab.pinch) { _crab.pinch = d; return; }
   var r = d / _crab.pinch;
-  if (r > 1.25) { setZoom(0); _crab.pinch = d; } else if (r < 0.8) { setZoom(1); _crab.pinch = d; }
+  if (r > 1.5) { setZoom(0); _crab.pinch = d; } else if (r < 0.67) { setZoom(1); _crab.pinch = d; }   // eine Stufe = halber Ausschnitt, also etwa doppelter Fingerabstand (vorher 1,25: vier Stufen je Geste)
 }
 function touchPassband(ev) { ev.preventDefault(); if (ev.touches.length !== 1) return; setFreq(dragStartVal + (ev.touches[0].pageX - dragStartX) * khzPerPx); }
 function keydown(e) { return true; }
@@ -911,7 +911,7 @@ function _crabLoadLook() {
       a.title = 'crabSDR – Sysop-Bereich'; a.setAttribute('aria-label', 'crabSDR – Sysop-Bereich'); a.innerHTML = '<span class="crabemoji" aria-hidden="true">🦀</span>'; foot.appendChild(a); }
   }
   if (!document.getElementById('crab-look-css')) {
-    var l = document.createElement('link'); l.id = 'crab-look-css'; l.rel = 'stylesheet'; l.href = 'look.css?v=9'; document.head.appendChild(l);
+    var l = document.createElement('link'); l.id = 'crab-look-css'; l.rel = 'stylesheet'; l.href = 'look.css?v=10'; document.head.appendChild(l);
   }
 }
 

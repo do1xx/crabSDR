@@ -12,7 +12,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="{{STATION_NAME}}">
-<link rel="stylesheet" href="ui.css?v=64">
+<link rel="stylesheet" href="ui.css?v=65">
 <link rel="stylesheet" href="account.css?v=1">
 <script>
 // Einstellungen der Vorversion übernehmen (Schlüssel gartow_… und 1xx_… werden zu crab_…)
@@ -28,7 +28,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </script>
 <script>(function(){var t=null;try{t=localStorage.getItem('crab_token')}catch(e){}document.write('<script src="bandinfo.js?_=' + Date.now() + (t ? '&token=' + encodeURIComponent(t) : '') + '"><\/script>');})();</script>
 <script>window.STATION_NAME = '{{STATION_NAME_JS}}';</script>
-<script src="core.js?v=97"></script>
+<script src="core.js?v=98"></script>
 </head>
 <body class="hoeren">
 
@@ -295,7 +295,12 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
   <button class="btn mmute" id="mmute" type="button" aria-label="Stumm" title="Stumm">🔇</button>
   <button class="btn mset" id="mset" type="button" aria-label="Einstellungen" title="Einstellungen">☰</button>
   <button class="btn btn-accent audio-btn" id="maudio" type="button" aria-label="Ton einschalten">🔊</button>
-  <div class="mrow"><div class="mmeter"><div class="smeter-fill" id="mfill"></div></div><span class="mtext" id="mtext"></span></div>
+  <div class="mrow">
+    <button class="btn mstep" id="mdown" type="button" aria-label="Schritt runter" title="Schritt runter">−</button>
+    <div class="mmeter"><div class="smeter-fill" id="mfill"></div></div><span class="mtext" id="mtext"></span>
+    <button class="btn mstep" id="mup" type="button" aria-label="Schritt hoch" title="Schritt hoch">+</button>
+    <button class="btn mchat chatbtn" id="mchat" type="button" aria-label="Chat" title="Chat mit den anderen Hörern">💬<b id="mchatbadge" hidden></b></button>
+  </div>
 </div>
 
 <!-- Unsichtbare Felder: Hörername (Cookie) und Zähler, die core.js füllt -->
@@ -305,7 +310,7 @@ P.prototype=W.prototype;P.CONNECTING=W.CONNECTING;P.OPEN=W.OPEN;P.CLOSING=W.CLOS
 </div>
 </div>
 
-<script src="ui.js?v=82"></script>
+<script src="ui.js?v=83"></script>
 <script src="account.js?v=1"></script>
 </body>
 </html>

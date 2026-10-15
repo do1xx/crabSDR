@@ -4,6 +4,28 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 
 ## Unveröffentlicht
 
+### Handy-Ansicht (iPhone und Android)
+- **Querformat ist jetzt eine Handy-Ansicht.** Ein Handy quer (850–930 px breit, nur 350–400 px hoch) landete bisher in der
+  Desktop-Ansicht: dreizeilige Bedienleiste, Wasserfall als schmaler Streifen. Jetzt gilt „Handy“ auch bei Touch und
+  weniger als 500 px Höhe (gleiche Abfrage in `ui.css`, `look.css` und `ui.js`): Bandleiste oben, Wasserfall über die
+  volle Höhe, die Bedienleiste als schmale Spalte rechts (Frequenz, Betriebsart, SQ, Stumm, Menü, Ton, −/+, Chat),
+  Notch und Rand über `safe-area`. Reiter (Logbuch, Info) und Sprache stehen im Querformat oben im Menü. Drehen baut
+  die Ansicht ohne Neuladen um – Ton und Verbindung laufen weiter.
+- **Wasserfall mit dem Finger:** Tippen stimmt ab (beim Loslassen, mit Raster), Ziehen mit einem Finger verschiebt den
+  Ausschnitt wie auf einer Karte (bisher ging das nur über Zoom raus/rein), zwei Finger zoomen – jetzt eine Stufe je
+  Verdopplung des Fingerabstands (vorher vier Stufen je Geste).
+- **Leiste unten:** alle Ziele 44 px hoch (vorher 30), zweite Zeile mit Schritt-Knöpfen −/+ (ein Kanal im Raster), Pegel
+  und Chat-Knopf mit Zähler – der Chat war auf dem Handy nur über das Menü erreichbar. Der Wasserfall lag 10 px unter der
+  Leiste (die feste Leiste wurde nicht mitgerechnet), jetzt endet er darüber.
+- **Menü (Einstellungen):** Knöpfe, Auswahlfelder und Umschalter mindestens 40 px (look.css hatte 30 px), Schnellwahl und
+  „Liste“ nebeneinander, Bereich darunter, Squelch und Stumm nebeneinander mit dem Regler darunter, Frequenzfeld 16 px
+  (iOS zoomt sonst hinein), Griff im Kopf. Neu: Karte „Decoder“ mit Zustand, letzten Treffern, „Hören“ und dekodiertem
+  Ton – wie das Decoder-Menü der Desktop-Leiste (Stationen mit Decodern).
+- **Tastatur:** öffnet sich die Tastatur (Frequenz, Name, Chat), heftet sich das Menü bzw. der Chat an den sichtbaren
+  Ausschnitt (`visualViewport`) – auf iOS lag das Feld bisher hinter der Tastatur.
+- Reiter und Bandleiste 40 px hoch, aktives Band rollt in der Bandleiste ins Bild, Chat sitzt über der Leiste,
+  Hinweise (Toast) darüber, kein Überscrollen/„Pull to refresh“ beim Ziehen im Wasserfall.
+
 ### iPhone und iPad
 - **Ton auf iOS zuverlässig:** der Stummschalter machte Web-Audio lautlos (eine stille Tonschleife hält die Sitzung jetzt in
   der Wiedergabe-Kategorie), nach Anruf, Siri, Sperre oder App-Wechsel blieb der Ton aus (Zustand „interrupted“ wird jetzt
