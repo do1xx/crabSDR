@@ -171,6 +171,7 @@ erscheinen auf der Seite **Digital** und unter `/api/decoders`.
 | `enabled` | `true` | Decoder aus, Daten bleiben sichtbar |
 | `public` | `true` | `false` = Ergebnisse nur für Admins und Benutzer, denen der Decoder zugeteilt ist |
 | `options` | – | Einstellungen des Plugins, z. B. `options = { depth = "2" }` |
+| `options` (APRS-Objekt) | – | zusätzlicher Punkt auf der APRS-Karte, z. B. ein Clubabend: `object_name` (≤ 9 Zeichen), `object_comment` (≤ 43 Zeichen), `object_symbol` (Standard `\?` = Info), `object_lat`/`object_lon` (Standard Stationsstandort), `object_every` (Minuten, Standard 30). Nur an APRS-IS, nie per Funk |
 
 Mehrere Einträge desselben Plugins sind erlaubt (SSTV auf 145,800 und 144,900).
 

@@ -6,7 +6,9 @@ iGate (Empfangenes an APRS-IS / aprs.fi weitergeben, nie per Funk senden): igate
 mycall; der APRS-IS-Passcode wird nach dem üblichen öffentlichen Verfahren aus dem Rufzeichen berechnet, optional
 igate_passfile), igate_server (Standard euro.aprs2.net). Bake: lat, lon (Dezimalgrad, Standard: Standort aus [station]),
 symbol (Standard R&), comment,
-every (Minuten, Standard 30).
+every (Minuten, Standard 30). Zusätzliches APRS-Objekt (z. B. Clubtreffen, nur an APRS-IS): object_name (höchstens 9
+Zeichen), object_comment (höchstens 43 Zeichen), object_symbol (Standard \\? = Info), object_lat/object_lon (Standard
+Stationsstandort), object_every (Minuten, Standard 30).
 Für die Seite „Digital" schreibt es alle 60 s aprs.json und relais.json in den Datenordner (aprssummary.py).
 """
 import csv, json, os, subprocess, sys, threading, time
@@ -45,6 +47,17 @@ if (igate_on or passfile) and call.upper().split("-")[0] not in ("N0CALL", "NOCA
             sym = O("symbol", "R&")
             symarg = 'symbol="%s"' % sym if sym[0] in "/\\" else 'symbol="\\%s" overlay=%s' % (sym[1], sym[0])
             lines.append('PBEACON sendto=IG delay=0:30 every=%s lat=%s long=%s %s comment="%s"' % (O("every", "30"), lat, lon, symarg, O("comment", "crabSDR iGate").replace('"', "'")))
+            # Objekt (eigener Punkt auf der Karte, z. B. Clubabend): Name ≤ 9, Text ≤ 43 Zeichen (APRS-Grenzen), nur an APRS-IS
+            oname = O("object_name").strip()
+            if oname:
+                if len(oname) > 9: sys.stderr.write("aprs: object_name auf 9 Zeichen gekürzt\n"); oname = oname[:9]
+                ocom = O("object_comment", "").replace('"', "'")
+                if len(ocom) > 43: sys.stderr.write("aprs: object_comment auf 43 Zeichen gekürzt\n"); ocom = ocom[:43]
+                osym = O("object_symbol", "\\?")
+                osymarg = 'symbol="%s"' % osym if osym[0] in "/\\" else 'symbol="\\%s" overlay=%s' % (osym[1], osym[0])
+                lines.append('OBEACON sendto=IG delay=1:00 every=%s objname="%s" lat=%s long=%s %s comment="%s"'
+                             % (O("object_every", "30"), oname, O("object_lat") or lat, O("object_lon") or lon, osymarg, ocom))
+                sys.stderr.write("aprs: Objekt %s wird alle %s min gemeldet\n" % (oname, O("object_every", "30")))
         sys.stderr.write("aprs: iGate an %s als %s\n" % (O("igate_server", "euro.aprs2.net"), call))
 with open(conf, "w") as f:
     f.write("\n".join(lines) + "\n")

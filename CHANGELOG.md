@@ -2,6 +2,11 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Decoder
+- APRS-iGate kann ein zusätzliches Objekt melden (`object_name`, `object_comment`, …), z. B. den Clubabend als eigenen Punkt auf der APRS-Karte.
+
 ## 1.5.0 – 2026-10-15
 
 RADE-Rufzeichen, SSTV-Korrektur, neuestes Bild als feste Adresse, Rechtstexte, Rauschsperre ohne Fahne, FM-Klang,
