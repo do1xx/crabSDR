@@ -97,8 +97,9 @@ def main():
         if not r:
             # Diagnose: SSTV-Vorlauf (1900 Hz) gehört, aber kein gültiger VIS-Kopf – melden und die 2 s als WAV ablegen,
             # damit sich ein verpasstes Bild nachträglich untersuchen lässt (höchstens alle 15 s, höchstens --misses Dateien)
-            lm = sstvdec.leader_ms(xf, FS)
-            if lm >= 250 and time.time() - miss_last > 15:
+            lm, lend = sstvdec.leader_run(xf, FS)
+            # Vorlauf muss >= 600 ms vor dem Pufferende geendet haben, sonst ist der VIS einfach noch nicht da
+            if lm >= 250 and lend <= len(ring) * 1000 // FS - 600 and time.time() - miss_last > 15:
                 miss_last = time.time(); miss_n += 1
                 fn = ""
                 if miss_n <= a.misses:

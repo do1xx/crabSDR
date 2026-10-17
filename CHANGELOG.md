@@ -5,6 +5,14 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 ## Unveröffentlicht
 
 ### Decoder
+- **SSTV erkennt auch schwache Bilder:** Der VIS-Sucher verlangte lückenlose 1-ms-Läufe auf 1200 Hz, mit Rauschen riss das an
+  einer einzigen Millisekunde ab – nur sehr starke Signale kamen durch (gemessen mit echtem Empfängerrauschen von DF0HHH:
+  Grenze 12 dB S/N breitbandig). Jetzt Bandpass vor der Frequenzmessung (900–2600 Hz für den Kopf, 700–3000 Hz fürs Bild,
+  der Rohton des Diskriminators rauscht sonst flach bis 12 kHz mit) und Fensterbewertung (Mittel über das Startbit, Anteil
+  1900 Hz im Vorlauf, Median je Bit, Plausibilität der Bits, Parität, Stoppbit): Grenze 0 dB, keine Fehlalarme in 90 s
+  Rauschen. Mit der Vollkette (`tools/fake_rtl_fm.py`, Robot 36 bei ≈12 dB im Kanal) sauber decodiert.
+- SSTV: Option `dump = <Sekunden>` schneidet den Eingangston ab Start als WAV mit (Diagnose des Decoder-Pfads);
+  `tools/fake_rtl_fm.py` = nachgebauter rtl_tcp, der eine WAV-Datei FM-moduliert (Decoder-Tests ohne Hardware).
 - SSTV: hört der Lauscher den 1900-Hz-Vorlauf, kann aber keinen VIS-Kopf lesen, meldet er das (`vis_miss`) und legt die zwei
   Sekunden als WAV im Bildordner ab (`misses`, Standard 20 Dateien), damit verpasste Bilder untersucht werden können.
 - Pager-Seite: Rufliste nutzt die Fensterhöhe; Klick auf einen RIC rechts zeigt nur dessen Rufe, bis zu 60 RICs.

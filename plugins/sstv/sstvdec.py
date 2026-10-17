@@ -45,15 +45,26 @@ def duration_s(vis):
     return lines * line_ms(m) / 1000 + (m["sync"] / 1000 if m["kind"] == "scottie" else 0) + 1.0
 
 
-def freq_track(x, fs):
+# Bandpass vor der Frequenzmessung: SSTV liegt zwischen 1100 Hz (VIS-Bit) und 2300 Hz (Weiß). Der Rohton des
+# FM-Diskriminators rauscht flach bis 12 kHz – ohne Bandpass geht das alles in die Momentanfrequenz, und nur sehr
+# starke Signale wurden erkannt (gemessen mit echtem Empfängerrauschen: Grenze 12 dB S/N breitbandig, mit Bandpass
+# 0 dB). Kopf-Suche enger als die Bilddecodierung, damit Zeilen scharf bleiben (Flanken ~0,4 ms).
+BAND_VIS = (900.0, 2600.0)
+BAND_IMAGE = (700.0, 3000.0)
+
+
+def freq_track(x, fs, band=BAND_IMAGE):
     """Momentanfrequenz (Hz) je Sample über das analytische Signal (FFT-Hilbert, keine Spiegelfrequenzen),
-    danach leichte Glättung (~0,3 ms)."""
+    Bandpass `band` (Hz, Flanken 150 Hz) im Spektrum, danach leichte Glättung (~0,3 ms)."""
     x = np.asarray(x, dtype=np.float64)
     n = len(x)
     X = np.fft.rfft(x)
     # analytisches Signal: einseitiges Spektrum
     h = np.zeros(n // 2 + 1); h[0] = 1.0; h[1:] = 2.0
     if n % 2 == 0: h[-1] = 1.0
+    if band is not None:
+        fr = np.fft.rfftfreq(n, 1 / fs); lo, hi = band; edge = 150.0
+        h = h * np.clip((fr - (lo - edge)) / edge, 0, 1) * np.clip(((hi + edge) - fr) / edge, 0, 1)
     xa = np.fft.ifft(np.concatenate((X * h, np.zeros(n - (n // 2 + 1), dtype=complex))))[:n] if False else np.fft.irfft(X * h, n) + 1j * np.fft.irfft(X * h * (-1j) * np.sign(np.arange(n // 2 + 1)), n)
     ph = np.angle(xa[1:] * np.conj(xa[:-1]))
     f = ph * fs / (2 * np.pi)
@@ -62,49 +73,67 @@ def freq_track(x, fs):
     return np.convolve(f, np.ones(k) / k, mode="same")
 
 
-def leader_ms(x, fs, f=None):
-    """Längster zusammenhängender 1900-Hz-Vorlauf in ms (Diagnose: Kopf gehört, aber VIS nicht lesbar)."""
-    if f is None: f = freq_track(x, fs)
+def leader_run(x, fs, f=None):
+    """Längster zusammenhängender 1900-Hz-Vorlauf: (Dauer ms, Ende in ms ab Pufferanfang). Diagnose: Kopf gehört,
+    aber VIS nicht lesbar – ein Vorlauf, der bis ans Pufferende reicht, zählt nicht, der VIS kommt dann erst noch."""
+    if f is None: f = freq_track(x, fs, BAND_VIS)
     b = max(1, int(fs * 0.001)); nb = len(f) // b
-    if nb < 10: return 0
+    if nb < 10: return 0, 0
     blk = np.median(f[:nb * b].reshape(nb, b), axis=1)
     on = np.abs(blk - 1900) < 120
-    best = run = 0
-    for v in on:
+    best = run = 0; best_end = 0
+    for i, v in enumerate(on):
         run = run + 1 if v else 0
-        if run > best: best = run
-    return int(best)
+        if run > best: best, best_end = run, i + 1
+    return int(best), int(best_end)
+
+
+def leader_ms(x, fs, f=None):
+    return leader_run(x, fs, f)[0]
 
 
 def find_vis(x, fs, f=None, start=0):
     """Sucht den VIS-Kopf: >=150 ms 1900 Hz, Startbit 1200 Hz (30 ms), 8 Bits (1100=1/1300=0, LSB zuerst, Bit 7 = gerade Parität), Stopbit.
-    Liefert (vis, index des VIS-Endes) oder None."""
-    if f is None: f = freq_track(x, fs)
+    Liefert (vis, index des VIS-Endes) oder None.
+    Bewertet Fenster (Mittel über das 30-ms-Startbit, Anteil 1900 Hz im Vorlauf, Median je Bit) statt lückenloser
+    1-ms-Läufe: mit Rauschen riss ein Lauf an einer einzigen Millisekunde ab, und nur sehr starke Signale wurden
+    erkannt (gemessen mit echtem Empfängerrauschen: Grenze 12 dB S/N breitbandig, jetzt 0 dB, 17.10.)."""
+    if f is None: f = freq_track(x, fs, BAND_VIS)
     b = max(1, int(fs * 0.001))                      # 1-ms-Blöcke
     nb = len(f) // b
+    if nb < 340: return None
     blk = np.median(f[:nb * b].reshape(nb, b), axis=1)
-    is1200 = np.abs(blk - 1200) < 50           # eng: 1100/1300 sind die VIS-Bits, keine Syncs
-    is1900 = np.abs(blk - 1900) < 120
-    i = max(start // b, 160)
-    while i < nb - 330:
-        if is1200[i] and not is1200[i - 1]:
-            j = i
-            while j < nb and is1200[j]: j += 1
-            run = j - i
-            if 18 <= run <= 45 and is1900[i - 150:i - 5].mean() > 0.6:
-                bits = []
-                for k in range(8):
-                    c = j + 15 + 30 * k
-                    v = np.median(blk[c - 6:c + 6])
-                    bits.append(1 if v < 1200 else 0)
-                vis = sum(bit << k for k, bit in enumerate(bits[:7]))
-                par = sum(bits[:7]) % 2
-                stop = j + 30 * 8
-                if par == bits[7] and is1200[stop + 3:stop + 27].mean() > 0.6:
-                    return vis, (stop + 30) * b
-            i = j
-        else:
-            i += 1
+    cs = np.concatenate(([0.0], np.cumsum(blk)))
+    c19 = np.concatenate(([0.0], np.cumsum(np.abs(blk - 1900) < 120)))
+    idx = np.arange(max(start // b, 150), nb - 330)
+    if len(idx) == 0: return None
+    m30 = (cs[idx + 30] - cs[idx]) / 30.0                       # Mittel über das Startbit
+    lead = (c19[idx - 5] - c19[idx - 150]) / 145.0              # Anteil 1900 Hz im Vorlauf
+    cand = idx[(np.abs(m30 - 1200) < 70) & (lead > 0.5)]
+    g = np.convolve(blk, np.ones(3) / 3, mode="same")          # 3 ms geglättet für die Kante
+    k0 = 0
+    while k0 < len(cand):
+        k1 = k0
+        while k1 + 1 < len(cand) and cand[k1 + 1] - cand[k1] <= 3: k1 += 1
+        a, c = int(cand[k0]), int(cand[k1])
+        # Kante Vorlauf → Startbit: erste Millisekunde unter der Mitte (1550 Hz) nahe dem Fensteranfang
+        lo = max(150, a - 6); hi = min(nb - 330, c + 6)
+        edge = next((i for i in range(lo, hi) if g[i] < 1550 and g[i + 1] < 1550), a)
+        i = edge
+        bits, ok = [], True
+        for k in range(8):
+            cc = i + 45 + 30 * k
+            v = np.median(blk[cc - 8:cc + 8])
+            if not (980 < v < 1420): ok = False; break
+            bits.append(1 if v < 1200 else 0)
+        if ok:
+            vis = sum(bit << k for k, bit in enumerate(bits[:7]))
+            par = sum(bits[:7]) % 2
+            stop = i + 270
+            stop_m = (cs[stop + 27] - cs[stop + 3]) / 24.0
+            if par == bits[7] and abs(stop_m - 1200) < 70 and vis in MODES:
+                return vis, (stop + 30) * b
+        k0 = k1 + 1
     return None
 
 
