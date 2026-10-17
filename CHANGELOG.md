@@ -14,7 +14,8 @@ POCSAG mit Vorgabefrequenz, Digital-Seite in voller Höhe.
   „Hörer online“ behalten ihre Pfade unter `/logbuch/api/` (Apps nutzen sie).
 
 ### Oberfläche
-- Digital-Seite nutzt auf großen Fenstern die ganze Höhe (Paketliste dehnt sich, Karte spannt mit); vorher feste Pixelhöhen, unter der Liste blieb Platz leer.
+- Digital-Seite ist genau so hoch wie das Fenster: Kopf, Reiter und Fuß fest, die Listen scrollen innen, die Karte spannt mit. Vorher feste Pixelhöhen, je nach Fenster blieb unten Platz leer oder die Seite wuchs darüber hinaus.
+- Pager-Seite: Rufe links in voller Höhe, RICs rechts.
 
 ### Decoder
 - **SSTV erkennt auch schwache Bilder:** Der VIS-Sucher verlangte lückenlose 1-ms-Läufe auf 1200 Hz, mit Rauschen riss das an
