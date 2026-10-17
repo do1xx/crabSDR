@@ -2,7 +2,10 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
-## Unveröffentlicht
+## 1.6.0 – 2026-10-17
+
+Logbuch entfernt, SSTV erkennt auch schwache Bilder, Pager-Seite mit RIC-Filter, APRS-Objekt fürs iGate,
+POCSAG mit Vorgabefrequenz, Digital-Seite in voller Höhe.
 
 ### Entfernt
 - **Logbuch** (Reiter, Seite `logbuch/`, `GET/POST /logbuch/api/log`, Admin-Liste, Schalter `[ui] logbook`): kaum genutzt,
