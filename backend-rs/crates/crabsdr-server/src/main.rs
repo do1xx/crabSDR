@@ -657,9 +657,17 @@ async fn ui_file_exists(state: &AppState, name: &str) -> bool {
 /// selbst erzeugt (Laufzeit, Last, CPU-Temperatur soweit lesbar).
 async fn status_json(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let hdr = [(axum::http::header::CONTENT_TYPE, "application/json"), (axum::http::header::CACHE_CONTROL, "no-store")];
-    if let Some(b) = read_ui_file(&state, "status.json").await { return (hdr, b).into_response(); }
     // Laufzeit des Servers selbst (im Container wäre /proc/uptime die der Docker-VM)
     let up = SERVER_START.get().map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.0);
+    if let Some(b) = read_ui_file(&state, "status.json").await {
+        // Datei eines Wächters (Temperatur, USB-Fehler …): Laufzeit trotzdem die von crabSDR, sonst zeigt eine Station mit
+        // Wächter die Rechnerlaufzeit und die anderen die des Programms (CCCHH „1 Tag“ neben DF0HHH „5 Std.“, 17.10.)
+        if let Ok(mut v) = serde_json::from_slice::<serde_json::Value>(&b) {
+            if let Some(o) = v.as_object_mut() { o.insert("up_s".into(), json!(up as u64)); o.remove("uptime"); }
+            return (hdr, v.to_string()).into_response();
+        }
+        return (hdr, b).into_response();
+    }
     let load = std::fs::read_to_string("/proc/loadavg").ok().and_then(|s| s.split_whitespace().next().map(|v| v.to_string())).unwrap_or_default();
     let temp = std::fs::read_to_string("/sys/class/thermal/thermal_zone0/temp").ok().and_then(|s| s.trim().parse::<i64>().ok()).map(|t| t / 1000);
     let ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);

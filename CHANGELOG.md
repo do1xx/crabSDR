@@ -2,6 +2,11 @@
 
 Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-server --version` zeigt Version und Git-Stand.
 
+## Unveröffentlicht
+
+### Oberfläche
+- Statuszeile „läuft seit“ zeigt immer die Laufzeit von crabSDR, auch wenn ein Wächter eine eigene `status.json` liefert (vorher dort die Rechnerlaufzeit).
+
 ## 1.6.0 – 2026-10-17
 
 Logbuch entfernt, SSTV erkennt auch schwache Bilder, Pager-Seite mit RIC-Filter, APRS-Objekt fürs iGate,
