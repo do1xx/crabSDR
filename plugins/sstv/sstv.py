@@ -15,6 +15,7 @@ ap.add_argument("--freq", type=float, default=float(E("CRAB_FREQ", "0")), help="
 ap.add_argument("--rate", type=int, default=int(E("CRAB_RATE", "24000")))
 ap.add_argument("--out", default=E("CRAB_OPT_OUT") or E("CRAB_DATA", "."))
 ap.add_argument("--keep", type=int, default=int(E("CRAB_OPT_KEEP", "500")), help="Einträge im Index")
+ap.add_argument("--dump", type=float, default=float(E("CRAB_OPT_DUMP", "0")), help="Diagnose: so viele Sekunden Eingangston ab Start als WAV ablegen (sstv/dump_*.wav), 0 = aus")
 ap.add_argument("--misses", type=int, default=int(E("CRAB_OPT_MISSES", "20")), help="so viele Fehlversuche (Vorlauf gehört, VIS unlesbar) als WAV ablegen, 0 = aus")
 a = ap.parse_args()
 FS = a.rate
@@ -69,9 +70,18 @@ def main():
     if add_index_dummy:
         json.dump({"images": [], "ts": int(time.time())}, open(INDEX, "w"))
     log(f"SSTV-Lauscher auf {a.freq/1e6:.3f} MHz, {FS} Hz")
+    dump, dump_left = None, int(a.dump * FS)
+    if dump_left > 0:
+        import wave
+        dfn = os.path.join(IMGDIR, time.strftime("dump_%Y%m%d_%H%M%S", time.gmtime()) + ".wav")
+        dump = wave.open(dfn, "wb"); dump.setnchannels(1); dump.setsampwidth(2); dump.setframerate(FS)
+        log(f"Mitschnitt des Eingangstons ({a.dump:.0f} s): {os.path.basename(dfn)}")
     while True:
         raw = src.read(chunk)
         if not raw: break
+        if dump is not None:
+            dump.writeframes(raw[:dump_left * 2]); dump_left -= len(raw) // 2
+            if dump_left <= 0: dump.close(); dump = None; log("Mitschnitt beendet")
         x = np.frombuffer(raw, dtype=np.int16)
         if recording is not None:
             recording["buf"].append(x); recording["have"] += len(x)
