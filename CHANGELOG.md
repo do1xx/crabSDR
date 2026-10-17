@@ -10,6 +10,9 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
   `logbuch/` leitet auf die Hören-Seite um, ein alter Schlüssel `logbook` in der Konfiguration wird ignoriert. Chat und
   „Hörer online“ behalten ihre Pfade unter `/logbuch/api/` (Apps nutzen sie).
 
+### Oberfläche
+- Digital-Seite nutzt auf großen Fenstern die ganze Höhe (Paketliste dehnt sich, Karte spannt mit); vorher feste Pixelhöhen, unter der Liste blieb Platz leer.
+
 ### Decoder
 - **SSTV erkennt auch schwache Bilder:** Der VIS-Sucher verlangte lückenlose 1-ms-Läufe auf 1200 Hz, mit Rauschen riss das an
   einer einzigen Millisekunde ab – nur sehr starke Signale kamen durch (gemessen mit echtem Empfängerrauschen von DF0HHH:
