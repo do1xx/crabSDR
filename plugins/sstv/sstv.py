@@ -93,11 +93,12 @@ def main():
         ring = np.concatenate((ring, x))[-RING:]
         if len(ring) < int(FS * 1.2): continue
         xf = ring.astype(np.float32) / 32768
-        r = sstvdec.find_vis(xf, FS)
+        ftr = sstvdec.freq_track(xf, FS, sstvdec.BAND_VIS)     # einmal rechnen, Sucher und Diagnose teilen sich das
+        r = sstvdec.find_vis(xf, FS, f=ftr)
         if not r:
             # Diagnose: SSTV-Vorlauf (1900 Hz) gehört, aber kein gültiger VIS-Kopf – melden und die 2 s als WAV ablegen,
             # damit sich ein verpasstes Bild nachträglich untersuchen lässt (höchstens alle 15 s, höchstens --misses Dateien)
-            lm, lend = sstvdec.leader_run(xf, FS)
+            lm, lend = sstvdec.leader_run(xf, FS, f=ftr)
             # Vorlauf muss >= 600 ms vor dem Pufferende geendet haben, sonst ist der VIS einfach noch nicht da
             if lm >= 250 and lend <= len(ring) * 1000 // FS - 600 and time.time() - miss_last > 15:
                 miss_last = time.time(); miss_n += 1
