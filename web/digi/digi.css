@@ -70,9 +70,9 @@ body:not(.dec-aprs) .aprsonly { display: none; }
 body:not(.dec-reichweite) .rwonly { display: none; }
 
 body.dec-nomap .card-map { display: none; }
-/* Pager/FreeDV ohne Karte: Rufe links in voller Höhe, RICs rechts; beide Karten in einer Zeile */
+/* Pager/FreeDV ohne Karte: Rufe (digi.js füllt sie in #stations) links in voller Höhe, RICs (#packets) rechts */
 body.dec-nomap .digi-main { grid-template-columns: 1.6fr 1fr; grid-template-rows: minmax(0, 1fr); }
-body.dec-nomap .card-packets { grid-column: 1; grid-row: 1; } body.dec-nomap .card-stations { grid-column: 2; grid-row: 1; }
+body.dec-nomap .card-stations { grid-column: 1; grid-row: 1; } body.dec-nomap .card-packets { grid-column: 2; grid-row: 1; }
 body.dec-nomap .stations { max-height: none; flex: 1 1 auto; }
 @media (max-width: 900px) { body.dec-nomap .digi-main { grid-template-columns: 1fr; grid-template-rows: auto; } body.dec-nomap .card-packets, body.dec-nomap .card-stations { grid-column: auto; grid-row: auto; } body.dec-nomap .stations { max-height: 200px; } }
 .pk.ric { cursor: pointer; } .pk.ric:hover { background: var(--bg2); } .pk.ric.active { background: var(--bg2); outline: 1px solid var(--accent); border-radius: 4px; padding-left: 4px; }
