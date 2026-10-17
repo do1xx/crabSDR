@@ -21,7 +21,7 @@
 - Viele Hörer an einem Empfänger, jeder auf seiner Frequenz (FM, AM, USB, LSB, CW).
 - Mehrere Bänder je Station: RTL-SDR, `rtl_tcp`, HackRF, SoapySDR (`rx_sdr`).
 - Decoder-Plugins, die immer mithören: APRS (mit RX-iGate), FT8, SSTV.
-- Chat, Logbuch, Admin-Seite für Bänder, Decoder, Benutzer und die Konfigurationsdatei.
+- Chat, Admin-Seite für Bänder, Decoder, Benutzer und die Konfigurationsdatei.
 - Fertige Programme für x86-64, ARM64 und ARMv7 (Raspberry Pi ab Pi 2).
 
 | Zwei Bänder | Digital: APRS | Handy |

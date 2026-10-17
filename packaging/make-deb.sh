@@ -46,7 +46,7 @@ Homepage: https://crabsdr.de
 Description: modernes, minimalistisches WebSDR
  crabSDR zeigt einen oder mehrere SDR-Empfänger (RTL-SDR, rtl_tcp, HackRF,
  SoapySDR) im Browser: Wasserfall, Ton, Decoder für APRS, FT8, SSTV und FreeDV (RADE),
- Chat, Logbuch und eine Admin-Seite. Nach der Installation: http://<rechner>:8080
+ Chat und eine Admin-Seite. Nach der Installation: http://<rechner>:8080
 CTL
   cat > "$R/DEBIAN/postinst" <<'SH'
 #!/bin/sh
@@ -86,7 +86,7 @@ set -e
 [ -d /run/systemd/system ] && systemctl daemon-reload 2>/dev/null || true
 if [ "$1" = purge ]; then
   rm -rf /etc/crabsdr
-  echo "crabSDR: Konfiguration entfernt. Daten (Benutzer, Chat, Logbuch, Decoder) bleiben in /var/lib/crabsdr."
+  echo "crabSDR: Konfiguration entfernt. Daten (Benutzer, Chat, Decoder) bleiben in /var/lib/crabsdr."
 fi
 exit 0
 SH

@@ -431,24 +431,19 @@ pub async fn live_gain(State(state): State<Arc<AppState>>, headers: HeaderMap, A
     ok(json!({"ok": true}))
 }
 
-// ---------------- Chat und Logbuch ----------------
+// ---------------- Chat ----------------
 
 #[derive(Deserialize)]
 pub struct ListQ { pub n: Option<i64> }
 
 pub async fn list_chat(State(state): State<Arc<AppState>>, headers: HeaderMap, Query(q): Query<ListQ>) -> Response {
     let _p = admin!(state, headers);
-    ok(json!({"chat": state.chat.recent_chat(q.n.unwrap_or(200).clamp(1, 1000)), "log": state.chat.recent_log(q.n.unwrap_or(200).clamp(1, 1000))}))
+    ok(json!({"chat": state.chat.recent_chat(q.n.unwrap_or(200).clamp(1, 1000))}))
 }
 
 pub async fn delete_chat(State(state): State<Arc<AppState>>, headers: HeaderMap, AxPath(id): AxPath<i64>) -> Response {
     let p = admin!(state, headers);
     if state.chat.delete_chat(id) { info!("Admin „{}“: Chat-Zeile {} gelöscht", p.username, id); ok(json!({"ok": true})) } else { err(StatusCode::NOT_FOUND, "gibt es nicht") }
-}
-
-pub async fn delete_log(State(state): State<Arc<AppState>>, headers: HeaderMap, AxPath(id): AxPath<i64>) -> Response {
-    let p = admin!(state, headers);
-    if state.chat.delete_log(id) { info!("Admin „{}“: Logbuch-Eintrag {} gelöscht", p.username, id); ok(json!({"ok": true})) } else { err(StatusCode::NOT_FOUND, "gibt es nicht") }
 }
 
 // ---------------- Sticks ----------------

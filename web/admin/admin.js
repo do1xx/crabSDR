@@ -212,7 +212,7 @@
   }
 
   /* ---------- Station und Oberfläche ---------- */
-  var UI_SWITCHES = [['login', 'Knopf „Anmelden“'], ['chat', 'Chat'], ['logbook', 'Logbuch'], ['digital', 'Seite Digital'], ['info', 'Seite Info'],
+  var UI_SWITCHES = [['login', 'Knopf „Anmelden“'], ['chat', 'Chat'], ['digital', 'Seite Digital'], ['info', 'Seite Info'],
     ['decoders', 'Decoder-Menü'], ['recording', 'Aufnahme'], ['status', 'Statuszeile']];
   function station(v) {
     loadCfg(function (c) {
@@ -475,7 +475,7 @@
       out, h('button', { cls: 'btn btn-accent', type: 'submit', text: 'Anlegen' }), h('button', { cls: 'btn', type: 'button', text: 'Liste neu laden', onclick: function () { show('users'); } })));
   }
 
-  /* ---------- Chat und Logbuch ---------- */
+  /* ---------- Chat ---------- */
   function chat(v) {
     api('GET', 'admin/chat?n=300', undefined, function (code, r) {
       if (!okOr(code, r)) return;
@@ -485,10 +485,6 @@
       var t1 = h('tbody');
       r.chat.forEach(function (m) { var tr = h('tr'); [when(m.t), m.name, m.msg].forEach(function (x) { tr.appendChild(h('td', { text: x })); }); tr.appendChild(h('td', null, del('chat', m.id, tr))); t1.appendChild(tr); });
       v.appendChild(r.chat.length ? h('div', { cls: 'adm-tablewrap' }, h('table', { cls: 'adm-table' }, h('thead', null, h('tr', null, ['Zeit', 'Name', 'Nachricht', ''].map(function (x) { return h('th', { text: x }); }))), t1)) : h('p', { cls: 'muted', text: 'leer' }));
-      v.appendChild(h('h3', { text: 'Logbuch (' + r.log.length + ')' }));
-      var t2 = h('tbody');
-      r.log.forEach(function (m) { var tr = h('tr'); [when(m.t), m.name || '', m.call || '', m.freq ? (m.freq / 1000).toFixed(3).replace('.', ',') : '', m.loc || '', m.comment || ''].forEach(function (x) { tr.appendChild(h('td', { text: x })); }); tr.appendChild(h('td', null, del('log', m.id, tr))); t2.appendChild(tr); });
-      v.appendChild(r.log.length ? h('div', { cls: 'adm-tablewrap' }, h('table', { cls: 'adm-table' }, h('thead', null, h('tr', null, ['Zeit', 'von', 'Rufzeichen', 'MHz', 'Locator', 'Bemerkung', ''].map(function (x) { return h('th', { text: x }); }))), t2)) : h('p', { cls: 'muted', text: 'leer' }));
     });
   }
 

@@ -6,7 +6,7 @@
 
 port = 8080
 
-# ---- Station: erscheint oben auf der Seite; der Standort dient für Entfernungen (Logbuch, Digital, Reichweite) ----
+# ---- Station: erscheint oben auf der Seite; der Standort dient für Entfernungen (Digital, Reichweite) ----
 [station]
 name = "Mein WebSDR"
 subtitle = "Ort · Antenne · Höhe"

@@ -1,4 +1,4 @@
-# Testkonfiguration der Unterseiten Digital/Logbuch/Info: Decoder aus, ihre Daten liegen in testdata/data-digi
+# Testkonfiguration der Unterseiten Digital/Info: Decoder aus, ihre Daten liegen in testdata/data-digi
 # (nicht im Repo; eigene Decoder-Ausgaben dort ablegen: decoders/aprs-144800/aprs.json, ft8-144174/ft8.json, sstv-145800/).
 port = 8084
 plugin_dir = "plugins"

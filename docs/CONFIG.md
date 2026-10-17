@@ -49,10 +49,10 @@ Station unangetastet.
 | `site_dir` | – | Stationsordner, siehe unten |
 | `frontend_dir` | automatisch | Oberfläche; neben dem Programm (`…/bin/crabsdr-server` → `…/web`), sonst `/opt/crabsdr/web`, sonst `./web` |
 | `plugin_dir` | automatisch | Decoder-Plugins; wie oben mit `plugins` |
-| `data_dir` | automatisch | Daten (Chat, Logbuch, Decoder-Ergebnisse, Benutzer): `/data` in Docker, sonst `/var/lib/crabsdr`, sonst `./data` |
+| `data_dir` | automatisch | Daten (Chat, Decoder-Ergebnisse, Benutzer): `/data` in Docker, sonst `/var/lib/crabsdr`, sonst `./data` |
 | `db_path` | `data_dir/crabsdr.db` | Benutzerdatenbank (Admin, Gäste) |
-| `builtin_chat` | `true` | Chat und Logbuch der Hörer (SQLite `data_dir/pinnwand.db`). `false` nur, wenn ein anderer Dienst sie übernimmt |
-| `chat_keep_lines` | `50` | Chat behält nur die letzten so vielen Zeilen (FIFO), `0` = alle behalten. Das Logbuch bleibt |
+| `builtin_chat` | `true` | Chat der Hörer (SQLite `data_dir/pinnwand.db`). `false` nur, wenn ein anderer Dienst ihn übernimmt |
+| `chat_keep_lines` | `50` | Chat behält nur die letzten so vielen Zeilen (FIFO), `0` = alle behalten |
 | `max_listeners` | `50` | Verbindungen je Band insgesamt (Browser und Streams), `0` = keine Grenze |
 | `max_per_ip` | `10` | Verbindungen je Band und Absenderadresse (mehrere Tabs/Bänder einer Person zählen einzeln) |
 | `max_channels` | `16` | verschiedene Kanäle je Band: jede andere Frequenz, Betriebsart oder Bandbreite kostet einen DSP-Kanal, Hörer auf demselben Kanal teilen ihn. Darüber: „Station voll“ |
@@ -76,7 +76,7 @@ Umgebungsvariablen überschreiben: `PORT`, `PLUGIN_DIR`, `FRONTEND_DIR`, `DATA_D
 | `name` | Titel oben links, Seitentitel, Link-Vorschau (Voreinstellung `crabSDR`) |
 | `subtitle` | Zeile unter dem Titel, z. B. Ort, Antenne, Höhe |
 | `locator` | Maidenhead-Locator (4, 6 oder 8 Zeichen) |
-| `lat`, `lon` | Standort in Dezimalgrad; ohne Angabe die Mitte des Locators. Dient für Entfernungen im Logbuch, auf der Digital-Seite, für die Reichweite und als Standort der APRS-iGate-Bake |
+| `lat`, `lon` | Standort in Dezimalgrad; ohne Angabe die Mitte des Locators. Dient für Entfernungen auf der Digital-Seite, für die Reichweite und als Standort der APRS-iGate-Bake |
 | `url` | öffentliche Adresse, z. B. `https://sdr.example.org` (optional; nötig für das Verzeichnis) |
 | `operator`, `address`, `contact` | Betreiber (Name/Rufzeichen), Anschrift (Zeilen mit ` · ` trennen), E-Mail. Mit `operator` zeigt die Info-Seite ein Impressum, der Fuß verlinkt es. Der Datenschutz-Hinweis auf der Info-Seite ist immer da (`[ui] datenschutz` überschreibt den Link) |
 | `hosting`, `hosting_log_days` | Vorgeschalteter Server (Proxy/Hoster), z. B. `"Hetzner Online GmbH, Gunzenhausen"`, und die Aufbewahrung seines Zugriffsprotokolls in Tagen; erscheint in der Datenschutzerklärung. Leer, wenn die Station direkt erreichbar ist |
@@ -217,7 +217,6 @@ Alles ist an, solange es etwas zu zeigen gibt. Nur eintragen, was abweichen soll
 |---|---|---|
 | `login` | an, wenn es Mitglieder- oder Admin-Bänder gibt | Knopf „Anmelden“ auf der Hören-Seite |
 | `chat` | wie `builtin_chat` | Chat auf der Hören-Seite |
-| `logbook` | wie `builtin_chat` | Reiter Logbuch |
 | `digital` | an, wenn öffentliche Decoder laufen | Reiter Digital |
 | `info` | an | Reiter Info (baut sich aus Station, Bändern und Decodern; eigene Seite im Stationsordner) |
 | `decoders` | an, wenn Decoder da sind | Decoder-Menü in der Bedienleiste |
@@ -250,7 +249,7 @@ Jede andere Datei der Oberfläche lässt sich genauso ersetzen; wer das tut, mus
 ## Admin-Seite und Benutzer
 
 Unter `/admin/` verwaltet der Admin die Station im Browser: Überblick (Bänder, Decoder mit ihren Meldungen, Hörer,
-Last, Plattenbelegung – rot ab 85 %), Station und Oberfläche, Bänder, Decoder, Benutzer, Chat und Logbuch, die Konfigurationsdatei als Text und die
+Last, Plattenbelegung – rot ab 85 %), Station und Oberfläche, Bänder, Decoder, Benutzer, Chat, die Konfigurationsdatei als Text und die
 angeschlossenen Sticks. Formulare und Textansicht schreiben dieselbe `config.toml`: Kommentare bleiben erhalten, vorher
 gilt dieselbe Prüfung wie bei `--check`, die vorige Fassung landet in `data_dir/config-backups/`. Die meisten
 Änderungen wirken nach „Neu starten“ (über systemd bzw. Docker); die Verstärkung lässt sich sofort ausprobieren.
@@ -288,7 +287,7 @@ Sysop es einschaltet (Admin-Seite → Station → „Im Verzeichnis listen“, o
 | `server` | `https://crabsdr.de` | Verzeichnis (nur in der Datei änderbar) |
 
 Die Station meldet alle 5 Minuten Name, Untertitel, Locator/Standort, die **öffentlichen** Bänder und Decoder, die
-Hörerzahl und die Version. Mitglieder- und Admin-Bänder, Benutzer, Chat und Logbuch werden nie gemeldet. Dieselben
+Hörerzahl und die Version. Mitglieder- und Admin-Bänder, Benutzer und Chat werden nie gemeldet. Dieselben
 Angaben stehen unter `/api/directory` (sonst 404); das Verzeichnis ruft diese Adresse unter `url` selbst ab und
 vergleicht die Kennung (Zufallszahl in `data_dir/directory.id`), damit niemand fremde Adressen eintragen kann. Ist
 `enabled` wieder aus, verschwindet die Station nach spätestens einer halben Stunde.

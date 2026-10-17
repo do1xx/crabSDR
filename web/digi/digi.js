@@ -1,6 +1,6 @@
 /* Seite „Digital": zeigt, was die Decoder-Plugins empfangen (APRS, FT8, SSTV) und wie weit die Station hört.
    Daten: ../api/decoders (welche Decoder laufen), digi/aprs.json, ft8.json, sstv.json, relais.json (vom Server aus den
-   Datenordnern der Decoder), ../positionen.json (feste Standorte ohne Positionsbake), ../logbuch/api/log (Reichweite).
+   Datenordnern der Decoder), ../positionen.json (feste Standorte ohne Positionsbake).
    Standort und Name der Station kommen aus ../ui.json (common.js). */
 crabReady(function (UI) {
   'use strict';
@@ -100,7 +100,7 @@ crabReady(function (UI) {
     var T = { aprs: ['APRS', 'AFSK 1200 Bd · direwolf'], ft8: ['FT8', '15-s-Zyklen · jt9'], sstv: ['SSTV', 'Bilder · Martin, Scottie, Robot, PD'], pocsag: ['Pager', 'POCSAG · multimon-ng'], freedv: ['FreeDV', 'RADE (FreeDV ab 2.0) · Codec 2 700D, 700E, 1600 · Rufzeichen'] }, h = [];
     TABS = [];
     ['aprs', 'ft8'].forEach(function (k) { if (DECS[k].length) { TABS.push(k); h.push('<button class="band" data-dec="' + k + '"><b>' + T[k][0] + ' <small>' + freqs(DECS[k]) + ' MHz</small></b><small>' + T[k][1] + (bandOf(DECS[k]) ? ' · ' + esc(bandOf(DECS[k])) : '') + '</small></button>'); } });
-    if (DECS.aprs.length || DECS.ft8.length) { TABS.push('reichweite'); h.push('<button class="band" data-dec="reichweite"><b>Reichweite <small>so weit hört die Station</small></b><small>direkt empfangen · ' + (DECS.aprs.length ? 'APRS · ' : '') + (DECS.ft8.length ? 'FT8 · ' : '') + (UI.features && UI.features.logbook ? 'Logbuch · ' : '') + '90 Tage</small></button>'); }
+    if (DECS.aprs.length || DECS.ft8.length) { TABS.push('reichweite'); h.push('<button class="band" data-dec="reichweite"><b>Reichweite <small>so weit hört die Station</small></b><small>direkt empfangen · ' + (DECS.aprs.length ? 'APRS · ' : '') + (DECS.ft8.length ? 'FT8 · ' : '') + '90 Tage</small></button>'); }
     ['pocsag'].forEach(function (k) { if (DECS[k].length) { TABS.push(k); h.push('<button class="band" data-dec="' + k + '"><b>' + T[k][0] + ' <small>' + freqs(DECS[k]) + ' MHz</small></b><small>' + T[k][1] + '</small></button>'); } });
     if (DECS.sstv.length) { TABS.push('sstv'); h.push('<button class="band" data-dec="sstv"><b>SSTV <small>' + freqs(DECS.sstv) + ' MHz</small></b><small>' + T.sstv[1] + '</small></button>'); }
     // FreeDV: feste Decoder (rade, freedv) oder Betriebsart DV; flüchtige DV-Decoder der Hörer wechseln die Frequenz, daher nur die festen im Titel
@@ -293,8 +293,8 @@ crabReady(function (UI) {
     p.forEach(function (s) { cnt[s.src]++; });
     $('packets').innerHTML = '<div class="rw-dirs">' + DIRS.map(function (n, i) {
       return '<div class="rw-dir"><span>' + n + '</span><i style="width:' + (100 * (sec[i] || 0) / mx).toFixed(0) + '%"></i><b>' + (sec[i] ? sec[i] + ' km' : '–') + '</b></div>';
-    }).join('') + '</div><p class="muted rw-note">Nur Direktempfang der letzten ' + (d.days || 90) + ' Tage: APRS-Stationen und Digipeater, die ' + esc(NAME) + ' selbst hört (keine weitergeleiteten Pakete), FT8-Decodes (Position = Locator-Mitte) und Logbuch-Einträge. ' +
-      cnt.aprs + ' APRS · ' + cnt.ft8 + ' FT8 · ' + cnt.log + ' Logbuch.</p>';
+    }).join('') + '</div><p class="muted rw-note">Nur Direktempfang der letzten ' + (d.days || 90) + ' Tage: APRS-Stationen und Digipeater, die ' + esc(NAME) + ' selbst hört (keine weitergeleiteten Pakete), FT8-Decodes (Position = Locator-Mitte). ' +
+      cnt.aprs + ' APRS · ' + cnt.ft8 + ' FT8.</p>';
     $('status').innerHTML = '<span>Reichweite · Direktempfang</span><span class="ok">Stand ' + hm(d.ts) + '</span><span>weiteste: ' + (p[0] ? esc(p[0].call) + ' ' + p[0].km + ' km' : '–') + '</span>';
   }
   // Reichweite als Bild (PNG) speichern bzw. am Handy direkt teilen; Link teilen
@@ -320,7 +320,7 @@ crabReady(function (UI) {
       g.fillStyle = '#e5e7eb'; g.font = '600 ' + Math.round(20 * dpr) + 'px ' + mono; g.textBaseline = 'middle';
       g.fillText(NAME + ' · Reichweite', 16 * dpr, 22 * dpr);
       g.fillStyle = '#9ca3af'; g.font = Math.round(12 * dpr) + 'px ' + mono;
-      g.fillText('Direktempfang der letzten ' + (rangeData.days || 90) + ' Tage · ' + cnt.aprs + ' APRS · ' + cnt.ft8 + ' FT8 · ' + cnt.log + ' Logbuch' + (far ? ' · weiteste: ' + far.call + ' ' + far.km + ' km' : ''), 16 * dpr, 46 * dpr);
+      g.fillText('Direktempfang der letzten ' + (rangeData.days || 90) + ' Tage · ' + cnt.aprs + ' APRS · ' + cnt.ft8 + ' FT8' + (far ? ' · weiteste: ' + far.call + ' ' + far.km + ' km' : ''), 16 * dpr, 46 * dpr);
       var y = c.height - foot / 2;
       g.fillStyle = '#34d399'; g.fillText(location.host, 16 * dpr, y);
       g.fillStyle = '#6b7280'; g.textAlign = 'right';
@@ -375,7 +375,7 @@ crabReady(function (UI) {
   $('lightbox').onclick = function (e) { if (e.target === this) this.hidden = true; };
   document.addEventListener('keydown', function (e) { if ($('lightbox').hidden) return; if (e.key === 'Escape') $('lightbox').hidden = true; if (e.key === 'ArrowLeft') showLb(lbIdx + 1); if (e.key === 'ArrowRight') showLb(lbIdx - 1); });
 
-  // Reichweite aus aprs.json (direkt gehörte Stationen und Digis), ft8.json (Sender mit Locator) und dem Logbuch
+  // Reichweite aus aprs.json (direkt gehörte Stationen und Digis), ft8.json (Sender mit Locator)
   var CALLRE = /^(?:[A-Z]{1,2}|[A-Z][0-9]|[0-9][A-Z])[0-9][A-Z]{1,4}(?:[-\/][A-Z0-9]{1,3})?$/;
   var PREFIX_EU = /^(?:D[A-R]|D[0-9]|P[A-I]|O[N-TZ]|L[A-NX]|S[A-FMP-R]|H[AB]|O[EK-M]|G|M|2|E[I-J]|F|T[FK]|Y[LO]|L[YZ]|E[RS]|U|R|I|Z[ABS]|9A|S5|E[A-H]|C[T]|4X|Y[UT]|Z[23]|OH|OF|OG|OI|OJ|OX|OY|TF|JW|LA|SM|SA|SK|SL|OZ|5[PQ])/;
   var inEurope = HOME[0] > 34 && HOME[0] < 72 && HOME[1] > -25 && HOME[1] < 45;   // Präfix-Filter gegen Fehldecodes nur in Europa
@@ -423,7 +423,7 @@ crabReady(function (UI) {
       var fin = function (k, v) { got[k] = v; if (++n === 3) renderReichweite(buildRange(got.aprs, got.ft8, got.log)); };
       if (DECS.aprs.length) get('aprs.json', function (v) { fin('aprs', v); }); else fin('aprs', null);
       if (DECS.ft8.length) get('ft8.json', function (v) { fin('ft8', v); }); else fin('ft8', null);
-      if (UI.features && UI.features.logbook) get('../logbuch/api/log?n=500', function (v) { fin('log', v); }); else fin('log', null);
+      fin('log', null);   // Logbuch gibt es seit 1.6.0 nicht mehr
       return;
     }
     get(dec + '.json', function (v) {

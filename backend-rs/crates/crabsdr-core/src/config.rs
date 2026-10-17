@@ -124,7 +124,7 @@ pub struct StationConfig {
     pub url: String,
     #[serde(default)]
     pub locator: String,
-    /// Standort (Dezimalgrad) für Entfernungen im Logbuch und auf der Digital-Seite; ohne Angabe aus dem Locator
+    /// Standort (Dezimalgrad) für Entfernungen auf der Digital-Seite; ohne Angabe aus dem Locator
     #[serde(default)]
     pub lat: Option<f64>,
     #[serde(default)]
@@ -234,7 +234,8 @@ impl Default for DirectoryConfig {
 }
 
 /// Oberfläche (`[ui]`). Alles ist optional: ohne Angabe gilt die Voreinstellung (meist „an“ bzw. „automatisch“).
-/// digital/logbook/info erscheinen automatisch, wenn die Seite (digi/, logbuch/, info/) im Stationsordner liegt.
+/// digital/info erscheinen automatisch, wenn die Seite (digi/, info/) im Stationsordner liegt. Ein alter Schlüssel
+/// `logbook` (Logbuch, entfernt in 1.6.0) wird still ignoriert.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UiConfig {
     #[serde(default)] pub chat: Option<bool>,
@@ -242,7 +243,6 @@ pub struct UiConfig {
     #[serde(default)] pub decoders: Option<bool>,
     #[serde(default)] pub recording: Option<bool>,
     #[serde(default)] pub digital: Option<bool>,
-    #[serde(default)] pub logbook: Option<bool>,
     #[serde(default)] pub info: Option<bool>,
     /// Knopf „Anmelden“ auf der Hören-Seite (Voreinstellung: an, wenn es Mitglieder- oder Admin-Bänder gibt)
     #[serde(default)] pub login: Option<bool>,
@@ -301,10 +301,10 @@ pub struct ServerConfig {
     /// Opus-Bitrate je Kanal in bit/s (24 kHz mono; 32 kbit/s reicht für NFM-Sprache, 48 für Rundfunk)
     #[serde(default = "default_opus_bitrate")]
     pub opus_bitrate: u32,
-    /// Chat und Logbuch der Hörer (SQLite in data_dir); false nur, wenn ein anderer Dienst sie übernimmt
+    /// Chat der Hörer (SQLite in data_dir); false nur, wenn ein anderer Dienst ihn übernimmt
     #[serde(default = "default_true")]
     pub builtin_chat: bool,
-    /// Chat behält nur die letzten so vielen Zeilen, Älteres fällt hinten raus (0 = alle behalten); das Logbuch bleibt
+    /// Chat behält nur die letzten so vielen Zeilen, Älteres fällt hinten raus (0 = alle behalten)
     #[serde(default = "default_chat_keep_lines")]
     pub chat_keep_lines: u32,
     /// Zusätzlich Chat-Zeilen nach so vielen Stunden löschen (0 = aus)

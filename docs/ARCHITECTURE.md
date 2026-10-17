@@ -20,7 +20,7 @@ wie ein Kanal ausgeschnitten, 2048er-FFT), damit die Auflösung mit dem Zoom ste
 | `crabsdr-sdr` | Quellen: `rtl_sdr`, `rtl_tcp`, `hackrf`, `rx_sdr` (SoapySDR) als Unterprozess bzw. TCP; Wächter startet hängende Quellen neu |
 | `crabsdr-dsp` | FFT-Kanalfilter (Overlap-Save, Phase über Blöcke fortgesetzt), Demodulatoren FM/AM/SSB/CW, Rauschsperre, AGC, Resampler |
 | `crabsdr-auth` | optionale Benutzerverwaltung (SQLite, JWT): Admin, Nutzer, Gäste |
-| `crabsdr-server` | Webserver (axum): WebSocket je Band, DSP-Thread, Hörerverwaltung, Decoder, Chat/Logbuch, Seiten-Daten, `--check` |
+| `crabsdr-server` | Webserver (axum): WebSocket je Band, DSP-Thread, Hörerverwaltung, Decoder, Chat, Seiten-Daten, `--check` |
 
 ### Wichtige Dateien im Server
 
@@ -31,7 +31,7 @@ wie ein Kanal ausgeschnitten, 2048er-FFT), damit die Auflösung mit dem Zoom ste
 | `dsp_thread.rs` | FFT, Wasserfall (inkl. 2 min Verlauf als JPEG beim Anmelden), Kanäle gruppiert nach Frequenz/Modus/Bandbreite |
 | `client.rs` | Zustand je Hörer; Hörer mit gleichem `ChannelKey` teilen Filter, Demodulator und Opus-Encoder |
 | `decoders.rs` | `[[decoders]]`: Plugin starten, Rohton zuführen, Meldungen (JSON-Zeilen) sammeln, Neustart mit Pause, MQTT |
-| `chat.rs` | Chat und Logbuch (SQLite `pinnwand.db`), Hörer online |
+| `chat.rs` | Chat (SQLite `pinnwand.db`, Pfade aus alter Zeit unter `/logbuch/api/`), Hörer online |
 | `digi.rs` | Daten der Digital-Seite aus den Datenordnern der Decoder |
 | `check.rs` | `crabsdr-server --check` |
 | `auth.rs`, `access.rs`, `ratelimit.rs` | Anmeldung, Rechte je Band und Decoder, Anmeldebremse ([SECURITY.md](SECURITY.md)) |
@@ -62,14 +62,14 @@ Befehle vom Browser: `tune` (Frequenz, Modus, Bandbreite), `untune`, `set_squelc
 
 | Pfad | Inhalt |
 |---|---|
-| `/`, `/digi/`, `/logbuch/`, `/info/` | Oberfläche (`web/`, Stationsordner hat Vorrang) |
+| `/`, `/digi/`, `/info/` | Oberfläche (`web/`, Stationsordner hat Vorrang) |
 | `/bandinfo.js`, `/ui.json` | Bänder und Einstellungen für die Oberfläche |
 | `/api/health` | Zustand, Version, Laufzeit |
 | `/api/bands`, `/api/listeners` | Bänder, Hörer (`n` Personen, `n_audio` hören gerade, `connections` Verbindungen) |
 | `/api/decoders`, `/api/decoders/events?since=&wait=1` | Decoder-Zustand, Meldungen (Langabfrage) |
 | `/digi/aprs.json`, `ft8.json`, `sstv.json`, `relais.json`, `pocsag.json` | Übersichten der Decoder |
 | `/digi/freedv.json` | FreeDV: Codec-2-Zustand, DV-Decoder und gehörte Rufzeichen (`text`-Treffer von `rade`/`freedv` aus dem Ereignisspeicher) |
-| `/logbuch/api/chat`, `/logbuch/api/log`, `/logbuch/api/online` | Chat, Logbuch, Hörer online |
+| `/logbuch/api/chat`, `/logbuch/api/online` | Chat, Hörer online (Pfadname aus alter Zeit) |
 | `/admin/`, `/api/admin/…` | Admin-Seite und ihre Schnittstelle (nur mit Admin-Anmeldung) |
 | `/api/auth/…` | Anmelden, Passwort ändern, eigenes Konto |
 | `/api/directory` | Angaben fürs Verzeichnis (404, solange `[directory]` aus ist) |
@@ -84,7 +84,7 @@ Reines HTML/CSS/JavaScript ohne Build-Schritt.
 | `core.js` | Kern: WebSockets, Wasserfall-Zeichnen, Ton (Opus über WebCodecs, AudioWorklet), Abstimmen, Zoom, Rauschsperre |
 | `ui.js` | Bedienung: Bandleiste, Schnellwahl, Frequenzliste, S-Meter, Tastatur, Teilen, Aufnahme, Chat |
 | `ui.css`, `look.css` | Aussehen (hell/dunkel) |
-| `digi/`, `logbuch/`, `info/` | Unterseiten; `common.js` setzt Kopf, Reiter und Stationsname aus `ui.json` |
+| `digi/`, `info/` | Unterseiten; `common.js` setzt Kopf, Reiter und Stationsname aus `ui.json` |
 | `account.js` | Anmelden auf der Hören-Seite (Mitglieder-Bänder) |
 | `admin/` | Admin-Seite (kein Inline-Code, eigene Sicherheitsköpfe) |
 

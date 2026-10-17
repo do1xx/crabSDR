@@ -262,13 +262,7 @@ body.allbands .onlyall { display: inline-flex; }
 .wfopts { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
 .wfopts .btn { min-height: 30px; padding: 4px 10px; }
 
-/* Logbuch, Sysop, Chat */
-.logbook { max-height: 150px; overflow-y: auto; background: var(--bg2); border: 1px solid var(--line2); border-radius: var(--radius); padding: 4px 8px; font-size: 11px; line-height: 1.6; }
-.logbook div { display: flex; gap: 8px; flex-wrap: wrap; border-bottom: 1px solid var(--line2); padding: 2px 0; }
-.logbook div:last-child { border-bottom: 0; }
-.logbook .t { color: var(--faint); white-space: nowrap; }
-.logbook .f { font-variant-numeric: tabular-nums; color: var(--accent); }
-.logbook .c { font-weight: 700; }
+/* Sysop, Chat */
 .logform { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 4px; margin-top: 6px; }
 .logform input { min-width: 0; }
 .sysop { display: grid; gap: 6px; }

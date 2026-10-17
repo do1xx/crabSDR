@@ -7,8 +7,8 @@
 <meta name="description" content="Technik des WebSDR: Standort, Bänder, Decoder und Bedienung.">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)"><meta name="theme-color" content="#f6f7f8" media="(prefers-color-scheme: light)">
 <link rel="icon" href="../icons/favicon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="../ui.css?v=35">
-<link rel="stylesheet" href="../pages.css?v=1">
+<link rel="stylesheet" href="../ui.css?v=36">
+<link rel="stylesheet" href="../pages.css?v=2">
 <link rel="stylesheet" href="../account.css?v=1">
 <script>
 // Einstellungen der Vorversion übernehmen (Schlüssel gartow_… und 1xx_… werden zu crab_…)
@@ -31,7 +31,7 @@ sys();window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change
     </div>
   </div>
   <div class="topright">
-    <nav class="tabs"><a href="../" class="btn">Hören</a><a href="../digi/" class="btn" data-feature="digital">Digital</a><a href="../logbuch/" class="btn" data-feature="logbook">Logbuch</a><a href="./" class="btn active" data-feature="info">Info</a></nav>
+    <nav class="tabs"><a href="../" class="btn">Hören</a><a href="../digi/" class="btn" data-feature="digital">Digital</a><a href="./" class="btn active" data-feature="info">Info</a></nav>
     <button id="themebtn" class="btn btn-ghost btn-icon" type="button" title="Hell / Dunkel">◐</button>
   </div>
 </header>
@@ -136,9 +136,8 @@ sys();window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change
       Zugriffsprotokoll enthält IP-Adresse, Zeitpunkt, aufgerufene Adresse, Datenmenge und Browserkennung<span id="hostdays"></span>.</span></dd>
     <dt>Name</dt><dd>Der freiwillig eingetragene Name wird den anderen Hörern angezeigt und im Browser als Cookie gespeichert.
       Ohne Eintrag erscheint die Bezeichnung „Hörer“.</dd>
-    <dt data-feature="chat">Chat und Logbuch</dt><dd data-feature="chat">Einträge werden mit Name und Uhrzeit auf der Station gespeichert und
-      allen Besuchern angezeigt. Der Chat behält <span id="chatkeep">die letzten Zeilen</span>; Logbucheinträge bleiben, bis
-      der Betreiber sie löscht. Löschwünsche nimmt der Betreiber unter der Kontaktadresse entgegen.
+    <dt data-feature="chat">Chat</dt><dd data-feature="chat">Nachrichten werden mit Name und Uhrzeit auf der Station gespeichert und
+      allen Besuchern angezeigt. Der Chat behält <span id="chatkeep">die letzten Zeilen</span>. Löschwünsche nimmt der Betreiber unter der Kontaktadresse entgegen.
       <span data-feature="chat_verbund"> Die Station nimmt am Verbund-Chat teil: Chatzeilen werden mit Name, Text, Uhrzeit und
       Stationskürzel über crabsdr.de an die anderen teilnehmenden Stationen übertragen und dort mit denselben Grenzen gehalten.</span></dd>
     <dt>Einstellungen</dt><dd>Frequenz, Lautstärke, Rauschsperre, Ansicht und Sprache speichert der Browser lokal
@@ -162,7 +161,7 @@ sys();window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change
 </footer>
 
 <script>(function(){var t=null;try{t=localStorage.getItem('crab_token')}catch(e){}document.write('<script src="../bandinfo.js?_=' + Date.now() + (t ? '&token=' + encodeURIComponent(t) : '') + '"><\/script>');})();</script>
-<script src="../common.js?v=2"></script>
+<script src="../common.js?v=3"></script>
 <script src="info.js?v=5"></script>
 <script src="../account.js?v=1"></script>
 </body>

@@ -1,4 +1,4 @@
-/* Gemeinsamer Kopf der Unterseiten (Digital, Logbuch, Info): liest ../ui.json und setzt Stationsname, Untertitel und
+/* Gemeinsamer Kopf der Unterseiten (Digital, Info): liest ../ui.json und setzt Stationsname, Untertitel und
    Seitentitel (Elemente mit data-station="name|sub|title"), blendet Reiter nach den Schaltern aus [ui] aus (data-feature),
    setzt Name, Hörer online, Chat-Knopf, Hell/Dunkel, Hinweisbanner und Impressum/Datenschutz.
    Seiten-Skripte warten mit crabReady(function (ui) { … }) auf ui.json (ui.station.lat/lon = Standort). */
@@ -34,7 +34,7 @@
     var c = readCookie('username'); if (c && c !== 'Hörer') inp.value = c;
     inp.onchange = function () { setCookie('username', inp.value.trim().slice(0, 20) || 'Hörer'); };
   }
-  var own = !!$('numusers');   // Logbuch-Seite pflegt die Zahl selbst
+  var own = !!$('numusers');   // Seite pflegt die Zahl selbst
   if (right && nav && !own) {
     var u = document.createElement('span'); u.className = 'users'; u.title = 'Hörer gerade online';
     u.innerHTML = '<span id="numusers">–</span> Hörer';
@@ -74,7 +74,6 @@
 
   if (!own && $('numusers')) {
     var poll = function () {
-      if (UI && UI.features && UI.features.chat === false && UI.features.logbook === false) return;
       var y = new XMLHttpRequest(); y.open('GET', root + 'logbuch/api/online?_=' + Date.now());
       y.onload = function () { try { $('numusers').textContent = JSON.parse(y.responseText).count; } catch (e) {} };
       y.send();

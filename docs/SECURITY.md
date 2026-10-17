@@ -7,7 +7,7 @@ vollständig steuern. Deshalb gelten diese Regeln; jede Änderung an Anmeldung u
 
 | Rolle | darf |
 |---|---|
-| Gast (ohne Anmeldung) | öffentliche Bänder hören, öffentliche Decoder sehen, Chat und Logbuch |
+| Gast (ohne Anmeldung) | öffentliche Bänder hören, öffentliche Decoder sehen, Chat |
 | Nutzer | zusätzlich die ihm zugeteilten Mitglieder-Bänder und nicht öffentlichen Decoder („alle“ oder einzelne) |
 | Admin | alles, dazu die Admin-Seite |
 

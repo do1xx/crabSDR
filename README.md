@@ -21,7 +21,7 @@
 - Many listeners on one receiver, each on their own frequency (FM, AM, USB, LSB, CW).
 - Several bands per station: RTL-SDR, `rtl_tcp`, HackRF, SoapySDR (`rx_sdr`).
 - Decoder plugins that always listen: APRS (with RX iGate), FT8, SSTV.
-- Chat, logbook, admin page for bands, decoders, users and the config file.
+- Chat, admin page for bands, decoders, users and the config file.
 - Static binaries for x86-64, ARM64 and ARMv7 (Raspberry Pi 2 and newer).
 
 | Two bands | Digital: APRS | Phone |

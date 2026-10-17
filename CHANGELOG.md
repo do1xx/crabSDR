@@ -4,6 +4,12 @@ Versionen nach [Semantic Versioning](https://semver.org/lang/de/). `crabsdr-serv
 
 ## Unveröffentlicht
 
+### Entfernt
+- **Logbuch** (Reiter, Seite `logbuch/`, `GET/POST /logbuch/api/log`, Admin-Liste, Schalter `[ui] logbook`): kaum genutzt,
+  dazu weniger öffentliche Beiträge, die jemand prüfen muss. Die Tabelle `log` in `pinnwand.db` wird beim Start gelöscht;
+  `logbuch/` leitet auf die Hören-Seite um, ein alter Schlüssel `logbook` in der Konfiguration wird ignoriert. Chat und
+  „Hörer online“ behalten ihre Pfade unter `/logbuch/api/` (Apps nutzen sie).
+
 ### Decoder
 - **SSTV erkennt auch schwache Bilder:** Der VIS-Sucher verlangte lückenlose 1-ms-Läufe auf 1200 Hz, mit Rauschen riss das an
   einer einzigen Millisekunde ab – nur sehr starke Signale kamen durch (gemessen mit echtem Empfängerrauschen von DF0HHH:

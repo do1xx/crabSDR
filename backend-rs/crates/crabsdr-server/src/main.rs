@@ -142,7 +142,7 @@ async fn main() {
         config: Arc::new(RwLock::new(config.clone())),
         manager: Arc::new(RwLock::new(manager)),
         auth: auth_state,
-        chat: Arc::new(if config.builtin_chat { chat::Chat::open(&config.data_dir, config.station.home(), config.chat_keep_lines, config.chat_keep_hours) } else { chat::Chat::disabled() }),
+        chat: Arc::new(if config.builtin_chat { chat::Chat::open(&config.data_dir, config.chat_keep_lines, config.chat_keep_hours) } else { chat::Chat::disabled() }),
         decoders: decoder_hub,
         config_lock: tokio::sync::Mutex::new(()),
         restart_pending: std::sync::atomic::AtomicBool::new(false),
@@ -170,7 +170,6 @@ async fn main() {
         .route("/api/admin/bands/{id}/gain", post(admin::live_gain))
         .route("/api/admin/chat", get(admin::list_chat))
         .route("/api/admin/chat/{id}", axum::routing::delete(admin::delete_chat))
-        .route("/api/admin/log/{id}", axum::routing::delete(admin::delete_log))
         .route("/api/admin/devices", get(admin::devices))
         .route("/api/admin/devices/serial", post(admin::set_serial))
         .layer(axum::extract::DefaultBodyLimit::max(confedit::MAX_BYTES * 2 + 64 * 1024));
@@ -216,7 +215,7 @@ async fn main() {
         .merge(auth_api)
         .merge(admin_api)
         .merge(admin_page)
-        // Chat und Logbuch der Hörer (abschaltbar mit builtin_chat = false, z. B. wenn ein eigener Dienst sie übernimmt)
+        // Chat der Hörer (abschaltbar mit builtin_chat = false, z. B. wenn ein eigener Dienst sie übernimmt)
         .merge(if config.builtin_chat { chat::routes() } else { Router::new() })
         .merge(chat::routes_always())
         .fallback_service({
@@ -720,9 +719,8 @@ async fn ui_json(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let features = json!({
         "chat": ui.chat.unwrap_or(chat_on), "status": ui.status.unwrap_or(true), "recording": ui.recording.unwrap_or(true),
         "decoders": ui.decoders.unwrap_or(has_decoders),
-        // Digital nur mit öffentlichen Decodern, Logbuch nur mit eingebautem Chat/Logbuch-Dienst (oder ausdrücklich per [ui])
+        // Digital nur mit öffentlichen Decodern (oder ausdrücklich per [ui])
         "digital": match ui.digital { Some(b) => b, None => has_decoders && ui_file_exists(&state, "digi/index.html").await },
-        "logbook": match ui.logbook { Some(b) => b, None => chat_on && ui_file_exists(&state, "logbuch/index.html").await },
         "login": ui.login.unwrap_or(has_private) && state.auth.is_some(),
         "info": match ui.info { Some(b) => b, None => ui_file_exists(&state, "info/index.html").await },
         // eigenes Logo im Stationsordner → crabSDR-Marke klein neben dem Titel, sonst ist die Krabbe selbst das Logo

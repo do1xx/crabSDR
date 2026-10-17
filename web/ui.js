@@ -69,7 +69,7 @@
     var tb = $('themebtn'); if (tb) sf.appendChild(tb);
     panel.appendChild(sf);
     var back = document.createElement('div'); back.className = 'sheetback'; back.onclick = function () { openSheet(false); }; document.body.appendChild(back);
-    // Querformat: Kopf und Reiter sind weg – Reiter (Logbuch, Info …) und Sprache stehen dann oben im Menü
+    // Querformat: Kopf und Reiter sind weg – Reiter (Digital, Info …) und Sprache stehen dann oben im Menü
     var nav = document.createElement('div'); nav.className = 'sheetnav';
     if (tabs) Array.prototype.forEach.call(tabs.querySelectorAll('a'), function (a) { if (a.style.display !== 'none') nav.appendChild(a.cloneNode(true)); });
     var lb = document.createElement('button'); lb.type = 'button'; lb.className = 'btn'; lb.textContent = $('langbtn').textContent; lb.onclick = function () { $('langbtn').click(); lb.textContent = $('langbtn').textContent; }; nav.appendChild(lb);
@@ -414,7 +414,7 @@
     return m ? Number(m[1]) : null;
   }
 
-  /* ================= Deep-Link, Marker, Logbuch, Sysop, Web-App ================= */
+  /* ================= Deep-Link, Marker, Sysop, Web-App ================= */
   function toast(msg) {
     var t = $('toast'); if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; document.body.appendChild(t); }
     t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove('show'); }, 1800);
@@ -543,7 +543,6 @@
     p.style.left = Math.max(4, Math.min(x, window.innerWidth - p.offsetWidth - 8)) + 'px';
     p.style.top = Math.max(4, Math.min(y, window.innerHeight - p.offsetHeight - 8)) + 'px';
   };
-  // Logbuch
   // Sysop
   function sysCall(ep, param, value) {
     var url = ep + (param ? (ep.indexOf('?') < 0 ? '?' : '&') + param + '=' + encodeURIComponent(value) : '');

@@ -1,4 +1,4 @@
-/* Unterseiten (Digital, Logbuch, Info): Ergänzungen zu ui.css */
+/* Unterseiten (Digital, Info): Ergänzungen zu ui.css */
 .x1banner { padding: 6px 16px; font-size: 12px; background: var(--accent-dim); color: var(--text); border-bottom: 1px solid var(--line2); }
 .x1links { display: flex; gap: 14px; font-size: 10px; letter-spacing: .06em; text-transform: uppercase; margin: 8px 0 0; }
 .x1links a { color: var(--muted); } .x1links a:hover { color: var(--accent); }
