@@ -62,6 +62,20 @@ def freq_track(x, fs):
     return np.convolve(f, np.ones(k) / k, mode="same")
 
 
+def leader_ms(x, fs, f=None):
+    """Längster zusammenhängender 1900-Hz-Vorlauf in ms (Diagnose: Kopf gehört, aber VIS nicht lesbar)."""
+    if f is None: f = freq_track(x, fs)
+    b = max(1, int(fs * 0.001)); nb = len(f) // b
+    if nb < 10: return 0
+    blk = np.median(f[:nb * b].reshape(nb, b), axis=1)
+    on = np.abs(blk - 1900) < 120
+    best = run = 0
+    for v in on:
+        run = run + 1 if v else 0
+        if run > best: best = run
+    return int(best)
+
+
 def find_vis(x, fs, f=None, start=0):
     """Sucht den VIS-Kopf: >=150 ms 1900 Hz, Startbit 1200 Hz (30 ms), 8 Bits (1100=1/1300=0, LSB zuerst, Bit 7 = gerade Parität), Stopbit.
     Liefert (vis, index des VIS-Endes) oder None."""

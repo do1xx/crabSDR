@@ -15,6 +15,7 @@ ap.add_argument("--freq", type=float, default=float(E("CRAB_FREQ", "0")), help="
 ap.add_argument("--rate", type=int, default=int(E("CRAB_RATE", "24000")))
 ap.add_argument("--out", default=E("CRAB_OPT_OUT") or E("CRAB_DATA", "."))
 ap.add_argument("--keep", type=int, default=int(E("CRAB_OPT_KEEP", "500")), help="Einträge im Index")
+ap.add_argument("--misses", type=int, default=int(E("CRAB_OPT_MISSES", "20")), help="so viele Fehlversuche (Vorlauf gehört, VIS unlesbar) als WAV ablegen, 0 = aus")
 a = ap.parse_args()
 FS = a.rate
 IMGDIR = os.path.join(a.out, "sstv"); INDEX = os.path.join(a.out, "sstv.json")
@@ -63,6 +64,7 @@ def main():
     ring = np.zeros(0, dtype=np.int16)
     RING = int(FS * 2.0)
     recording = None                                # dict(samples list, need, vis, t)
+    miss_last, miss_n = 0.0, 0
     add_index_dummy = not os.path.exists(INDEX)
     if add_index_dummy:
         json.dump({"images": [], "ts": int(time.time())}, open(INDEX, "w"))
@@ -80,7 +82,21 @@ def main():
             continue
         ring = np.concatenate((ring, x))[-RING:]
         if len(ring) < int(FS * 1.2): continue
-        r = sstvdec.find_vis(ring.astype(np.float32) / 32768, FS)
+        xf = ring.astype(np.float32) / 32768
+        r = sstvdec.find_vis(xf, FS)
+        if not r:
+            # Diagnose: SSTV-Vorlauf (1900 Hz) gehört, aber kein gültiger VIS-Kopf – melden und die 2 s als WAV ablegen,
+            # damit sich ein verpasstes Bild nachträglich untersuchen lässt (höchstens alle 15 s, höchstens --misses Dateien)
+            lm = sstvdec.leader_ms(xf, FS)
+            if lm >= 250 and time.time() - miss_last > 15:
+                miss_last = time.time(); miss_n += 1
+                fn = ""
+                if miss_n <= a.misses:
+                    import wave
+                    fn = os.path.join(IMGDIR, time.strftime("miss_%Y%m%d_%H%M%S", time.gmtime()) + ".wav")
+                    with wave.open(fn, "wb") as w: w.setnchannels(1); w.setsampwidth(2); w.setframerate(FS); w.writeframes(ring.tobytes())
+                log(f"SSTV-Vorlauf {lm} ms gehört, aber kein lesbarer VIS-Kopf" + (f" – Mitschnitt {os.path.basename(fn)}" if fn else ""))
+                emit({"kind": "vis_miss", "t": int(time.time()), "freq": int(a.freq), "leader_ms": lm, "file": os.path.relpath(fn, a.out) if fn else ""})
         if r:
             vis, end = r
             name = sstvdec.MODES.get(vis, {}).get("name", f"VIS {vis}")
